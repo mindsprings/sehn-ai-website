@@ -91,7 +91,7 @@
         boxes.forEach(function (x) { x.classList.remove('is-right', 'is-wrong'); });
         if (b.dataset.box === '3') {
           b.classList.add('is-right'); drawTrace(); solved = true;
-          say('<strong>Box 3, right.</strong> You barely had to think. Answering directly, Claude Haiku 5.5 solved only 4 of 30 maze puzzles like this. Now flip the switch to see why.');
+          say('<strong>Box 3, right.</strong> You barely had to think. On 200 new mazes, Claude Haiku 5.5 answering directly got 32% right, about what guessing scores. Now flip the switch to see why.');
         } else {
           b.classList.add('is-wrong'); drawTrace();
           say('Not quite. Watch line A…');

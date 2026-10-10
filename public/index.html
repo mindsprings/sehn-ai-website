@@ -282,33 +282,29 @@
             <p class="eyebrow">First evidence</p>
             <h2 id="evidence-title">Five days in, agents trace paths they couldn’t before.</h2>
           </div>
-          <p class="lead">Maze puzzles like the one above: follow a line from start to finish. Easy for a child, hard for today’s models.</p>
+          <p class="lead">200 new mazes: which entrance reaches the exit? We generated them after building the tools. Nobody looked at them, nothing was tuned on them, and the analysis was written down before the run.</p>
         </div>
-        <ul class="chart reveal" aria-label="Maze puzzles solved">
+        <h3 class="chart-title reveal" id="chart-title">Claude Haiku 5.5 on 200 new mazes our tools never saw</h3>
+        <ul class="chart reveal" aria-labelledby="chart-title">
           <li class="chart__row">
-            <span class="chart__label">Claude Haiku 5.5, answering directly</span>
-            <span class="chart__track" aria-hidden="true"><span class="chart__bar w13"></span></span>
-            <span class="chart__value"><strong>4/30</strong> · 13%</span>
+            <span class="chart__label">Answers directly</span>
+            <span class="chart__track" aria-hidden="true"><span class="chart__bar w32"></span></span>
+            <span class="chart__value"><strong>63/200</strong> · 32%</span>
           </li>
           <li class="chart__row">
-            <span class="chart__label">Agent that can zoom in</span>
-            <span class="chart__track" aria-hidden="true"><span class="chart__bar w42"></span></span>
-            <span class="chart__value"><strong>5/12</strong> · 42%</span>
+            <span class="chart__label">Agent, can zoom in</span>
+            <span class="chart__track" aria-hidden="true"><span class="chart__bar w34"></span></span>
+            <span class="chart__value"><strong>67/200</strong> · 34%</span>
           </li>
           <li class="chart__row chart__row--ours">
             <span class="chart__label">Agent + sehn.ai tools</span>
-            <span class="chart__track" aria-hidden="true"><span class="chart__bar chart__bar--ours w83"></span></span>
-            <span class="chart__value"><strong>10/12</strong> · 83%</span>
-          </li>
-          <li class="chart-divider" aria-hidden="true"></li>
-          <li class="chart__row">
-            <span class="chart__label">Second model, with our tools<small>DeepSeek V4.1 Flash</small></span>
-            <span class="chart__track" aria-hidden="true"><span class="chart__bar chart__bar--ours2 w92"></span></span>
-            <span class="chart__value"><strong>11/12</strong> · 92%</span>
+            <span class="chart__track" aria-hidden="true"><span class="chart__bar chart__bar--ours w87"></span></span>
+            <span class="chart__value"><strong>173/200</strong> · 87%</span>
           </li>
         </ul>
+        <p class="chart-note reveal">Guessing scores 30%. On the 10 BabyVision puzzles the tools were built on: 10/12 with tools, 5/12 zooming, 4/30 directly.</p>
         <div class="evidence__foot reveal">
-          <p class="honest"><b>Promising, not proven</b>One week in, built on 10 BabyVision maze puzzles, small numbers. Next: fresh, unseen mazes.</p>
+          <p class="honest"><b>Held up on its first real test</b>94% on familiar maze styles, 79% on styles we never built on. Weak spot: colour-inverted regions (11/25). One task family, week one.</p>
         </div>
       </div>
       <div class="edge edge--bottom" aria-hidden="true"></div>
@@ -420,7 +416,7 @@
           </article>
         </div>
         <div class="status reveal">
-          <div class="status__now"><b>Working now</b>connections and filtering</div>
+          <div class="status__now"><b>Working now</b>connections and filtering, 87% on 200 unseen mazes</div>
           <div class="status__test"><b>Built, in testing</b>boundaries, surfaces, depth</div>
           <div class="status__next"><b>Next</b>real photos, drawings, live video</div>
         </div>

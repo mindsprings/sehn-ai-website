@@ -365,21 +365,20 @@ button { font: inherit; color: inherit; }
 .chart__track { display: block; width: 260px; height: 28px; background: #2A3A52; border-radius: 8px; overflow: hidden; }
 .chart__bar { display: block; height: 100%; background: #8C96A5; border-radius: 8px; transition: width 1.2s cubic-bezier(.2, .8, .2, 1); }
 .chart__bar--ours { background: #E7A1B6; }
-.chart__bar--ours2 { background: #F7DDE5; }
-/* fixed pixel widths: 260px track on phones, 520px on desktop */
-.w13 { width: 34px; }  .w42 { width: 109px; } .w83 { width: 216px; } .w92 { width: 238px; }
+/* fixed pixel widths: 260px track on phones, 520px on desktop (32%, 34%, 87%) */
+.w32 { width: 82px; }  .w34 { width: 87px; }  .w87 { width: 225px; }
 @media (min-width: 960px) {
   .chart__track { width: 520px; }
-  .w13 { width: 68px; } .w42 { width: 218px; } .w83 { width: 432px; } .w92 { width: 477px; }
+  .w32 { width: 164px; } .w34 { width: 174px; } .w87 { width: 450px; }
 }
 .js .chart:not(.is-visible) .chart__bar { width: 0; }
 .chart__row:nth-child(2) .chart__bar { transition-delay: .15s; }
 .chart__row:nth-child(3) .chart__bar { transition-delay: .3s; }
-.chart__row:nth-child(5) .chart__bar { transition-delay: .45s; }
 .chart__value { font-family: var(--mono); font-size: 18px; color: var(--on-dark-2); letter-spacing: 1px; }
 .chart__value strong { color: var(--on-dark); font-size: 22px; }
 .chart__row--ours .chart__value strong, .chart__row--ours .chart__label { color: var(--rose); }
-.chart-divider { height: 1px; background: var(--night-line); margin: 4px 0; }
+.chart-title { font-size: 24px; color: var(--on-dark); margin-bottom: 28px; }
+.chart-note { margin-top: 28px; color: var(--on-dark-3); font-size: 16px; max-width: 720px; }
 .evidence__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 20px 40px; margin-top: 48px; }
 .honest { padding: 18px 22px; border: 2px dashed var(--night-frame); border-radius: 10px; color: var(--on-dark-2); max-width: 720px; }
 .honest b { font-family: var(--mono); text-transform: uppercase; letter-spacing: 3px; font-size: 13px; color: var(--rose); display: block; margin-bottom: 6px; }
