@@ -20,4 +20,3 @@ Static site, no build step. Everything that gets deployed is in `public/`.
 ## Open TODOs
 - Fill in Mindsprings LLC's legal details in `imprint.html`.
 - Decide whether to self-host the fonts (avoids sending visitor IPs to Google; relevant under GDPR).
-- "Five days in" in the evidence section will age; update the wording as results come in.

@@ -62,7 +62,6 @@
       <nav class="site-nav" aria-label="Sections">
         <a href="#problem">The problem</a>
         <a href="#how">How it works</a>
-        <a href="#model">What we model</a>
         <a href="#evidence">Evidence</a>
         <a href="#team">Team</a>
       </nav>
@@ -177,7 +176,7 @@
               <div>
                 <h3>The sehn.ai MCP server</h3>
                 <p class="quote">“use the tools at sehn.ai”</p>
-                <ul class="chips"><li class="chip">Boundaries, shapes</li><li class="chip">Paths, connections</li><li class="chip">What’s in front</li><li class="chip">Rotate, count</li></ul>
+                <ul class="chips"><li class="chip">Paths, connections</li><li class="chip chip--soon">More coming</li></ul>
               </div>
             </li>
             <li>
@@ -219,56 +218,14 @@
       <div class="wrap">
         <div class="split-head reveal">
           <div>
-            <p class="eyebrow">What we model</p>
-            <h2 id="model-title">How the brain represents space, open to LLMs</h2>
+            <p class="eyebrow">Grounded in neuroscience</p>
+            <h2 id="model-title">Built on how the brain sees space</h2>
           </div>
-          <p class="lead">Not just the first layers of the eye. We model a large part of the human visual system, grounded in decades of vision neuroscience, and make its picture of space readable for any LLM.</p>
+          <p class="lead">Our tools draw on decades of vision neuroscience, and give an LLM the sense of space it can’t get from a list of patches.</p>
         </div>
-
-        <div class="card card--dark model reveal">
-          <div>
-            <ul class="model__list" role="tablist" aria-label="What we model">
-              <li><button class="model__btn" role="tab" type="button" aria-selected="true" data-mode="boundaries" data-caption="finding the outline…">
-                <svg viewBox="0 0 56 44" width="56" height="44" aria-hidden="true"><path d="M8,36 Q6,10 26,8 Q50,6 48,30 Q46,40 26,38 Z" fill="none" stroke="#E7A1B6" stroke-width="3"/></svg>
-                <p><strong>Boundaries</strong><span>where things start and stop</span></p><span class="arrow" aria-hidden="true">→</span></button></li>
-              <li><button class="model__btn" role="tab" type="button" aria-selected="false" data-mode="surfaces" data-caption="filling in the surface…">
-                <svg viewBox="0 0 56 44" width="56" height="44" aria-hidden="true"><path d="M8,36 Q6,10 26,8 Q50,6 48,30 Q46,40 26,38 Z" fill="#E7A1B6" stroke="#F5F2EA" stroke-width="2"/></svg>
-                <p><strong>Surfaces</strong><span>what belongs together</span></p><span class="arrow" aria-hidden="true">→</span></button></li>
-              <li><button class="model__btn" role="tab" type="button" aria-selected="false" data-mode="connections" data-caption="following the connection…">
-                <svg viewBox="0 0 56 44" width="56" height="44" aria-hidden="true"><path d="M8,34 Q20,6 30,22 T50,10" fill="none" stroke="#E7A1B6" stroke-width="3" stroke-dasharray="3 5" stroke-linecap="round"/><circle cx="8" cy="34" r="5" fill="#F5F2EA"/><circle cx="50" cy="10" r="5" fill="#F5F2EA"/></svg>
-                <p><strong>Connections</strong><span>what links to what</span></p><span class="arrow" aria-hidden="true">→</span></button></li>
-              <li><button class="model__btn" role="tab" type="button" aria-selected="false" data-mode="depth" data-caption="what is in front?">
-                <svg viewBox="0 0 56 44" width="56" height="44" aria-hidden="true"><rect x="20" y="4" width="30" height="26" rx="3" fill="none" stroke="#B9C3D0" stroke-width="2.5" stroke-dasharray="4 3"/><rect x="6" y="14" width="30" height="26" rx="3" fill="#E7A1B6" stroke="#F5F2EA" stroke-width="2"/></svg>
-                <p><strong>Depth</strong><span>what is in front</span></p><span class="arrow" aria-hidden="true">→</span></button></li>
-              <li><button class="model__btn" role="tab" type="button" aria-selected="false" data-mode="filtering" data-caption="ignoring the noise…">
-                <svg viewBox="0 0 56 44" width="56" height="44" aria-hidden="true"><path d="M6,6 L50,6 L32,24 L32,38 L24,38 L24,24 Z" fill="none" stroke="#E7A1B6" stroke-width="3" stroke-linejoin="round"/><circle cx="16" cy="14" r="3" fill="#B9C3D0"/><circle cx="40" cy="12" r="3" fill="#B9C3D0"/><circle cx="28" cy="31" r="4" fill="#F5F2EA"/></svg>
-                <p><strong>Filtering</strong><span>what matters, what to ignore</span></p><span class="arrow" aria-hidden="true">→</span></button></li>
-            </ul>
-            <p class="model-next"><b>Later</b>a visual-spatial model of its own.</p>
-          </div>
-          <div class="model__stage" role="tabpanel" aria-label="Animated example">
-            <svg class="st" id="stage" data-mode="boundaries" viewBox="0 0 400 280" aria-hidden="true">
-              <g class="st-noise">
-                <circle cx="30" cy="250" r="4" fill="#B9C3D0"/><circle cx="110" cy="30" r="3" fill="#B9C3D0"/><circle cx="250" cy="20" r="4" fill="#B9C3D0"/>
-                <circle cx="370" cy="40" r="3" fill="#B9C3D0"/><circle cx="380" cy="160" r="4" fill="#B9C3D0"/><circle cx="250" cy="250" r="3" fill="#B9C3D0"/>
-                <circle cx="20" cy="140" r="3" fill="#B9C3D0"/><circle cx="160" cy="262" r="4" fill="#B9C3D0"/><circle cx="350" cy="110" r="3" fill="#B9C3D0"/>
-              </g>
-              <g class="st-blob"><path d="M60,210 Q48,96 140,86 Q236,76 228,180 Q222,232 140,228 Q70,228 60,210 Z" fill="#E7A1B6" stroke="#F5F2EA" stroke-width="3"/></g>
-              <g class="st-depth">
-                <rect x="222" y="44" width="130" height="100" rx="8" fill="none" stroke="#B9C3D0" stroke-width="3" stroke-dasharray="7 6"/>
-                <rect class="st-front" x="192" y="86" width="130" height="100" rx="8" fill="#E7A1B6" stroke="#F5F2EA" stroke-width="3"/>
-              </g>
-              <g class="st-conn">
-                <path class="st-path" d="M40,46 Q120,0 176,64 T300,204 Q330,252 368,240" fill="none" stroke="#E7A1B6" stroke-width="4" stroke-linecap="round"/>
-                <circle cx="40" cy="46" r="9" fill="#F5F2EA"/><circle cx="368" cy="240" r="9" fill="#F5F2EA"/>
-              </g>
-              <g class="st-filter">
-                <circle cx="312" cy="232" r="22" fill="none" stroke="#E7A1B6" stroke-width="3" stroke-dasharray="4 5"/>
-                <circle class="st-key" cx="312" cy="232" r="9" fill="#F5F2EA"/>
-              </g>
-            </svg>
-            <p class="model__caption" id="stage-caption" aria-hidden="true">finding the outline…</p>
-          </div>
+        <div class="status reveal">
+          <div class="status__now"><b>Working now</b>path tracing, 87% on 200 unseen mazes</div>
+          <div class="status__next"><b>More coming</b>new skills, each tested on puzzles it never saw</div>
         </div>
       </div>
     </section>
@@ -280,9 +237,9 @@
         <div class="split-head reveal">
           <div>
             <p class="eyebrow">First evidence</p>
-            <h2 id="evidence-title">Five days in, agents trace paths they couldn’t before.</h2>
+            <h2 id="evidence-title">With sehn.ai, agents trace paths they couldn’t before.</h2>
           </div>
-          <p class="lead">200 new mazes: which entrance reaches the exit? We generated them after building the tools. Nobody looked at them, nothing was tuned on them, and the analysis was written down before the run.</p>
+          <p class="lead">200 new mazes: which entrance reaches the exit? None of them were used to build or tune the tools, and the analysis was written down before the run.</p>
         </div>
         <h3 class="chart-title reveal" id="chart-title">Claude Haiku 5.5 on 200 new mazes our tools never saw</h3>
         <ul class="chart reveal" aria-labelledby="chart-title">
@@ -302,9 +259,9 @@
             <span class="chart__value"><strong>173/200</strong> · 87%</span>
           </li>
         </ul>
-        <p class="chart-note reveal">Guessing scores 30%. On the 10 BabyVision puzzles the tools were built on: 10/12 with tools, 5/12 zooming, 4/30 directly.</p>
+        <p class="chart-note reveal">Guessing scores 30%.</p>
         <div class="evidence__foot reveal">
-          <p class="honest"><b>Held up on its first real test</b>94% on familiar maze styles, 79% on styles we never built on. Weak spot: colour-inverted regions (11/25). One task family, week one.</p>
+          <p class="honest"><b>Held up on its first real test</b>79% even on maze styles we never built on. Weaker on unusual rendering styles. One task family so far.</p>
         </div>
       </div>
       <div class="edge edge--bottom" aria-hidden="true"></div>
@@ -415,11 +372,6 @@
             <p>Follow what moves and connects across frames.</p>
           </article>
         </div>
-        <div class="status reveal">
-          <div class="status__now"><b>Working now</b>connections and filtering, 87% on 200 unseen mazes</div>
-          <div class="status__test"><b>Built, in testing</b>boundaries, surfaces, depth</div>
-          <div class="status__next"><b>Next</b>real photos, drawings, live video</div>
-        </div>
       </div>
     </section>
 
@@ -470,7 +422,7 @@
             <p class="eyebrow">Team</p>
             <h2 id="team-title">The two people behind sehn</h2>
           </div>
-          <p class="lead">A clinical psychologist who works with inner images, and an engineer who builds vision systems modelled on the brain.</p>
+          <p class="lead">A clinical psychologist with a computer-science background, and an engineer who builds brain-inspired vision systems.</p>
         </div>
         <div class="team">
           <article class="card card--dark person reveal">
@@ -482,7 +434,7 @@
             <ul>
               <li>20 years of engineering</li>
               <li>Vision AI at Toren AI and VEDO</li>
-              <li>Brain-inspired models of retina and cortex</li>
+              <li>Brain-inspired computer vision</li>
               <li>Model training and deployment</li>
             </ul>
           </article>
@@ -494,7 +446,7 @@
             </div>
             <ul>
               <li>Clinical psychologist, PhD; studied computer science</li>
-              <li>10+ years of practice in EMDR and trauma-reprocessing therapy</li>
+              <li>10+ years of clinical practice</li>
               <li>Organisational development, built high-performance teams</li>
               <li>Former CEO of a medical center</li>
             </ul>
@@ -503,9 +455,9 @@
         <div class="story">
           <h3 class="reveal">How we got here</h3>
           <ol class="timeline">
-            <li class="reveal"><span class="num">01</span>In therapy, inner images change emotions; words alone rarely do.</li>
-            <li class="reveal d1"><span class="num">02</span>We tried to teach LLMs imagery therapy; they couldn’t understand an image.</li>
-            <li class="reveal d2"><span class="num">03</span>Anton saw the same blind spot in every vision model he built.</li>
+            <li class="reveal"><span class="num">01</span>People reason in pictures: we follow, fit and compare shapes without a word.</li>
+            <li class="reveal d1"><span class="num">02</span>LLMs describe images brilliantly, then get the space in them wrong.</li>
+            <li class="reveal d2"><span class="num">03</span>Anton had met the same blind spot throughout his years in computer vision.</li>
             <li class="reveal d3"><span class="num">04</span>sehn.ai: give AI the non-verbal reasoning it is missing.</li>
           </ol>
         </div>

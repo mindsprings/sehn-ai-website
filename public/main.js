@@ -124,11 +124,11 @@
     if (!body) return;
     var demos = {
       trace: { q: 'Which box does line A end in?', thumb: 'thumb-trace',
-        off: 'Line A runs to box 1.', on: 'Line A ends in box 3.', tools: ['Paths, connections'] },
+        off: 'Line A runs to box 1.', on: 'Line A ends in box 3.' },
       front: { q: 'Can people read the label of the first field?', thumb: 'thumb-front',
-        off: 'Yes, the first field is clearly labelled above the input.', on: 'No. The button covers the label.', tools: ['Boundaries, shapes', 'What’s in front'] },
+        off: 'Yes, the first field is clearly labelled above the input.', on: 'No. The button covers the label.' },
       pipe: { q: 'Which of the three pipes feeds the valve on the right?', thumb: 'thumb-pipe',
-        off: 'The top pipe. It is the closest one to the valve.', on: 'The bottom one. It runs behind the middle pipe, over the top one, and into the valve.', tools: ['Paths, connections', 'What’s in front'] }
+        off: 'The top pipe. It is the closest one to the valve.', on: 'The bottom one. It runs behind the middle pipe, over the top one, and into the valve.' }
     };
     var state = { demo: 'trace', tools: false }, run = 0, touched = false;
 
@@ -147,9 +147,7 @@
       var t = 350;
       if (state.tools) {
         later(id, t, function () {
-          var call = el('div', 'toolcall', 'using the tools at sehn.ai');
-          d.tools.forEach(function (name) { call.appendChild(el('span', 'chip', name)); });
-          body.appendChild(call);
+          body.appendChild(el('div', 'toolcall', 'using the tools at sehn.ai'));
         });
         t += 650;
       }
@@ -185,27 +183,6 @@
         state.tools = true; sw.setAttribute('aria-pressed', 'true'); render();
       }, reduce ? 4000 : 4200);
     });
-  })();
-
-  // ---------- what we model: tabs + animated stage ----------
-  (function () {
-    var stage = $('#stage'), caption = $('#stage-caption'), btns = $$('.model__btn');
-    if (!stage) return;
-    var i = 0, timer = null;
-    function select(n) {
-      i = n;
-      btns.forEach(function (b, k) { b.setAttribute('aria-selected', String(k === n)); });
-      stage.setAttribute('data-mode', btns[n].dataset.mode);
-      caption.textContent = btns[n].dataset.caption;
-    }
-    btns.forEach(function (b, k) {
-      b.addEventListener('click', function () { clearInterval(timer); timer = null; select(k); });
-    });
-    if (!reduce) {
-      onFirstView(stage, function () {
-        timer = setInterval(function () { select((i + 1) % btns.length); }, 3200);
-      });
-    }
   })();
 
   // ---------- Magic Eye: hold to peek ----------
