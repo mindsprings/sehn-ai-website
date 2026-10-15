@@ -467,6 +467,8 @@ button { font: inherit; color: inherit; }
 .footer p + p { margin-top: 12px; }
 .footer a { color: var(--on-dark-2); text-underline-offset: 4px; }
 .footer a:hover { color: var(--rose); }
+.footer__link { background: none; border: 0; padding: 0; font: inherit; letter-spacing: inherit; text-transform: inherit; color: var(--on-dark-2); text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.footer__link:hover { color: var(--rose); }
 .footer .tm { text-transform: none; letter-spacing: .5px; font-size: 12px; margin-top: 24px; }
 
 /* ---------- legal page ---------- */
@@ -516,3 +518,11 @@ button { font: inherit; color: inherit; }
 /* grid children may shrink below their content (the stereogram scrolls inside its card) */
 .hero__grid > *, .puzzle-layout > *, .how > *, .name-grid > *, .contact__grid > *, .split-head > * { min-width: 0; }
 
+/* ---------- cookie consent (analytics.js) ---------- */
+.consent { position: fixed; z-index: 100; left: 16px; right: 16px; bottom: 16px; max-width: 440px; background: var(--paper-card); color: var(--ink); border: 2px solid var(--ink); border-radius: 12px; box-shadow: 5px 5px 0 var(--ink); padding: 18px 20px; font-size: 16px; animation: pop .35s ease both; }
+@media (min-width: 721px) { .consent { left: 24px; bottom: 24px; } }
+.consent[hidden] { display: none; }
+.consent p { margin: 0 0 14px; }
+.consent a { color: var(--plum); }
+.consent__btns { display: flex; flex-wrap: wrap; gap: 10px; }
+.consent__no { background: transparent; color: var(--ink); }

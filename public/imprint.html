@@ -13,6 +13,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <script src="analytics.js" defer></script>
 </head>
 <body>
   <main class="section section--light">
@@ -38,8 +39,10 @@
       <h3>Who is responsible</h3>
       <p>Mindsprings LLC, 2154 Seaman Court, Herndon, VA 20170, USA. Contact: <a href="mailto:diana@mindsprings.ai">diana@mindsprings.ai</a>.</p>
 
-      <h3>No cookies, no tracking</h3>
-      <p>This website sets no cookies and uses no analytics or tracking tools.</p>
+      <h3 id="analytics">Google Analytics, only with your consent</h3>
+      <p>If you agree in the cookie banner, this site uses Google Analytics 4, a web analytics service of Google Ireland Ltd., Gordon House, Barrow Street, Dublin 4, Ireland. It helps us understand how many people visit and which sections they read. Without your consent, Google Analytics is not loaded and no analytics cookies are set.</p>
+      <p>Google Analytics sets cookies (<code>_ga</code> and <code>_ga_…</code>, kept for up to 2 years) and records, for example, the pages you view, how long you stay, your approximate location, device and browser. Google Analytics 4 does not store full IP addresses. Data may be processed by Google LLC in the USA, which is certified under the EU-U.S. Data Privacy Framework.</p>
+      <p>Legal basis is your consent (Art. 6(1)(a) GDPR, § 165(3) TKG 2021). You can withdraw it at any time with “Cookie settings” at the bottom of every page. Your choice itself is stored in your browser’s local storage. More in <a href="https://policies.google.com/privacy">Google’s privacy policy</a>.</p>
 
       <h3>Hosting and server logs</h3>
       <p>The site is hosted on GitHub Pages by GitHub, Inc. (USA). When you visit, GitHub may record technical data such as your IP address, the time of the request and your browser type, so the site can be delivered securely. Details are in GitHub’s privacy statement.</p>
@@ -53,13 +56,14 @@
       <h3>Your rights</h3>
       <p>You can ask us at any time what data we hold about you, and ask us to correct or delete it. You can also complain to a data protection authority.</p>
 
-      <p style="margin-top:56px; font-size:15px">Last updated: 10 October 2026</p>
+      <p style="margin-top:56px; font-size:15px">Last updated: 14 October 2026</p>
     </div>
   </main>
   <footer class="section section--dark footer">
     <div class="wrap">
       <img src="assets/brand/logo.svg" width="160" height="104" alt="sehn.ai logo">
       <p>Mindsprings LLC · <a href="./">sehn.ai</a> · <a href="https://mindsprings.ai">mindsprings.ai</a></p>
+      <p><button class="footer__link" type="button" data-consent-open hidden>Cookie settings</button></p>
       <p class="tm">Magic Eye® is a trademark of Magic Eye Inc.</p>
     </div>
   </footer>
