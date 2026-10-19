@@ -198,11 +198,15 @@
     btn.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   })();
 
-  // ---------- API key request: compose an email ----------
+  // ---------- API key request: sent to HubSpot ----------
   (function () {
     var form = $('#key-form');
     if (!form) return;
-    var see = $('#f-see');
+    var HS_PORTAL = '246360482';
+    var HS_FORM = '8d7dfcd6-e21c-44d4-984f-2a887915d7d3'; // HubSpot form "sehn.ai API key request"
+    var HS_NEWS_SUB = '2854179345';                  // subscription type "Marketing Information"
+    var see = $('#f-see'), status = $('#form-status'), submit = $('button[type="submit"]', form);
+
     $$('.idea', form).forEach(function (b) {
       b.addEventListener('click', function () {
         var v = see.value.trim();
@@ -210,15 +214,87 @@
         see.focus();
       });
     });
+
+    form.addEventListener('input', function (e) { if (e.target.getAttribute('aria-invalid') === 'true') e.target.setAttribute('aria-invalid', 'false'); });
+    function val(name) { var f = form.elements[name]; return f ? f.value.trim() : ''; }
+    function setStatus(text, isError) {
+      status.textContent = text;
+      status.classList.toggle('is-error', !!isError);
+    }
+    function mailtoFallback(d) {
+      var text = 'Hi Anton and Diana,\n\nI\'d like an API key to try sehn.ai.\n\n' + d.message +
+        '\n\nName: ' + d.firstname + ' ' + d.lastname + '\nCompany or project: ' + d.company + '\nRole: ' + d.jobtitle + '\n\nThanks!';
+      return 'mailto:anton@mindsprings.ai,diana@mindsprings.ai?subject=' +
+        encodeURIComponent('sehn.ai API key' + (d.company ? ' for ' + d.company : '')) + '&body=' + encodeURIComponent(text);
+    }
+    function showError(d) {
+      status.innerHTML = '';
+      status.classList.add('is-error');
+      status.appendChild(document.createTextNode('Sorry, that didn’t go through. Please try again, or '));
+      var a = document.createElement('a'); a.href = mailtoFallback(d); a.textContent = 'send it by email';
+      status.appendChild(a);
+      status.appendChild(document.createTextNode('.'));
+    }
+    function showThanks(d) {
+      form.innerHTML = '<span class="tape" aria-hidden="true"></span><h3></h3><p class="form-thanks"></p>';
+      $('h3', form).textContent = 'Thanks, ' + d.firstname + '!';
+      $('.form-thanks', form).textContent = 'We got your request and will write to ' + d.email + ' soon.' +
+        (d.news ? ' You’ll also hear from us when there’s news.' : '');
+      form.setAttribute('tabindex', '-1'); form.focus();
+    }
+
     form.addEventListener('submit', function (e) {
       e.preventDefault();
-      var name = $('#f-name').value.trim(), project = $('#f-project').value.trim(), what = see.value.trim();
-      var text = 'Hi Anton and Diana,\n\nI\'d like an API key to try sehn.ai.\n\n' +
-        'Name: ' + name + '\nCompany or project: ' + project + '\nWhat my agent should see: ' + what + '\n\nThanks!';
-      window.location.href = 'mailto:anton@mindsprings.ai,diana@mindsprings.ai?subject=' +
-        encodeURIComponent('sehn.ai API key' + (project ? ' for ' + project : '')) + '&body=' + encodeURIComponent(text);
-      var note = $('small', form);
-      if (note) note.textContent = 'Your email app should open now. If it doesn’t, write to anton@mindsprings.ai or diana@mindsprings.ai.';
+      var first = null;
+      ['firstname', 'lastname', 'email', 'see'].forEach(function (n) {
+        var f = form.elements[n], v = f.value.trim();
+        var bad = !v || (n === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v));
+        f.setAttribute('aria-invalid', String(bad));
+        if (bad && !first) first = f;
+      });
+      if (first) {
+        setStatus(first.name === 'email' && first.value.trim() ? 'Please check your email address.' : 'Please fill in the fields marked with *.', true);
+        first.focus();
+        return;
+      }
+
+      var d = {
+        firstname: val('firstname'), lastname: val('lastname'), email: val('email'),
+        company: val('company'), jobtitle: val('jobtitle'), news: form.elements.news.checked
+      };
+      d.message = 'What should the agent see: ' + val('see') +
+        (val('agent') ? '\nAgent: ' + val('agent') : '') +
+        '\nNewsletter: ' + (d.news ? 'yes' : 'no');
+
+      if (val('website')) { showThanks(d); return; } // a bot filled the hidden field
+      if (!HS_FORM) { showError(d); return; }
+
+      var body = {
+        fields: ['firstname', 'lastname', 'email', 'company', 'jobtitle', 'message']
+          .filter(function (k) { return d[k]; })
+          .map(function (k) { return { objectTypeId: '0-1', name: k, value: d[k] }; }),
+        context: { pageUri: location.href, pageName: document.title }
+      };
+      if (d.news && HS_NEWS_SUB) {
+        body.legalConsentOptions = { consent: {
+          consentToProcess: true,
+          text: 'We use your details only to reply and set up your access.',
+          communications: [{ value: true, subscriptionTypeId: Number(HS_NEWS_SUB),
+            text: 'Keep me posted: occasional news about sehn.ai and Mindsprings. Unsubscribe any time.' }]
+        } };
+      }
+
+      submit.disabled = true; submit.textContent = 'Sending…'; setStatus('');
+      fetch('https://api.hsforms.com/submissions/v3/integration/submit/' + HS_PORTAL + '/' + HS_FORM, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      }).then(function (r) {
+        if (!r.ok) throw new Error('HubSpot ' + r.status);
+        if (window.gtag) window.gtag('event', 'generate_lead', { form: 'api_key' });
+        showThanks(d);
+      }).catch(function () {
+        submit.disabled = false; submit.textContent = 'Send request →';
+        showError(d);
+      });
     });
   })();
 })();

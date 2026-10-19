@@ -476,21 +476,36 @@
           <p class="contact__direct"><a href="mailto:anton@mindsprings.ai">anton@mindsprings.ai</a> <a href="mailto:diana@mindsprings.ai">diana@mindsprings.ai</a></p>
           <p class="note" style="margin-top:28px" aria-hidden="true">we read every one<svg viewBox="0 0 46 30" style="transform:rotate(-10deg)"><use href="#arrow"/></svg></p>
         </div>
-        <form class="index-card reveal d2" id="key-form"
-              action="mailto:anton@mindsprings.ai,diana@mindsprings.ai?subject=sehn.ai%20API%20key" method="post" enctype="text/plain">
+        <form class="index-card reveal d2" id="key-form" novalidate>
           <span class="tape" aria-hidden="true"></span>
           <h3>Ask for an API key</h3>
-          <label class="field"><span>Your name</span><input type="text" name="name" id="f-name" autocomplete="name"></label>
-          <label class="field"><span>Company or project</span><input type="text" name="project" id="f-project" autocomplete="organization"></label>
-          <label class="field"><span>What should your agent see?</span><textarea name="see" id="f-see" rows="3" placeholder="e.g. follow the wires in our schematics"></textarea></label>
+          <div class="field-row">
+            <label class="field"><span>First name <i aria-hidden="true">*</i></span><input type="text" name="firstname" autocomplete="given-name" required></label>
+            <label class="field"><span>Last name <i aria-hidden="true">*</i></span><input type="text" name="lastname" autocomplete="family-name" required></label>
+          </div>
+          <label class="field"><span>Email <i aria-hidden="true">*</i></span><input type="email" name="email" autocomplete="email" inputmode="email" required></label>
+          <div class="field-row">
+            <label class="field"><span>Company or project</span><input type="text" name="company" autocomplete="organization"></label>
+            <label class="field"><span>Your role</span><input type="text" name="jobtitle" autocomplete="organization-title" placeholder="e.g. ML engineer"></label>
+          </div>
+          <label class="field"><span>Which agent do you use?</span>
+            <select name="agent">
+              <option value="">Choose one</option>
+              <option>Claude</option><option>GPT</option><option>Gemini</option><option>Our own agent</option><option>Not sure yet</option>
+            </select>
+          </label>
+          <label class="field"><span>What should your agent see? <i aria-hidden="true">*</i></span><textarea name="see" id="f-see" rows="3" placeholder="e.g. follow the wires in our schematics" required></textarea></label>
           <div class="ideas" aria-label="Ideas">
             <button class="idea" type="button">Follow wires in our drawings</button>
             <button class="idea" type="button">Find a free path for our robot</button>
             <button class="idea" type="button">Know when a hand covers a face</button>
             <button class="idea" type="button">Catch impossible geometry</button>
           </div>
-          <button class="btn btn--plum" type="submit">Write the email →</button>
-          <small>Opens your email app with this text filled in. Nothing is sent until you press send.</small>
+          <label class="check"><input type="checkbox" name="news"><span>Keep me posted: occasional news about sehn.ai and Mindsprings. Unsubscribe any time.</span></label>
+          <label class="hp" aria-hidden="true">Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+          <button class="btn btn--plum" type="submit">Send request →</button>
+          <p class="form-status" id="form-status" role="status" aria-live="polite"></p>
+          <small><i aria-hidden="true">*</i> required. We use your details only to reply and set up your access (<a href="imprint.html#requests">privacy</a>).</small>
         </form>
       </div>
       <div class="edge edge--bottom-night" aria-hidden="true"></div>

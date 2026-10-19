@@ -448,15 +448,29 @@ button { font: inherit; color: inherit; }
 .index-card h3 { font-size: 26px; margin-bottom: 18px; padding-left: 12px; }
 .field { display: block; padding-left: 12px; margin-bottom: 16px; }
 .field span { display: block; font-family: var(--mono); text-transform: uppercase; letter-spacing: 2px; font-size: 12px; color: var(--plum); margin-bottom: 6px; }
-.field input, .field textarea {
+.field input, .field textarea, .field select {
   width: 100%; font: inherit; font-size: 17px; color: var(--ink); background: #fff;
   border: 1.5px solid var(--paper-line); border-radius: 8px; padding: 10px 12px; resize: vertical;
 }
 .field textarea { min-height: 96px; font-family: var(--hand); font-size: 24px; line-height: 1.2; }
-.field input:focus, .field textarea:focus { outline: none; border-color: var(--plum); box-shadow: 0 0 0 3px rgba(231, 161, 182, .5); }
+.field select { appearance: none; cursor: pointer; padding-right: 36px; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1,1 L6,6 L11,1' fill='none' stroke='%238E2F55' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 14px center; }
+.field input[aria-invalid="true"], .field textarea[aria-invalid="true"] { border-color: var(--plum); background: var(--rose-white); }
+.field span i, .index-card small i { font-style: normal; color: var(--plum); }
+.field-row { display: grid; gap: 0 14px; }
+@media (min-width: 480px) { .field-row { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 480px) { .field-row .field + .field { padding-left: 0; } }
+.field input:focus, .field textarea:focus, .field select:focus { outline: none; border-color: var(--plum); box-shadow: 0 0 0 3px rgba(231, 161, 182, .5); }
 .ideas { display: flex; flex-wrap: wrap; gap: 8px; padding-left: 12px; margin: -4px 0 22px; }
 .idea { cursor: pointer; background: var(--rose-white); border: 1px dashed var(--rose-frame); color: var(--plum-deep); border-radius: 99px; padding: 5px 12px; font-size: 14px; transition: background-color .2s ease; }
 .idea:hover { background: var(--rose-soft); }
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; padding-left: 12px; margin: 0 0 22px; font-size: 15px; color: var(--ink-2); cursor: pointer; }
+.check input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--plum); cursor: pointer; }
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.form-status { margin: 14px 0 0 12px; font-size: 15px; color: var(--ink-2); }
+.form-status:empty { display: none; }
+.form-status.is-error { color: var(--plum); }
+.form-status a, .index-card small a { color: var(--plum); }
+.form-thanks { padding-left: 12px; font-size: 18px; color: var(--ink-2); }
 .index-card .btn { margin-left: 12px; }
 .index-card small { display: block; margin: 16px 0 0 12px; color: var(--ink-3); font-size: 14px; }
 
