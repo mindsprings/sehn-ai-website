@@ -26,7 +26,7 @@
   var BLIND = { x: -0.62, y: 0.05 };  // the blind spot, where the nerve fibres leave and the vessels come in
   // the retina edge on, in world units, down is positive: its inner surface, where the glia's roots stop, the floor
   var ILM = -0.9, OLM = 0.6, FLOOR = 0.9;
-  var SLICES = [13, 7.5, 4.4, 2.7, 1.7];
+  var SLICES = [13, 7.5, 4.4, 2.7, 1.7, 1.25];   // the last one frames the view: trees at its edges, its middle open
   var CAM_Z0 = -0.6, CAM_Z1 = 1;      // the forest camera's depth just after the cut, and at the very end
   var HAZE = '#DDB57C', DARK = '#0E1726';
 
@@ -74,7 +74,19 @@
     path.closePath();
   }
 
-  function Ink() { this.path = new Path2D(); this.box = [Infinity, Infinity, -Infinity, -Infinity]; }
+  // Chrome makes each step added to a Path2D slower the bigger the path already is, so an ink collects its
+  // shapes in chunks of a few hundred and joins them into one path only when it is drawn.
+  function Ink() { this.chunks = [new Path2D()]; this.n = 0; this.merged = null; this.box = [Infinity, Infinity, -Infinity, -Infinity]; }
+  Ink.prototype.cur = function () {
+    if (++this.n % 300 === 0) this.chunks.push(new Path2D());
+    this.merged = null;
+    return this.chunks[this.chunks.length - 1];
+  };
+  Object.defineProperty(Ink.prototype, 'path', { get: function () {
+    if (this.chunks.length === 1) return this.chunks[0];
+    if (!this.merged) { var m = new Path2D(); this.chunks.forEach(function (c) { m.addPath(c); }); this.merged = m; }
+    return this.merged;
+  } });
   Ink.prototype.fit = function (x, y, r) {
     var b = this.box;
     if (x - r < b[0]) b[0] = x - r;
@@ -89,44 +101,46 @@
       var ph = wob() * TAU, ph2 = wob() * TAU;
       pts = pts.map(function (pt, i) { return [pt[0], pt[1], pt[2] * (1 + wobble * (0.6 * Math.sin(i * 0.9 + ph) + 0.4 * Math.sin(i * 2.3 + ph2)))]; });
     }
-    taper(this.path, pts);
+    taper(this.cur(), pts);
     for (var i = 0; i < pts.length; i++) this.fit(pts[i][0], pts[i][1], pts[i][2]);
   };
   // a rounded cell body, drawn out towards ang
   Ink.prototype.blob = function (x, y, r, ang, point) {
-    var n = 28, i, t, rr, px, py;
+    var n = 28, i, t, rr, px, py, P = this.cur();
     for (i = 0; i <= n; i++) {
       t = -i / n * TAU;
       rr = r * (1 + point * Math.pow(Math.max(0, Math.cos(t)), 5));
       px = x + Math.cos(ang + t) * rr; py = y + Math.sin(ang + t) * rr;
-      if (i) this.path.lineTo(px, py); else this.path.moveTo(px, py);
+      if (i) P.lineTo(px, py); else P.moveTo(px, py);
     }
-    this.path.closePath();
+    P.closePath();
     this.fit(x, y, r * (1 + point));
   };
   // a rounded triangle, pointing up (the broad foot of a cone)
   Ink.prototype.tri = function (x, y, r) {
-    var n = 30, i, t, rr, px, py;
+    var n = 30, i, t, rr, px, py, P = this.cur();
     for (i = 0; i <= n; i++) {
       t = -i / n * TAU;
       rr = r * (1 + 0.32 * Math.cos(3 * t));
       px = x + Math.cos(t - Math.PI / 2) * rr; py = y - r * 0.2 + Math.sin(t - Math.PI / 2) * rr;
-      if (i) this.path.lineTo(px, py); else this.path.moveTo(px, py);
+      if (i) P.lineTo(px, py); else P.moveTo(px, py);
     }
-    this.path.closePath();
+    P.closePath();
     this.fit(x, y, r * 1.4);
   };
   Ink.prototype.dot = function (x, y, r) {
-    this.path.moveTo(x + r, y);
-    this.path.arc(x, y, r, 0, TAU, true);
+    var P = this.cur();
+    P.moveTo(x + r, y);
+    P.arc(x, y, r, 0, TAU, true);
     this.fit(x, y, r);
   };
   Ink.prototype.hex = function (x, y, r, a) {
+    var P = this.cur();
     for (var i = 0; i <= 6; i++) {
       var t = a - i / 6 * TAU, px = x + Math.cos(t) * r, py = y + Math.sin(t) * r;
-      if (i) this.path.lineTo(px, py); else this.path.moveTo(px, py);
+      if (i) P.lineTo(px, py); else P.moveTo(px, py);
     }
-    this.path.closePath();
+    P.closePath();
     this.fit(x, y, r);
   };
 
@@ -156,6 +170,7 @@
     var end = cut || depth >= o.depth;
     if (end) pts[pts.length - 1][2] = 0;
     ink.taper(pts);
+    if (end && o.leafInk && rnd() < o.leaf) o.leafInk.blob(x, y, o.leafR * (0.6 + rnd() * 0.8), ang, 0.2 + rnd() * 0.5);   // a tuft of foliage
     if (end) return;
     if (o.joint) ink.dot(x, y, wi);   // a round joint where it forks, so the branches grow out of it smoothly
     for (i = 0; i < 2; i++) {
@@ -270,31 +285,39 @@
     g.clearRect(0, 0, w, h);
     return c;
   }
-  function wash(out, path, colour, edge, qpx, box, soft, dry) {
-    var w = out.width, h = out.height, o = out.getContext('2d'), r = Math.max(0.8, soft * qpx);
-    var A = blank(0, w, h), B = blank(1, w, h), E = blank(2, w, h), a = A.getContext('2d'), b = B.getContext('2d'), e = E.getContext('2d');
-    // the shape in its colour, the pigment settling unevenly
-    a.setTransform(qpx, 0, 0, qpx, -box[0] * qpx, -box[1] * qpx);
+  // ibox: the shape's bounds in the same units as box; the wash only works on that part of the canvas.
+  function wash(out, path, colour, edge, qpx, box, soft, dry, ibox) {
+    var W0 = out.width, H0 = out.height, o = out.getContext('2d'), r = Math.max(0.8, soft * qpx), pad = Math.ceil(r * 2.5 + 2);
+    var x0 = 0, y0 = 0, x1 = W0, y1 = H0;
+    if (ibox) {
+      x0 = clamp(Math.floor((ibox[0] - box[0]) * qpx) - pad, 0, W0); y0 = clamp(Math.floor((ibox[1] - box[1]) * qpx) - pad, 0, H0);
+      x1 = clamp(Math.ceil((ibox[2] - box[0]) * qpx) + pad, 0, W0); y1 = clamp(Math.ceil((ibox[3] - box[1]) * qpx) + pad, 0, H0);
+    }
+    var w = x1 - x0, h = y1 - y0, hw = Math.max(1, Math.ceil(w / 2)), hh = Math.max(1, Math.ceil(h / 2));
+    if (w < 1 || h < 1) return;
+    var A = blank(0, w, h), B = blank(1, hw, hh), E = blank(2, w, h), a = A.getContext('2d'), b = B.getContext('2d'), e = E.getContext('2d');
+    // the shape in its colour, the pigment settling unevenly (textures stay put relative to the whole canvas)
+    a.setTransform(qpx, 0, 0, qpx, -box[0] * qpx - x0, -box[1] * qpx - y0);
     a.fillStyle = colour; a.fill(path);
     a.setTransform(1, 0, 0, 1, 0, 0);
     a.globalCompositeOperation = 'source-atop'; a.globalAlpha = 0.55;
-    a.fillStyle = pattern(a, TEX.mottle, 1.4); a.fillRect(0, 0, w, h);
+    a.fillStyle = pattern(a, TEX.mottle, 1.4, -x0, -y0); a.fillRect(0, 0, w, h);
     a.globalAlpha = 0.22;
-    a.fillStyle = pattern(a, TEX.warm, 2.2, 37, 91); a.fillRect(0, 0, w, h);
+    a.fillStyle = pattern(a, TEX.warm, 2.2, 37 - x0, 91 - y0); a.fillRect(0, 0, w, h);
     if (dry) {
       a.globalCompositeOperation = 'destination-out'; a.globalAlpha = dry;
-      a.fillStyle = pattern(a, TEX.speckle, 1 + qpx / 1500, 13, 7); a.fillRect(0, 0, w, h);
+      a.fillStyle = pattern(a, TEX.speckle, 1 + qpx / 1500, 13 - x0, 7 - y0); a.fillRect(0, 0, w, h);
     }
     a.globalCompositeOperation = 'source-over'; a.globalAlpha = 1;
-    // a soft copy: it bleeds past the edges, and tells us where the edges are
-    b.filter = 'blur(' + r.toFixed(1) + 'px)'; b.drawImage(A, 0, 0); b.filter = 'none';
+    // a soft copy, at half size: it bleeds past the edges, and tells us where the edges are
+    b.filter = 'blur(' + (r / 2).toFixed(1) + 'px)'; b.drawImage(A, 0, 0, hw, hh); b.filter = 'none';
     // pigment pooling along the edges: the shape minus its soft copy, darker
     e.drawImage(A, 0, 0);
-    e.globalCompositeOperation = 'destination-out'; e.drawImage(B, 0, 0);
+    e.globalCompositeOperation = 'destination-out'; e.drawImage(B, 0, 0, w, h);
     e.globalCompositeOperation = 'source-in'; e.fillStyle = edge; e.fillRect(0, 0, w, h);
-    o.globalAlpha = 0.42; o.drawImage(B, 0, 0);
-    o.globalAlpha = 0.88; o.drawImage(A, 0, 0);
-    o.globalAlpha = 0.6; o.drawImage(E, 0, 0);
+    o.globalAlpha = 0.42; o.drawImage(B, x0, y0, w, h);
+    o.globalAlpha = 0.88; o.drawImage(A, x0, y0);
+    o.globalAlpha = 0.6; o.drawImage(E, x0, y0);
     o.globalAlpha = 1;
   }
   function paper(out, strength) {
@@ -525,7 +548,7 @@
           var a = Math.PI / 6 + c / 6 * TAU, q = nudge(cx + Math.cos(a) * cr, cy + Math.sin(a) * cr), inset = 0.84 + rnd() * 0.06;
           pts.push([lerp(cx, q[0], inset), lerp(cy, q[1], inset)]);
         }
-        var ink = t.cells[Math.floor(rnd() * 3)], P = ink.path;
+        var ink = t.cells[Math.floor(rnd() * 3)], P = ink.cur();
         P.moveTo((pts[5][0] + pts[0][0]) / 2, (pts[5][1] + pts[0][1]) / 2);
         for (c = 0; c < 6; c++) { var nx = pts[(c + 1) % 6]; P.quadraticCurveTo(pts[c][0], pts[c][1], (pts[c][0] + nx[0]) / 2, (pts[c][1] + nx[1]) / 2); }
         P.closePath();
@@ -699,8 +722,9 @@
   function haze(D) { return 0.95 * (1 - Math.exp(-Math.max(0, D - 1.5) / 3.2)); }
 
   // Rod or cone. Returns its foot, where the bipolar and horizontal cells reach it.
-  function rodOrCone(g, rnd, x, k, cone) {
-    var fl = FLOOR * k, os = (cone ? 0.1 : 0.17) * k, is = (cone ? 0.18 : 0.1) * k, w = (cone ? 0.011 : 0.0065) * k;
+  function rodOrCone(g, rnd, x, k, cone, fl, sc) {
+    fl = fl == null ? FLOOR * k : fl; sc = sc || 1;
+    var os = (cone ? 0.1 : 0.17) * k * sc, is = (cone ? 0.18 : 0.1) * k * sc, w = (cone ? 0.011 : 0.0065) * k * sc;
     var osTop = fl - os, isTop = osTop - is, sw = (rnd() - 0.5) * 0.02 * k;
     // the outer segment: rods a straight column, cones a cone pointing down into the floor
     g.seg.taper(cone ? [[x, fl, w * 0.25], [x, osTop, w * 0.85]] : [[x, fl, w * 0.95], [x, osTop, w * 0.95]]);
@@ -716,38 +740,60 @@
     return { x: x + sw, y: ft };
   }
 
-  // A bipolar cell: an upper trunk from the feet of a few rods and cones up into the canopy.
-  function bipolarCell(g, rnd, x, k, feet) {
-    var sy = (-0.24 + rnd() * 0.28) * k, top = (-0.5 - rnd() * 0.16) * k, wob = (rnd() - 0.5) * 0.04 * k, i;
+  // A bipolar cell: an upper trunk from the feet of a few rods and cones up into the canopy, its body hanging
+  // on it like a lantern. A tree's own bipolar cell is thicker.
+  function bipolarCell(g, rnd, x, k, feet, sc) {
+    sc = sc || 1;
+    var sy = (-0.2 + rnd() * 0.26) * k, top = (-0.48 - rnd() * 0.12) * k, wob = (rnd() - 0.5) * 0.04 * k, i;
     for (i = 0; i < feet.length; i++) {
       var f = feet[i];
-      g.ink.taper([[x, sy, 0.003 * k], [lerp(x, f.x, 0.55), lerp(sy, f.y, 0.75), 0.002 * k], [f.x, f.y, 0.0012 * k]]);
+      g.ink.taper([[x, sy, 0.003 * k * sc], [lerp(x, f.x, 0.55), lerp(sy, f.y, 0.75), 0.002 * k * sc], [f.x, f.y, 0.0012 * k]]);
     }
-    g.ink.taper([[x, sy, 0.0045 * k], [x + wob * 0.5, (sy + top) / 2, 0.0035 * k], [x + wob, top, 0.0026 * k]]);
-    grow(g.ink, { step: 0.012 * k, wiggle: 0.6, taper: 0.3, spread: 0.9, lenK: 0.55, wK: 0.6, depth: 2 }, rnd, x + wob, top, -Math.PI / 2, 0.035 * k, 0.002 * k, 0);
-    g.lamp.blob(x, sy, 0.018 * k, -Math.PI / 2, 0.6);
+    g.ink.taper([[x, sy, 0.0045 * k * sc], [x + wob * 0.5, (sy + top) / 2, 0.0038 * k * sc], [x + wob, top, 0.003 * k * sc]]);
+    grow(g.ink, { step: 0.012 * k, wiggle: 0.6, taper: 0.3, spread: 0.9, lenK: 0.55, wK: 0.6, depth: 2 }, rnd, x + wob, top, -Math.PI / 2, 0.04 * k * sc, 0.0022 * k * sc, 0);
+    g.lamp.blob(x, sy, 0.018 * k * sc, -Math.PI / 2, 0.6);
   }
 
-  // A horizontal cell: long lower branches, drooping a little, with tufts down to the feet below.
-  function horizontalCell(g, rnd, x, k, lod) {
-    var y = (0.13 + rnd() * 0.03) * k, s, j;
-    var o = { step: 0.02 * k, wiggle: 0.24, taper: 0.5, spread: 0.6, lenK: 0.55, wK: 0.65, depth: 1 + lod, pullK: 0.07 };
-    for (s = -1; s <= 1; s += 2) { o.pull = s > 0 ? 0.3 : Math.PI - 0.3; grow(g.ink, o, rnd, x, y, s > 0 ? -0.15 : Math.PI + 0.15, (0.11 + rnd() * 0.1) * k, 0.005 * k, 0); }
+  // A horizontal cell: lower branches spreading wide from the foot of a tree, drooping, with tufts down to the
+  // feet of the rods and cones around it.
+  function horizontalCell(g, rnd, x, y, k, lod, sc) {
+    var s, j, o = { step: 0.018 * k, wiggle: 0.26, taper: 0.5, spread: 0.6, lenK: 0.58, wK: 0.66, depth: 1 + lod, pullK: 0.06, leafInk: g.leafLow, leaf: lod ? 0.6 : 0.3, leafR: 0.011 * k * sc };
+    for (s = -1; s <= 1; s += 2) {
+      o.pull = s > 0 ? 0.35 : Math.PI - 0.35;
+      for (j = 0; j < 1 + (lod >> 1); j++) grow(g.ink, o, rnd, x, y, s > 0 ? -0.25 - rnd() * 0.3 : Math.PI + 0.25 + rnd() * 0.3, (0.13 + rnd() * 0.12) * k * sc, 0.0055 * k * sc, 0);
+    }
     var drop = { step: 0.012 * k, wiggle: 0.4, taper: 0.3, spread: 0.7, lenK: 0.5, wK: 0.6, depth: 1, pull: Math.PI / 2, pullK: 0.1 };
-    for (j = 0; j < 2 + lod; j++) grow(g.ink, drop, rnd, x + (rnd() - 0.5) * 0.3 * k, y + 0.01 * k, Math.PI / 2, 0.09 * k, 0.0025 * k, 0);
-    g.gang.blob(x, y, 0.016 * k, 0, 0.3);
+    for (j = 0; j < 2 + lod; j++) grow(g.ink, drop, rnd, x + (rnd() - 0.5) * 0.3 * k * sc, y + 0.01 * k, Math.PI / 2, 0.07 * k, 0.0025 * k, 0);
+    g.gang.blob(x, y - 0.012 * k, 0.015 * k * sc, 0, 0.3);
   }
 
-  // An amacrine cell: its branches rise into the canopy and spread flat, a lacy layer.
-  function amacrineCell(g, rnd, x, k, lod) {
-    var y = (-0.38 - rnd() * 0.04) * k, j;
-    var o = { step: 0.018 * k, wiggle: 0.35, taper: 0.5, spread: 0.7, lenK: 0.6, wK: 0.66, depth: 2 + lod, pullK: 0.1, spine: lod > 1 ? 0.2 : 0, spineLen: 0.008 * k };
-    for (j = 0; j < 2 + lod; j++) {
+  // An amacrine cell: branches rising into the canopy and spreading flat, a lacy crown with tufts of foliage.
+  function amacrineCell(g, rnd, x, k, lod, sc) {
+    sc = sc || 1;
+    var y = (-0.36 - rnd() * 0.06) * k, j;
+    var o = { step: 0.016 * k, wiggle: 0.38, taper: 0.5, spread: 0.75, lenK: 0.6, wK: 0.66, depth: 2 + lod, pullK: 0.1, spine: lod > 1 ? 0.15 : 0, spineLen: 0.008 * k,
+      leafInk: g.leaf, leaf: lod ? 0.75 : 0.5, leafR: 0.016 * k * sc };
+    for (j = 0; j < 3 + lod; j++) {
       var side = j % 2 ? 1 : -1;
-      o.pull = side > 0 ? -0.15 : Math.PI + 0.15;
-      grow(g.ink, o, rnd, x, y, -Math.PI / 2 + side * (0.4 + rnd() * 0.6), (0.14 + rnd() * 0.16) * k, 0.004 * k, 0);
+      o.pull = side > 0 ? -0.2 : Math.PI + 0.2;
+      grow(g.ink, o, rnd, x, y, -Math.PI / 2 + side * (0.3 + rnd() * 0.7), (0.12 + rnd() * 0.14) * k * sc, 0.004 * k * sc, 0);
     }
-    g.gang.blob(x, y, 0.017 * k, -Math.PI / 2, 0.5);
+    g.gang.blob(x, y, 0.016 * k * sc, -Math.PI / 2, 0.5);
+  }
+
+  // One tree of the strange forest, built the way the retina is: a cone for its trunk, horizontal cells for its
+  // lower branches, a bipolar cell for its upper trunk, amacrine cells for its canopy, a ganglion cell in the roof.
+  function tree(g, rnd, x, k, lod, ground, feet) {
+    var sc = 0.8 + rnd() * 0.55, fl = ground(x);
+    var foot = rodOrCone(g, rnd, x, k, true, fl, sc * 1.25);
+    feet.push(foot);
+    horizontalCell(g, rnd, foot.x + (rnd() - 0.5) * 0.02 * k, (0.15 + rnd() * 0.04) * k, k, lod, sc);
+    var near = feet.filter(function (f) { return Math.abs(f.x - foot.x) < 0.07 * k; }).slice(0, 4);
+    var bx = foot.x + (rnd() - 0.5) * 0.03 * k;
+    bipolarCell(g, rnd, bx, k, near, sc * 1.35);
+    var n = lod > 1 ? 3 : 2;
+    for (var j = 0; j < n; j++) amacrineCell(g, rnd, bx + (j - (n - 1) / 2) * 0.09 * k * sc + (rnd() - 0.5) * 0.03 * k, k, lod, sc);
+    if (rnd() < 0.8) ganglionCell(g, rnd, bx + (rnd() - 0.5) * 0.1 * k, k, lod);
   }
 
   // A ganglion cell: a big body in the roof, dendrites down into the canopy, an axon up and away along the top.
@@ -810,59 +856,112 @@
     }
   }
 
-  function slice(D, rnd, view) {
-    var k = 1 / D, hz = haze(D), X = (view + 0.42) * (D - CAM_Z0) / D, lod = D < 3 ? 2 : D < 8 ? 1 : 0, x, i;
-    var g = { pr: new Ink(), rod: new Ink(), seg: new Ink(), glia: new Ink(), ink: new Ink(), lamp: new Ink(), gang: new Ink(), roofA: new Ink(), roofB: new Ink(), roofC: new Ink(), discs: lod > 1 ? new Path2D() : null };
-    // keep an avenue open along the river, wide for the big cells, narrow for the rods and cones on its banks
-    var rx = riverX(D) * k;
-    function open(x, wide) { return Math.abs(x - rx) < (wide ? 0.34 : 0.1) * k * (0.8 + rnd() * 0.4); }
-    var qpx = H * clamp(D / Math.max(0.5, D - CAM_Z1), 1, 1.3) * Math.min(dpr, 1.25);
-    minInk = 0.7 / qpx;
-    wob = rng(Math.round(D * 1000)); wobble = 0.35;
-    var thin = lod > 1 ? 1.5 : 1;   // the foreground holds a few bold things, not a thicket
-
-    // rods and cones along the floor
-    var feet = [], step = Math.max(0.016, (lod > 1 ? 0.075 : 0.055) * k);
-    for (x = -X; x < X; x += step * (0.7 + rnd() * 0.6) * (rnd() < 0.12 ? 3 + rnd() * 3 : 1)) if (!open(x, false)) feet.push(rodOrCone(g, rnd, x, k, rnd() < 0.2));
-    // the lower branches, the upper trunks reaching down to the feet nearest them, the canopy, the roof
-    for (x = -X + rnd() * 0.4 * k; x < X; x += Math.max(0.14, 0.6 * k * thin) * (0.7 + rnd() * 0.6)) if (!open(x, true)) horizontalCell(g, rnd, x, k, lod);
-    for (x = -X + rnd() * 0.1 * k; x < X; x += Math.max(0.07, 0.24 * k * thin) * (0.7 + rnd() * 0.6)) {
-      if (open(x, true)) continue;
-      var near = feet.filter(function (f) { return Math.abs(f.x - x) < 0.06 * k; }).slice(0, 4);
-      bipolarCell(g, rnd, x, k, near);
+  // A slice is painted in small steps, queued on forest.steps, so the page stays smooth while it grows:
+  // lay out the ground and the rods, grow the trees a few at a time, the rest, then one wash at a time, then finish.
+  function sliceSteps(D, view) {
+    var S = {}, rnd = forest.rnd, k = 1 / D, hz = haze(D), lod = D < 3 ? 2 : D < 8 ? 1 : 0, frame = D < 1.5;
+    var X = (view + 0.42) * (D - CAM_Z0) / D, x, i, g, feet = [];
+    function open(x, wide) {
+      if (frame && Math.abs(x) < view * (wide ? 0.62 : 0.45)) return true;
+      return Math.abs(x - S.rx) < (wide ? 0.3 : 0.09) * k * (0.8 + rnd() * 0.4);
     }
-    for (x = -X + rnd() * 0.3 * k; x < X; x += Math.max(0.1, 0.4 * k * thin) * (0.7 + rnd() * 0.6)) if (!open(x, true)) amacrineCell(g, rnd, x, k, lod);
-    for (x = -X + rnd() * 0.3 * k; x < X; x += Math.max(0.12, 0.5 * k * thin) * (0.7 + rnd() * 0.6)) if (!open(x, true)) ganglionCell(g, rnd, x, k, lod);
-    roof(g, rnd, X, k);
-    // the glia, our mangroves
-    for (x = -X + rnd() * 0.5 * k; x < X; x += Math.max(0.22, 1.2 * k * thin) * (0.7 + rnd() * 0.6)) if (!open(x, true)) mullerCell(g, rnd, x, k, lod);
-    minInk = 0; wobble = 0;
-
-    // paint it
-    var box = [-X, (ILM - 0.24) * k, X, (FLOOR + 0.01) * k];
-    var cv = document.createElement('canvas');
-    cv.width = Math.min(4096, Math.ceil((box[2] - box[0]) * qpx)); cv.height = Math.min(4096, Math.ceil((box[3] - box[1]) * qpx));
-    qpx = Math.min(cv.width / (box[2] - box[0]), cv.height / (box[3] - box[1]));
-    var soft = 0.012 * k, col = function (c) { return mix(c, HAZE, hz); }, edge = function (c) { return mix(mix(c, '#14080B', 0.45), HAZE, hz * 0.8); };
-    [[g.roofC, '#A56A7C', 0.2], [g.seg, '#C48A3A', 0.3], [g.rod, '#A0703E', 0.35], [g.pr, '#6B3A24', 0.3], [g.glia, '#7E86A8', 0.35], [g.ink, '#3E1C24', 0.45],
-      [g.roofB, '#83405A', 0.2], [g.gang, '#7A2E4A', 0.25], [g.roofA, '#64263E', 0.2], [g.lamp, '#C9587C', 0.2]].forEach(function (w) {
-      var roofy = w[0] === g.roofA || w[0] === g.roofB || w[0] === g.roofC, c = roofy ? mix(w[1], HAZE, Math.min(1, hz * 1.25)) : col(w[1]);
-      if (isFinite(w[0].box[0])) wash(cv, w[0].path, c, roofy ? mix(edge(w[1]), HAZE, hz * 0.4) : edge(w[1]), qpx, box, soft, w[2]);
-      if (w[0] === g.seg && g.discs) {
-        var o = cv.getContext('2d');
-        o.setTransform(qpx, 0, 0, qpx, -box[0] * qpx, -box[1] * qpx);
-        o.strokeStyle = alpha('#5C3214', 0.4); o.lineWidth = 0.0016 * k; o.stroke(g.discs);
-        o.setTransform(1, 0, 0, 1, 0, 0);
+    function ink(on) { minInk = on ? 0.7 / S.qpx : 0; wobble = on ? 0.35 : 0; if (on) wob = S.wob; }
+    return [
+      function layout() {
+        g = S.g = { pr: new Ink(), rod: new Ink(), seg: new Ink(), glia: new Ink(), ink: new Ink(), lamp: new Ink(), gang: new Ink(), leaf: new Ink(), leafLow: new Ink(),
+          roofA: new Ink(), roofB: new Ink(), roofC: new Ink(), ground: new Ink(), lumps: new Ink(), discs: lod > 1 ? new Path2D() : null };
+        // keep an avenue open along the river, wide for the trees, narrow for the rods and cones on its banks
+        S.rx = riverX(D) * k;
+        S.qpx = H * clamp(D / Math.max(0.5, D - CAM_Z1), 1, 1.3) * Math.min(dpr, 1.25);
+        S.wob = rng(Math.round(D * 1000));
+        ink(true);
+        // the ground: rolling, lumpy with cells, low where the river runs
+        var ph1 = rnd() * TAU, ph2 = rnd() * TAU, mounds = [];
+        for (i = 0; i < Math.ceil(X / k * 1.5) + 3; i++) mounds.push({ c: lerp(-X, X, rnd()), w: (0.18 + rnd() * 0.4) * k, h: (0.03 + rnd() * 0.09) * k });
+        S.ground = function (x) {
+          var h = 0.03 * k * (1 + Math.sin(x / k * 1.7 + ph1)) + 0.016 * k * (1 + Math.sin(x / k * 4.3 + ph2));
+          for (var j = 0; j < mounds.length; j++) { var t = (x - mounds[j].c) / mounds[j].w; h += mounds[j].h * Math.exp(-t * t * 2); }
+          return FLOOR * k - h * smooth(0.08 * k, 0.4 * k, Math.abs(x - S.rx));
+        };
+        var gp = g.ground.cur(), steps = 160;
+        S.bottom = (FLOOR + 0.4) * k;
+        gp.moveTo(X, S.bottom);   // right to left along the top, so it winds the same way as the strokes
+        for (i = 0; i <= steps; i++) { x = lerp(X, -X, i / steps); gp.lineTo(x, S.ground(x)); }
+        gp.lineTo(-X, S.bottom); gp.closePath();
+        g.ground.fit(-X, FLOOR * k - 0.3 * k, 0); g.ground.fit(X, S.bottom, 0);
+        for (x = -X; x < X; x += (0.012 + rnd() * 0.014) * k) {   // the cell bodies that make its surface lumpy
+          if (rnd() < 0.85) g.lumps.blob(x, S.ground(x) + (0.004 + rnd() * 0.012) * k, (0.007 + rnd() * 0.009) * k, -Math.PI / 2, 0.15);
+        }
+        // an understorey of rods, with the odd cone, in clumps
+        for (x = -X + rnd() * 0.5 * k; x < X; x += Math.max(0.06, 0.03 * k) * (0.7 + rnd() * 0.6) * (rnd() < 0.15 ? 2.5 : 1)) {
+          if (!open(x, false)) feet.push(rodOrCone(g, rnd, x, k, rnd() < 0.08, S.ground(x), 0.8 + rnd() * 0.4));
+        }
+        S.tstep = Math.max(0.05, (frame ? 0.22 : lod > 1 ? 0.3 : 0.34) * k);
+        S.tx = -X + rnd() * S.tstep;
+        ink(false);
+      },
+      function trees() {
+        var t0 = performance.now();
+        ink(true);
+        while (S.tx < X && performance.now() - t0 < 14) {
+          if (!open(S.tx, true)) tree(g, rnd, S.tx, k, lod, S.ground, feet);
+          S.tx += S.tstep * (0.6 + rnd() * 0.8);
+        }
+        ink(false);
+        return S.tx >= X;
+      },
+      function rest() {
+        ink(true);
+        // a few thin bipolar cells between the trees, more ganglion cells, the roof, and the occasional mangrove
+        for (x = -X + rnd() * 0.1 * k; x < X; x += Math.max(0.08, 0.3 * k) * (0.7 + rnd() * 0.6)) {
+          if (open(x, true)) continue;
+          bipolarCell(g, rnd, x, k, feet.filter(function (f) { return Math.abs(f.x - x) < 0.05 * k; }).slice(0, 3), 0.8);
+        }
+        for (x = -X + rnd() * 0.3 * k; x < X; x += Math.max(0.12, 0.5 * k) * (0.7 + rnd() * 0.6)) if (!open(x, true)) ganglionCell(g, rnd, x, k, lod);
+        roof(g, rnd, X, k);
+        for (x = -X + rnd() * 0.5 * k; x < X; x += Math.max(0.22, 1.1 * k) * (0.7 + rnd() * 0.6)) if (!open(x, true)) mullerCell(g, rnd, x, k, lod);
+        ink(false);
+        // the canvas, and the washes to lay on it, back to front
+        var box = S.box = [-X, (ILM - 0.24) * k, X, S.bottom], cv = S.cv = document.createElement('canvas');
+        cv.width = Math.min(4096, Math.ceil((box[2] - box[0]) * S.qpx)); cv.height = Math.min(4096, Math.ceil((box[3] - box[1]) * S.qpx));
+        S.qpx = Math.min(cv.width / (box[2] - box[0]), cv.height / (box[3] - box[1]));
+        var earth = ctx.createLinearGradient(0, (FLOOR - 0.15) * k, 0, S.bottom);
+        earth.addColorStop(0, mix('#E9B54A', HAZE, hz)); earth.addColorStop(0.35, mix('#D99A36', HAZE, hz)); earth.addColorStop(1, mix('#B8742A', HAZE, hz));
+        S.washes = [[g.roofC, '#A56A7C', 0.2, 1], [g.ground, earth, 0.15, 0, '#C98A2E'], [g.lumps, '#D7A03E', 0.2], [g.seg, '#C48A3A', 0.3], [g.rod, '#A0703E', 0.35], [g.pr, '#6B3A24', 0.3],
+          [g.glia, '#7E86A8', 0.35], [g.leafLow, '#7A4A3A', 0.3], [g.ink, '#3E1C24', 0.45], [g.leaf, '#8E4E5E', 0.25],
+          [g.roofB, '#83405A', 0.2, 1], [g.gang, '#7A2E4A', 0.25], [g.roofA, '#64263E', 0.2, 1], [g.lamp, '#C9587C', 0.2]];
+      },
+      function washes() {
+        var t0 = performance.now(), soft = 0.012 * k;
+        function edge(c) { return mix(mix(c, '#14080B', 0.45), HAZE, hz * 0.8); }
+        do {
+          var w = S.washes.shift(), base = w[4] || w[1];
+          // the roofs fade into the light more than the rest of their slice
+          var c = typeof w[1] !== 'string' ? w[1] : w[3] ? mix(w[1], HAZE, Math.min(1, hz * 1.25)) : mix(w[1], HAZE, hz);
+          if (isFinite(w[0].box[0])) wash(S.cv, w[0].path, c, w[3] ? mix(edge(base), HAZE, hz * 0.4) : edge(base), S.qpx, S.box, soft, w[2], w[0].box);
+          if (w[0] === g.seg && g.discs) {
+            var o = S.cv.getContext('2d');
+            o.setTransform(S.qpx, 0, 0, S.qpx, -S.box[0] * S.qpx, -S.box[1] * S.qpx);
+            o.strokeStyle = alpha('#5C3214', 0.4); o.lineWidth = 0.0016 * k; o.stroke(g.discs);
+            o.setTransform(1, 0, 0, 1, 0, 0);
+          }
+        } while (S.washes.length && performance.now() - t0 < 8);
+        return !S.washes.length;
+      },
+      function finish() {
+        var cv = S.cv;
+        paper(cv, 0.6);
+        // far off, the air softens everything; right in front of us, the lens does, focused further in
+        if (D > 6 || frame) {
+          var bl = blank(1, cv.width, cv.height), b = bl.getContext('2d');
+          b.filter = 'blur(' + (frame ? 2.2 : 0.6 + D * 0.06).toFixed(1) + 'px)'; b.drawImage(cv, 0, 0); b.filter = 'none';
+          var o2 = cv.getContext('2d'); o2.clearRect(0, 0, cv.width, cv.height); o2.drawImage(bl, 0, 0);
+        }
+        forest.planes.push({ D: D, items: [settle({ img: cv, box: S.box })] });
+        forest.planes.sort(function (a, b) { return b.D - a.D; });
+        S = null; g = null;
       }
-    });
-    paper(cv, 0.6);
-    // far off, the air softens everything
-    if (D > 6) {
-      var bl = blank(1, cv.width, cv.height), b = bl.getContext('2d');
-      b.filter = 'blur(' + (0.6 + D * 0.06).toFixed(1) + 'px)'; b.drawImage(cv, 0, 0); b.filter = 'none';
-      var o2 = cv.getContext('2d'); o2.clearRect(0, 0, cv.width, cv.height); o2.drawImage(bl, 0, 0);
-    }
-    return { D: D, items: [settle({ img: cv, box: box })] };
+    ];
   }
 
   // Hand a freshly painted bitmap to the browser to get ready for drawing, in the background, so that the first
@@ -1132,7 +1231,11 @@
     [[13, 1], [7.5, 2], [4.4, 1], [2.7, 1], [1.9, 1]].forEach(function (r) {
       for (i = 0; i < r[1]; i++) rays.push({ D: r[0] * (0.82 + rnd() * 0.12), x: lerp(-view, view, rnd()) * r[0] * 0.9, w: (0.22 + rnd() * 0.3) * Math.sqrt(r[0] / 3), slant: 0.32, a: 0.5 + rnd() * 0.25 });
     });
-    forest = { planes: [], todo: SLICES.slice(), trunks: grove.slice(), rnd: rnd, view: view, river: river, cells: cells, tube: { pts: tpts, R: 0.02, cells: tcells }, grove: grove, rays: rays, boat: { t: 0.5 } };
+    forest = { planes: [], steps: [], rnd: rnd, view: view, river: river, cells: cells, tube: { pts: tpts, R: 0.02, cells: tcells }, grove: grove, rays: rays, boat: { t: 0.5 } };
+    // what there is to paint, in order: the veil we meet first, the slices far to near, then the grove's trunks
+    forest.steps.push(function () { paintVeil(rnd); });
+    SLICES.forEach(function (D) { forest.steps.push.apply(forest.steps, sliceSteps(D, view)); });
+    grove.forEach(function (t) { forest.steps.push(function () { paintTrunk(t); }); });
     // split the river and the tube where they pass a slice, so the slices can cover them and they the slices
     forest.riverRuns = split(river.map(function (r) { return r[1]; }));
     forest.tubeRuns = split(tpts.map(function (r) { return r[2]; }));
@@ -1190,23 +1293,24 @@
   }
 
   // paint the slices one at a time, so the page stays smooth while they grow
+  var stepStats = { n: 0, max: 0, over30: 0 };
+  // one small step of painting; a step that is not done yet says so, and is called again
   function paintNext() {
-    if (!forest || (!forest.todo.length && forest.veil && !forest.trunks.length)) return false;
+    if (!forest || !forest.steps.length) return false;
     var t0 = performance.now();
-    if (!forest.veil) { paintVeil(forest.rnd); buildMs += performance.now() - t0; return true; }
-    if (!forest.todo.length) { paintTrunk(forest.trunks.shift()); buildMs += performance.now() - t0; return true; }
-    var D = forest.todo.shift();
-    forest.planes.push(slice(D, forest.rnd, forest.view));
-    forest.planes.sort(function (a, b) { return b.D - a.D; });
-    buildMs += performance.now() - t0;
+    if (forest.steps[0]() !== false) forest.steps.shift();
+    var dt = performance.now() - t0;
+    buildMs += dt; stepStats.n++; stepStats.max = Math.max(stepStats.max, dt); if (dt > 30) stepStats.over30++;
     return true;
   }
-  function paintLater() { if (paintNext()) setTimeout(paintLater, 30); }
+  // paint in the gaps between frames
+  var idle = window.requestIdleCallback ? function (f) { requestIdleCallback(f, { timeout: 200 }); } : function (f) { setTimeout(f, 16); };
+  function paintLater() { if (paintNext()) idle(paintLater); }
 
   // where things are in the forest: the slices, and everything that lives between them
   var queue = [];
   function drawForest(cam, now) {
-    while (!forest.veil || forest.todo.length) paintNext();   // we got here before the slices were painted: finish them now
+    while (!forest.veil || forest.planes.length < SLICES.length) paintNext();   // we got here before the slices were painted: finish them now
     rollC = 1; rollS = 0;
     if (SKIP.indexOf('planes') < 0) drawBackdrop(cam);
     var T = PT, i;
@@ -1487,12 +1591,13 @@
       return Math.round(ms * 100) / 100;
     },
     build: function () { return Math.round(buildMs); },
+    steps: function () { return { n: stepStats.n, max: Math.round(stepStats.max), over30: stepStats.over30 }; },
     // hold the camera at a point of the scroll (and, optionally, the pointer), as ?p= and ?px=&py= do
     seek: function (pp, px, py) {
       fixedP = clamp(pp, 0, 1); p = fixedP;
       if (px != null) { fixedPtr = { x: px, y: py || 0 }; ptr.x = ptr.tx = px; ptr.y = ptr.ty = py || 0; }
     },
-    ready: function () { return !!forest && !forest.todo.length && !!forest.veil && !forest.trunks.length; },
+    ready: function () { return !!forest && !forest.steps.length; },
     // for recording: stop the clock, then draw frames at chosen moments (scroll point, pointer, time in ms, flattening)
     pause: function () { paused = true; },
     frameAt: function (pp, px, py, t, flat) {
