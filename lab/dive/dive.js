@@ -21,7 +21,7 @@
   // the scroll, start to end: rest; fly at the eye until the pupil fills the screen; a moment of dark; the retina
   // glows up far below and we fall into it; the cut, in the dark of the roof; down into the forest; deeper in
   var P_DIVE = 0.03, P_PUPIL = 0.14, P_GLOW = 0.16, P_CUT = 0.4, P_REST = 0.66;
-  var Z_EYE = 1, FLAT_D = 4.2;
+  var Z_EYE = 1, FLAT_REF = 3;   // flattened, every plane sways with the pointer as one this far away would
   var FALL_TOP = 45, ROOF_H = 0.26;   // the fall: camera height above the floor of rods and cones, and the roof we fall into
   var BLIND = { x: -0.62, y: 0.05 };  // the blind spot, where the nerve fibres leave and the vessels come in
   // the retina edge on, in world units, down is positive: its inner surface, where the glia's roots stop, the floor
@@ -312,7 +312,7 @@
   var ptr = { x: 0, y: 0, tx: 0, ty: 0, cx: 0, cy: 0, last: -1e9 };
   var iris = { x: 0, y: 0, tx: 0, ty: 0, wanderAt: 0 };
   var blink = { at: 2.2, start: -10, v: 0 };
-  var CAM = { x: 0, y: 0, z: 0 }, FC = { x: 0, y: 0, c: FALL_TOP, roll: 0 }, SC = { x: 0, y: 0, z: 0, deep: 0 }, PT = { s: 1, tx: 0, ty: 0 };
+  var CAM = { x: 0, y: 0, z: 0 }, FC = { x: 0, y: 0, c: FALL_TOP, roll: 0 }, SC = { x: 0, y: 0, by: 0, py: 0, z: 0, deep: 0 }, PT = { s: 1, tx: 0, ty: 0 };
 
   // ---------- projection ----------
   // local -> screen: (x * s + tx, y * s + ty), then the camera roll about the middle, then device pixels
@@ -934,12 +934,15 @@
   }
 
   // ---------- the forest's living things: light, blood, and a boat ----------
-  // where a point of the forest lands on screen (with the flattening, like the slices)
+  // Where a point of the forest lands on screen. The camera's own path (cam.by, cam.z) is seen with true depth;
+  // the sway that follows the pointer (cam.x, cam.py) is the parallax, and flattening takes the depth out of just
+  // that: every plane then sways alike, so the picture stays the same but no longer comes apart as you move.
+  function sway(den) { return F / lerp(den, FLAT_REF, flatT); }
   var PR = { x: 0, y: 0, s: 1, den: 1 };
   function proj(x, Y, D, cam) {
-    var De = lerp(D, FLAT_D, flatT), den = Math.max(0.02, De - cam.z), k = De / den;
-    PR.x = C.x + x / D * H * k - cam.x * F / den;
-    PR.y = C.y + Y / D * H * k - cam.y * F / den;
+    var den = Math.max(0.02, D - cam.z), k = D / den, sw = sway(den);
+    PR.x = C.x + x / D * H * k - cam.x * sw;
+    PR.y = C.y + Y / D * H * k - cam.by * F / den - cam.py * sw;
     PR.s = F / D * k;
     PR.den = den;
     return PR;
@@ -1221,9 +1224,9 @@
       var it = queue[i];
       if (SKIP.indexOf(names[it.k]) >= 0) continue;
       if (it.k === 0) {
-        var De = lerp(it.D, FLAT_D, flatT), den = De - cam.z;
+        var den = it.D - cam.z, sw = sway(den);
         if (den < 0.25) continue;
-        T.s = H * De / den; T.tx = C.x - cam.x * F / den; T.ty = C.y - cam.y * F / den;
+        T.s = H * it.D / den; T.tx = C.x - cam.x * sw; T.ty = C.y - cam.by * F / den - cam.py * sw;
         setT(T.s, T.tx, T.ty);
         drawItems(it.pl.items, T, smooth(0.25, 0.55, den));   // slices we reach just before the end slip away
       } else if (it.k === 1) drawRiverRun(it.r, cam, now);
@@ -1234,7 +1237,8 @@
       else {
         var v = forest.veil, vd = v.z - cam.z;
         if (vd > 0.05) {
-          T.s = F / vd; T.tx = C.x - cam.x * T.s; T.ty = C.y - cam.y * T.s;
+          var vs = sway(vd);
+          T.s = F / vd; T.tx = C.x - cam.x * vs; T.ty = C.y - cam.by * T.s - cam.py * vs;
           setT(T.s, T.tx, T.ty);
           drawItems([v], T, smooth(0.05, 0.12, vd));
         }
@@ -1245,7 +1249,7 @@
   // the light from above, and the roof and the floor as two planes running off into the distance (in strips)
   function drawBackdrop(cam) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    var hy = C.y - cam.y * F / 200, g = ctx.createLinearGradient(0, 0, 0, H);
+    var hy = C.y - cam.by * F / 200 - cam.py * sway(200), g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, '#F7E2B0'); g.addColorStop(clamp(hy / H - 0.12, 0, 1), '#E2B678'); g.addColorStop(clamp(hy / H, 0, 1), '#E9BC74'); g.addColorStop(1, '#D9993E');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
     plane(cam, ILM, '#EFD3A0', '#DDB57C', TEX.roof, 0.12, 0.14);   // only a hint of cells: the leafy roof in the slices carries it
@@ -1283,19 +1287,20 @@
     if (pp < P_REST) {
       // out of the roof and down into the forest
       e = easeInOut(clamp((pp - P_CUT) / (P_REST - P_CUT), 0, 1));
-      c.y = lerp(-0.84, 0, e);
+      c.by = lerp(-0.84, 0, e);
       c.z = lerp(CAM_Z0, 0, e);
       c.deep = 0;
     } else {
       // down among the rods and cones, to the river
       e = easeInOut((pp - P_REST) / (1 - P_REST));
-      c.y = lerp(0, 0.8, e);
+      c.by = lerp(0, 0.8, e);
       c.z = lerp(0, CAM_Z1, e);
       c.deep = e;
     }
     var wf = smooth(P_CUT, P_CUT + 0.06, pp);
-    c.x = ptr.x * 0.1 * (1 - 0.6 * c.deep) * wf;
-    c.y += ptr.y * 0.035 * (1 - 0.6 * c.deep) * wf;
+    c.x = ptr.x * 0.1 * (1 - 0.6 * c.deep) * wf;   // the sway: x is all sway, y is the path plus its sway
+    c.py = ptr.y * 0.035 * (1 - 0.6 * c.deep) * wf;
+    c.y = c.by + c.py;
     forest.boat.t = lerp(0.55, 0.27, smooth(P_REST - 0.1, 1, pp));
     return c;
   }
