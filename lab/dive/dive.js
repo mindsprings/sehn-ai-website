@@ -711,7 +711,7 @@
     var ny = (cone ? OLM - 0.04 : lerp(0.33, OLM - 0.03, rnd())) * k, ft = (0.27 + (rnd() - 0.5) * 0.02) * k, fw = w * (cone ? 0.55 : 0.32);
     ink.taper([[x, isTop, fw * 1.4], [x + sw * 0.3, ny, fw], [x + sw, ft, fw * 0.9]]);
     ink.dot(x + sw * 0.3, ny, w * (cone ? 1.1 : 0.9));
-    if (cone) ink.tri(x + sw, ft + w * 0.2, w); else ink.dot(x + sw, ft, w * 0.55);
+    if (cone) ink.tri(x + sw, ft + w * 0.15, w * 0.7); else ink.dot(x + sw, ft, w * 0.4);
     return { x: x + sw, y: ft };
   }
 
@@ -730,8 +730,8 @@
   // A horizontal cell: long lower branches, drooping a little, with tufts down to the feet below.
   function horizontalCell(g, rnd, x, k, lod) {
     var y = (0.13 + rnd() * 0.03) * k, s, j;
-    var o = { step: 0.02 * k, wiggle: 0.2, taper: 0.5, spread: 0.5, lenK: 0.55, wK: 0.65, depth: 1 + lod, pullK: 0.07 };
-    for (s = -1; s <= 1; s += 2) { o.pull = s > 0 ? 0.08 : Math.PI - 0.08; grow(g.ink, o, rnd, x, y, o.pull, (0.18 + rnd() * 0.14) * k, 0.005 * k, 0); }
+    var o = { step: 0.02 * k, wiggle: 0.24, taper: 0.5, spread: 0.6, lenK: 0.55, wK: 0.65, depth: 1 + lod, pullK: 0.07 };
+    for (s = -1; s <= 1; s += 2) { o.pull = s > 0 ? 0.3 : Math.PI - 0.3; grow(g.ink, o, rnd, x, y, s > 0 ? -0.15 : Math.PI + 0.15, (0.11 + rnd() * 0.1) * k, 0.005 * k, 0); }
     var drop = { step: 0.012 * k, wiggle: 0.4, taper: 0.3, spread: 0.7, lenK: 0.5, wK: 0.6, depth: 1, pull: Math.PI / 2, pullK: 0.1 };
     for (j = 0; j < 2 + lod; j++) grow(g.ink, drop, rnd, x + (rnd() - 0.5) * 0.3 * k, y + 0.01 * k, Math.PI / 2, 0.09 * k, 0.0025 * k, 0);
     g.gang.blob(x, y, 0.016 * k, 0, 0.3);
@@ -754,8 +754,8 @@
     var y = (-0.78 + (rnd() - 0.5) * 0.05) * k, dir = rnd() < 0.5 ? -1 : 1, j;
     var o = { step: 0.02 * k, wiggle: 0.32, taper: 0.45, spread: 0.75, lenK: 0.6, wK: 0.65, depth: lod, pull: Math.PI / 2, pullK: 0.04 };
     for (j = 0; j < 1 + lod; j++) grow(g.ink, o, rnd, x, y, Math.PI / 2 + (rnd() - 0.5) * 1.4, (0.1 + rnd() * 0.12) * k, 0.0055 * k, 0);
-    var ay = (ILM - 0.04 - rnd() * 0.12) * k;
-    g.ink.taper([[x, y, 0.005 * k], [x + dir * 0.02 * k, ay + 0.02 * k, 0.004 * k], [x + dir * 0.12 * k, ay, 0.0035 * k], [x + dir * 0.6 * k, ay - 0.01 * k, 0.003 * k]]);
+    var ay = (ILM - 0.02 - rnd() * 0.06) * k;
+    g.ink.taper([[x, y, 0.005 * k], [x + dir * 0.015 * k, ay + 0.03 * k, 0.004 * k], [x + dir * 0.06 * k, ay, 0.003 * k], [x + dir * 0.14 * k, ay - 0.015 * k, 0]]);
     g.gang.blob(x, y, (0.022 + rnd() * 0.012) * k, -Math.PI / 2, 0.7);
   }
 
@@ -822,10 +822,10 @@
 
     // rods and cones along the floor
     var feet = [], step = Math.max(0.016, (lod > 1 ? 0.075 : 0.055) * k);
-    for (x = -X; x < X; x += step * (0.7 + rnd() * 0.6)) if (!open(x, false)) feet.push(rodOrCone(g, rnd, x, k, rnd() < 0.2));
+    for (x = -X; x < X; x += step * (0.7 + rnd() * 0.6) * (rnd() < 0.12 ? 3 + rnd() * 3 : 1)) if (!open(x, false)) feet.push(rodOrCone(g, rnd, x, k, rnd() < 0.2));
     // the lower branches, the upper trunks reaching down to the feet nearest them, the canopy, the roof
     for (x = -X + rnd() * 0.4 * k; x < X; x += Math.max(0.14, 0.6 * k * thin) * (0.7 + rnd() * 0.6)) if (!open(x, true)) horizontalCell(g, rnd, x, k, lod);
-    for (x = -X + rnd() * 0.1 * k; x < X; x += Math.max(0.06, 0.17 * k * thin) * (0.7 + rnd() * 0.6)) {
+    for (x = -X + rnd() * 0.1 * k; x < X; x += Math.max(0.07, 0.24 * k * thin) * (0.7 + rnd() * 0.6)) {
       if (open(x, true)) continue;
       var near = feet.filter(function (f) { return Math.abs(f.x - x) < 0.06 * k; }).slice(0, 4);
       bipolarCell(g, rnd, x, k, near);
@@ -833,12 +833,6 @@
     for (x = -X + rnd() * 0.3 * k; x < X; x += Math.max(0.1, 0.4 * k * thin) * (0.7 + rnd() * 0.6)) if (!open(x, true)) amacrineCell(g, rnd, x, k, lod);
     for (x = -X + rnd() * 0.3 * k; x < X; x += Math.max(0.12, 0.5 * k * thin) * (0.7 + rnd() * 0.6)) if (!open(x, true)) ganglionCell(g, rnd, x, k, lod);
     roof(g, rnd, X, k);
-    // nerve fibres along the very top
-    for (i = 0; i < 1 + lod; i++) {
-      var Y = ILM - 0.03 - rnd() * 0.15, ph = rnd() * TAU, pts = [];
-      for (var s = 0; s <= 40; s++) { var xx = lerp(-X, X, s / 40); pts.push([xx, (Y + 0.02 * Math.sin(xx / k * 1.3 + ph)) * k, (0.0016 + rnd() * 0.0012) * k]); }
-      g.ink.taper(pts);
-    }
     // the glia, our mangroves
     for (x = -X + rnd() * 0.5 * k; x < X; x += Math.max(0.22, 1.2 * k * thin) * (0.7 + rnd() * 0.6)) if (!open(x, true)) mullerCell(g, rnd, x, k, lod);
     minInk = 0; wobble = 0;
@@ -851,7 +845,8 @@
     var soft = 0.012 * k, col = function (c) { return mix(c, HAZE, hz); }, edge = function (c) { return mix(mix(c, '#14080B', 0.45), HAZE, hz * 0.8); };
     [[g.roofC, '#A56A7C', 0.2], [g.seg, '#C48A3A', 0.3], [g.rod, '#A0703E', 0.35], [g.pr, '#6B3A24', 0.3], [g.glia, '#7E86A8', 0.35], [g.ink, '#3E1C24', 0.45],
       [g.roofB, '#83405A', 0.2], [g.gang, '#7A2E4A', 0.25], [g.roofA, '#64263E', 0.2], [g.lamp, '#C9587C', 0.2]].forEach(function (w) {
-      if (isFinite(w[0].box[0])) wash(cv, w[0].path, col(w[1]), edge(w[1]), qpx, box, soft, w[2]);
+      var roofy = w[0] === g.roofA || w[0] === g.roofB || w[0] === g.roofC, c = roofy ? mix(w[1], HAZE, Math.min(1, hz * 1.25)) : col(w[1]);
+      if (isFinite(w[0].box[0])) wash(cv, w[0].path, c, roofy ? mix(edge(w[1]), HAZE, hz * 0.4) : edge(w[1]), qpx, box, soft, w[2]);
       if (w[0] === g.seg && g.discs) {
         var o = cv.getContext('2d');
         o.setTransform(qpx, 0, 0, qpx, -box[0] * qpx, -box[1] * qpx);
@@ -1003,7 +998,7 @@
   }
 
   // a slanting shaft of light, from the roof down to a pool on the floor
-  function drawRay(ray, cam) {
+  function drawRay(ray, cam, now) {
     var tp = proj(ray.x, ILM, ray.D, cam), tx = tp.x, ty = tp.y, s = tp.s;
     var bt = proj(ray.x + (FLOOR - ILM) * ray.slant, FLOOR, ray.D, cam), w = ray.w * s;
     if (Math.max(tx, bt.x) + w < 0 || Math.min(tx, bt.x) - w > W) return;
@@ -1017,6 +1012,17 @@
     ctx.setTransform(w * dpr, 0, (bt.x - tx) * dpr, (bt.y - ty) * dpr, (tx - w / 2) * dpr, ty * dpr);
     ctx.globalAlpha = ray.a;
     ctx.drawImage(TEX.ray, 0, 0, 1, 1);
+    // motes drifting slowly down through the light
+    if (s > 60 && !reduce) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = '#FFF6DC';
+      for (var i = 0; i < 14; i++) {
+        var v = ((ray.x * 7.3 + i * 0.137 + now * 0.000012 * (1 + i % 3)) % 1 + 1) % 1, u = 0.5 + 0.32 * Math.sin(i * 2.1 + now * 0.0004);
+        var mx = tx - w / 2 + u * w + (bt.x - tx) * v, my = ty + (bt.y - ty) * v, mr = (0.6 + (i % 4) * 0.35) * Math.min(3, s / 250);
+        ctx.globalAlpha = 0.35 + 0.35 * Math.sin(i * 1.3 + now * 0.002);
+        ctx.beginPath(); ctx.arc(mx, my, mr, 0, TAU); ctx.fill();
+      }
+    }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   }
@@ -1192,7 +1198,7 @@
         drawItems(it.pl.items, T, smooth(0.25, 0.55, den));   // slices we reach just before the end slip away
       } else if (it.k === 1) drawRiverRun(it.r, cam, now);
       else if (it.k === 2) drawTube(it.r, cam, now);
-      else if (it.k === 3) drawRay(it.r, cam);
+      else if (it.k === 3) drawRay(it.r, cam, now);
       else if (it.k === 4) drawTrunk(it.t, cam, now);
       else if (it.k === 5) drawBoat(cam, now);
       else {
@@ -1212,7 +1218,7 @@
     var hy = C.y - cam.y * F / 200, g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, '#F7E2B0'); g.addColorStop(clamp(hy / H - 0.12, 0, 1), '#E2B678'); g.addColorStop(clamp(hy / H, 0, 1), '#E9BC74'); g.addColorStop(1, '#D9993E');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    plane(cam, ILM, '#EFD3A0', '#DDB57C', TEX.roof, 0.05, 0.55);
+    plane(cam, ILM, '#EFD3A0', '#DDB57C', TEX.roof, 0.09, 0.28);
     plane(cam, FLOOR, '#F2BF45', '#DDB57C', TEX.floor, 0.035, 0.42);
   }
   function plane(cam, Y, nearCol, far, tex, cell, texA) {
