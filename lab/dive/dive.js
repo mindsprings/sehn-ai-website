@@ -157,6 +157,7 @@
     if (end) pts[pts.length - 1][2] = 0;
     ink.taper(pts);
     if (end) return;
+    if (o.joint) ink.dot(x, y, wi);   // a round joint where it forks, so the branches grow out of it smoothly
     for (i = 0; i < 2; i++) {
       grow(ink, o, rnd, x, y, ang + (i - 0.5) * o.spread * (0.7 + rnd() * 0.6), len * o.lenK * (0.75 + rnd() * 0.5), wi * o.wK, depth + 1);
     }
@@ -611,11 +612,11 @@
     g.addColorStop(0, '#FFF8E6'); g.addColorStop(0.25, '#FCEBB8'); g.addColorStop(0.6, '#F6D27E'); g.addColorStop(0.8, '#E9A548'); g.addColorStop(1, 'rgba(225,140,60,0)');
     L.items.push({ path: circle(BLIND.x, BLIND.y, 0.16), fill: g, box: [BLIND.x - 0.16, BLIND.y - 0.16, BLIND.x + 0.16, BLIND.y + 0.16] });
     var veins = new Ink(), arteries = new Ink();
-    var o = { step: 0.008, wiggle: 0.06, taper: 0.82, spread: 0.55, lenK: 0.7, wK: 0.74, depth: 6, side: 0.03, sideK: 0.45,
+    var o = { step: 0.008, wiggle: 0.06, taper: 0.82, spread: 0.55, lenK: 0.7, wK: 0.74, depth: 5, side: 0.03, sideK: 0.45, joint: true,
       inside: function (x, y) { var r2 = x * x + y * y; return r2 > 0.02 && r2 < 3; } };   // they keep out of the very middle
     [[-0.42, 0.022, 0.015, veins], [-0.56, 0.024, 0.011, arteries], [0.42, -0.022, 0.015, veins], [0.56, -0.024, 0.011, arteries],
       [Math.PI + 0.5, 0, 0.012, veins], [Math.PI - 0.5, 0, 0.011, arteries], [Math.PI + 0.1, 0, 0.009, arteries], [Math.PI - 0.15, 0, 0.009, veins]].forEach(function (v) {
-      o.curl = v[1];
+      o.curl = v[1] * o.step / 0.02;   // the curl is per step: keep the same turning per unit of length
       grow(v[3], o, rnd, BLIND.x + Math.cos(v[0]) * 0.03, BLIND.y + Math.sin(v[0]) * 0.03, v[0], 0.62, v[2], 0);
     });
     L.items.push({ path: veins.path, fill: '#8C1626', stroke: '#4A0A14', lw: 0.003, box: veins.box });
