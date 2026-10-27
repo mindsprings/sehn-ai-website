@@ -14,6 +14,9 @@ Static site, no build step. Everything that gets deployed is in `public/`.
 - `public/favicon.svg`, `favicon-32.png`, `apple-touch-icon.png`, `og-image.png`
 - `assets-source/`: the full asset library from the deck. **Not deployed**, because it contains images with unclear licenses (see its README)
 - `tools/og.html`: source of the Open Graph image (screenshot at 1200×630)
+- `lab/`: experiments, not deployed. `lab/dive/` is the multiplane prototype: the eye, a dive through the pupil, a world of neurons. Open `lab/dive/index.html` and scroll; `?p=0.5` holds the camera at a point of the scroll, `?debug` shows timings
+- `tools/make_keyframe_template.py`: writes the blank keyframe sheet `lab/dive/keyframes/keyframe-sheet.ora` (layered, opens in Krita) and a PNG preview
+- `tools/artcraft.sh`: starts PhotoCraft, VectorCraft, DesignCraft and EffectCraft with their control servers, for the MCP bridges in `.mcp.json` (`stop` and `status` too)
 - `screenshots/`: desktop and phone previews (of the first version)
 - `archive/v1-deck-style/`: the first, slide-like version of the page, kept for comparison
 

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>sehn.ai lab · Into the eye</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="../../public/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=Courier+Prime&family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --night-1: #18263F; --night-2: #0A111D;
+      --on-dark: #F5F2EA; --on-dark-2: #B9C3D0;
+      --rose: #E7A1B6; --rose-pale: #F7DDE5; --plum: #8E2F55;
+      --serif: "Fraunces", Georgia, "Times New Roman", serif;
+      --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+      --mono: "Courier Prime", "Courier New", Courier, monospace;
+      --hand: "Caveat", "Segoe Print", "Bradley Hand", cursive;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--night-2); color: var(--on-dark); }
+    body { font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+
+    /* the scroll drives the camera; the stage stays put */
+    .track { height: 800vh; }
+    .stage { position: sticky; top: 0; height: 100vh; overflow: hidden; }
+    #stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; transition: opacity .3s ease; }
+    #stage.is-fading { opacity: 0; }
+
+    /* old film: grain and a soft vignette */
+    .grain { position: absolute; inset: -20%; pointer-events: none; opacity: .09; mix-blend-mode: overlay; background-size: 180px 180px; animation: grain .9s steps(5) infinite; }
+    @keyframes grain {
+      0% { transform: translate(0, 0); } 20% { transform: translate(-4%, 3%); } 40% { transform: translate(3%, -2%); }
+      60% { transform: translate(-2%, -4%); } 80% { transform: translate(4%, 2%); } 100% { transform: translate(0, 0); }
+    }
+    .vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 95% at 50% 45%, transparent 58%, rgba(6, 8, 14, .55) 100%); }
+
+    .hero-copy { position: absolute; left: 0; right: 0; bottom: 7vh; padding: 0 16px; text-align: center; }
+    .eyebrow { font-family: var(--mono); text-transform: uppercase; letter-spacing: 4px; font-size: 13px; color: var(--rose); margin: 0 0 14px; }
+    .eyebrow::before { content: "✦ "; letter-spacing: 0; }
+    h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(34px, 5vw, 64px); line-height: 1.04; letter-spacing: -.01em; margin: 0 0 14px; }
+    h1 em { color: var(--rose); }
+    .note { font-family: var(--hand); font-weight: 600; font-size: 24px; line-height: 1.1; color: var(--rose); margin: 0; display: inline-block; transform: rotate(-3deg); }
+
+    .world-copy { position: absolute; left: 0; right: 0; bottom: 0; padding: 72px 16px 18px; background: linear-gradient(rgba(26,12,10,0), rgba(26,12,10,.62) 45%); display: grid; justify-items: center; gap: 10px; text-align: center; opacity: 0; visibility: hidden; }
+    .tagline { font-family: var(--serif); font-size: clamp(24px, 3.2vw, 40px); line-height: 1.1; margin: 0; text-shadow: 0 2px 18px rgba(0, 0, 0, .5); }
+    .world-copy .note { color: var(--rose-pale); font-size: 22px; }
+    .credits { font-size: 13px; line-height: 1.45; color: var(--on-dark-2); max-width: 44em; margin: 4px 0 0; }
+    .credits a { color: var(--on-dark); text-underline-offset: 2px; }
+
+    .switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; background: none; border: 0; padding: 4px; font: inherit; font-size: 15px; color: var(--on-dark); }
+    .switch__track { position: relative; width: 46px; height: 26px; border-radius: 99px; background: #2A3A52; border: 2px solid var(--on-dark-2); transition: background-color .2s ease; flex: none; }
+    .switch__track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--on-dark); border: 2px solid var(--on-dark-2); transition: transform .25s cubic-bezier(.3, 1.4, .5, 1); }
+    .switch[aria-pressed="true"] .switch__track { background: var(--rose); }
+    .switch[aria-pressed="true"] .switch__track::after { transform: translateX(20px); }
+    .switch:focus-visible { outline: 2px solid var(--rose); outline-offset: 3px; border-radius: 6px; }
+
+    .hud { position: fixed; top: 8px; left: 8px; z-index: 9; margin: 0; padding: 6px 8px; font: 12px/1.35 var(--mono); color: #CFE; background: rgba(0, 0, 0, .55); border-radius: 6px; pointer-events: none; }
+    .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <main class="track">
+    <div class="stage">
+      <canvas id="stage" aria-hidden="true"></canvas>
+      <div class="grain" aria-hidden="true"></div>
+      <div class="vignette" aria-hidden="true"></div>
+
+      <header class="hero-copy" id="hero-copy">
+        <p class="eyebrow">Visual-spatial perception for AI agents</p>
+        <h1>Agents want to <em>see</em> like we&nbsp;do.</h1>
+        <p class="note">scroll to look inside ↓</p>
+      </header>
+
+      <section class="world-copy" id="world-copy" aria-label="Inside the eye">
+        <p class="visually-hidden">Scrolling flies the camera into the eye’s pupil and through the dark inside, then down onto the glowing retina, past red vessels and layers of cells. The camera turns, and we stand inside the retina: a forest of strange layered trees made of neurons, on a yellow floor of rods and cones, with red capillaries winding through and light slanting down from above.</p>
+        <p class="tagline">Every AI that sees should see like we do.</p>
+        <button class="switch" type="button" id="flat" aria-pressed="false"><span class="switch__track" aria-hidden="true"></span>Flatten the layers</button>
+        <p class="note">move around: each layer is flat, the depth comes from motion</p>
+        <p class="credits">Inspired by <a href="https://en.wikipedia.org/wiki/Santiago_Ram%C3%B3n_y_Cajal">Santiago Ramón y Cajal</a>’s drawings of the retina, Disney’s <a href="https://en.wikipedia.org/wiki/Multiplane_camera">multiplane camera</a>, and the films of <a href="https://www.youtube.com/watch?v=n11j73OYqOY">McBess</a>.</p>
+      </section>
+    </div>
+  </main>
+  <script src="dive.js"></script>
+</body>
+</html>
