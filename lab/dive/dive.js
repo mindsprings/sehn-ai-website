@@ -1268,6 +1268,10 @@
         ctx.fillStyle = pattern(ctx, tex, sx, pm.x, pm.y);
         ctx.setTransform(dpr, 0, 0, dpr * sq, 0, pm.y * dpr * (1 - sq));
         ctx.fillRect(0, pm.y + (y0 - pm.y) / sq, W, (y1 - y0 + 1) / sq);
+        // an uneven wash over it, fixed to the ground so it does not swim as we move
+        ctx.globalAlpha = 0.3 * (1 - haze(Dm) * 0.7);
+        ctx.fillStyle = pattern(ctx, TEX.mottle, sx * 9, pm.x, pm.y);
+        ctx.fillRect(0, pm.y + (y0 - pm.y) / sq, W, (y1 - y0 + 1) / sq);
         ctx.globalAlpha = 1;
       }
       prev = { y: y, D: D };
