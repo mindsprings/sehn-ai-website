@@ -1,0 +1,1225 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<title>Vom Licht zum Gedanken</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Baloo+2:wght@600;700;800&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: Zeichentrick-„Player“ – 16:9-Bühne, Untertitel-Sprechblase, Steuerleiste, Kapitel-Leiste rechts; darunter das Lexikon */
+:root{
+  --bg:#e4ecef; --surface:#f8fbfb; --stage:#fcfefe; --fg:#18203a; --muted:#56627a; --line:#18203a; --shadow:#18203a;
+  --ink:#18203a; --lead:#8592a8; --accent:#13808d; --track:#d0dce1; --hi:#ffd23f; --glow:#ffb400; --hl-text:#b4470f;
+  --sun:#ffd23f; --sclera:#ffffff; --cornea:#a9dcec; --aqueous:#d6f0f6; --vitreous:#e4f3f6; --iris:#2f8f9d; --lens:#fff0b0;
+  --retina:#f08466; --choroid:#a83a3a; --macula:#f2bf2a; --nerve:#f7d46e; --muscle:#e98a8a; --rod:#8b67d0;
+  --coneS:#4c78f0; --coneM:#2fae55; --coneL:#ea4d4d; --rpe:#6e4a38; --brain:#f7c6cf; --brain2:#e59aac;
+  --fieldL:#2f74d6; --fieldR:#f0862a; --gang:#f5a04a; --bip:#4cb7a1; --hor:#e8bf42; --ama:#e57fb0; --cell:#f6dcb4; --v1c:#ff8a5c; --grass:#a6d98b; --sky:#c3e5f5;
+  --display:'Baloo 2','Trebuchet MS',system-ui,sans-serif;
+  --body:'Atkinson Hyperlegible','Segoe UI',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1420; --surface:#172034; --stage:#1a2438; --fg:#edf1f8; --muted:#a1adc2; --line:#b8c4d8; --shadow:#04070d;
+  --ink:#0b101c; --lead:#7886a0; --accent:#53c4d0; --track:#26324a; --hl-text:#ffc861; --vitreous:#cfe7ee; --aqueous:#c4e8f0; --sky:#a9d3ea; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1420; --surface:#172034; --stage:#1a2438; --fg:#edf1f8; --muted:#a1adc2; --line:#b8c4d8; --shadow:#04070d;
+  --ink:#0b101c; --lead:#7886a0; --accent:#53c4d0; --track:#26324a; --hl-text:#ffc861; --vitreous:#cfe7ee; --aqueous:#c4e8f0; --sky:#a9d3ea; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font:16px/1.55 var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 40px}
+.wrap{max-width:1240px;margin:0 auto}
+header.top{padding-block:28px 18px;display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 28px}
+.eyebrow{font:700 13px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1{font:800 clamp(34px,5.4vw,60px)/1 var(--display);margin:4px 0 6px;letter-spacing:-.01em;text-wrap:balance}
+h1 .dot{color:var(--glow)}
+.lede{margin:0;max-width:62ch;color:var(--muted)}
+.hint{font-size:14px;color:var(--muted);max-width:34ch}
+.hint b{color:var(--fg)}
+
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 272px;gap:24px;align-items:start}
+@media (max-width:940px){.layout{grid-template-columns:minmax(0,1fr)}}
+.player{min-width:0}
+.chap-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.chap-no{font:500 13px var(--mono);color:var(--muted)}
+.chap-head h2{font:700 clamp(22px,3vw,30px)/1.1 var(--display);margin:0;text-wrap:balance}
+.stagebox{position:relative;background:var(--stage);border:3px solid var(--line);border-radius:22px;box-shadow:6px 6px 0 var(--shadow);overflow:hidden}
+#stage{display:block;width:100%;height:auto;aspect-ratio:16/9;font-family:var(--body);touch-action:manipulation}
+.subtitle{position:relative;margin-top:16px;background:var(--surface);border:3px solid var(--line);border-radius:18px;box-shadow:4px 4px 0 var(--shadow);padding:14px 18px 14px;min-height:6.4em}
+.subtitle::before{content:"";position:absolute;top:-13px;left:46px;width:20px;height:20px;background:var(--surface);border-left:3px solid var(--line);border-top:3px solid var(--line);transform:rotate(45deg)}
+.subtitle p{margin:0;font-size:1.1rem;line-height:1.55;max-width:75ch}
+.sub-meta{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.sub-meta .lbl{font:500 12px var(--mono);color:var(--muted);margin-right:6px}
+.bd{width:9px;height:9px;border-radius:50%;background:var(--track);border:1.5px solid var(--line);cursor:pointer;padding:0}
+.bd.on{background:var(--hi)}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px}
+.btn{font:700 15px var(--body);border:2.5px solid var(--line);background:var(--surface);color:var(--fg);border-radius:12px;padding:8px 14px;box-shadow:3px 3px 0 var(--shadow);cursor:pointer;transition:transform .08s,box-shadow .08s;display:inline-flex;align-items:center;gap:8px;line-height:1.2}
+.btn:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--shadow)}
+.btn:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--shadow)}
+.btn:focus-visible,.bd:focus-visible,.seg:focus-visible,.chap button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--hi);color:#18203a;border-color:var(--line);min-width:118px;justify-content:center}
+.btn[aria-pressed="true"]{background:var(--accent);color:var(--surface)}
+.btn svg{width:16px;height:16px}
+.spacer{flex:1}
+.tgroup{display:inline-flex;gap:10px}
+.sub-meta .lbl{white-space:nowrap}
+.seggroup{display:inline-flex;border:2.5px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:3px 3px 0 var(--shadow)}
+.seggroup button{font:700 14px var(--body);border:0;background:var(--surface);color:var(--fg);padding:8px 11px;cursor:pointer}
+.seggroup button+button{border-left:2px solid var(--line)}
+.seggroup button[aria-pressed="true"]{background:var(--accent);color:var(--surface)}
+.progress{display:flex;gap:4px;width:100%;margin-top:14px}
+.seg{flex:1;height:12px;border-radius:6px;background:var(--track);border:1.5px solid var(--line);overflow:hidden;cursor:pointer;padding:0}
+.seg i{display:block;height:100%;width:0;background:var(--accent)}
+.panel{margin-top:16px;display:flex;flex-direction:column;gap:12px;background:var(--surface);border:2.5px dashed var(--lead);border-radius:16px;padding:14px 16px}
+.panel h3{margin:0;font:700 17px var(--display)}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ctl-l{font:700 13px var(--body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);min-width:96px}
+.ctl .btn{font-size:14px;padding:6px 11px}
+.ctl input[type=range]{flex:1 1 220px;min-width:0;accent-color:var(--accent)}
+.out{font:500 14px var(--mono);min-width:8ch}
+.facts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.fact{background:var(--stage);border:2px solid var(--line);border-radius:12px;padding:10px 12px}
+.fact b{display:block;font:800 22px/1.1 var(--display);font-variant-numeric:tabular-nums}
+.fact span{font-size:13.5px;color:var(--muted)}
+
+aside.chapters{position:sticky;top:max(12px,env(safe-area-inset-top,0px))}
+aside h3{font:700 14px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:2px 0 10px}
+.chap{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;counter-reset:c}
+.chap button{width:100%;text-align:left;display:flex;gap:10px;align-items:baseline;font:700 14.5px/1.3 var(--body);color:var(--fg);background:transparent;border:2px solid transparent;border-radius:10px;padding:6px 9px;cursor:pointer}
+.chap button:hover{border-color:var(--lead)}
+.chap button .n{font:500 12px var(--mono);color:var(--muted);min-width:2ch}
+.chap button[aria-current="true"]{background:var(--hi);color:#18203a;border-color:var(--line);box-shadow:3px 3px 0 var(--shadow)}
+.chap button[aria-current="true"] .n{color:#18203a}
+@media (max-width:940px){
+  aside.chapters{position:static}
+  .chap{flex-direction:row;overflow-x:auto;padding-bottom:8px}
+  .chap li{flex:0 0 auto}
+  .chap button{white-space:nowrap}
+}
+
+/* SVG-Bühne */
+.t{cursor:help;transition:opacity .45s}
+#stage.focus .t:not(.hl){opacity:.26}
+.t.hl:not(.lbl){filter:drop-shadow(0 0 5px var(--glow)) drop-shadow(0 0 2px var(--glow))}
+.lbl text{font:700 15px var(--body);fill:var(--fg);paint-order:stroke;stroke:var(--stage);stroke-width:4px;stroke-linejoin:round}
+.lbl line{stroke:var(--lead);stroke-width:1.6}
+.lbl circle{fill:var(--fg)}
+.lbl.hl text{fill:var(--hl-text)}
+.lbl.hl line{stroke:var(--hl-text);stroke-width:2.4}
+.tx{fill:var(--fg);font:700 14px var(--body)}
+.tx.sm{font-size:12.5px;font-weight:400}
+.tx.mono{font:500 12px var(--mono)}
+.tx.dk{fill:#18203a}
+.tx.halo{paint-order:stroke;stroke:var(--stage);stroke-width:4px;stroke-linejoin:round}
+.tx.big{font:800 22px var(--display)}
+.off{display:none}
+#scene [data-from]:not(.off),#scene [data-until]:not(.off){animation:pop .55s cubic-bezier(.3,1.6,.5,1) backwards;transform-box:fill-box;transform-origin:center}
+@keyframes pop{from{opacity:0;scale:.72}}
+#scene.enter{animation:sceneIn .5s ease-out backwards}
+@keyframes sceneIn{from{opacity:0;translate:0 14px}}
+.pulse{animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.45}}
+.ring{transform-box:fill-box;transform-origin:center;animation:ring 1.4s ease-out infinite}
+@keyframes ring{from{scale:.8;opacity:.9}to{scale:1.5;opacity:0}}
+.spark{fill:var(--sun);stroke:var(--ink);stroke-width:2}
+.bob{animation:bob 1.8s ease-in-out infinite}
+@keyframes bob{50%{translate:0 -7px}}
+.ion{fill:#ffb347;stroke:var(--ink);stroke-width:1.4}
+.drag{cursor:grab}
+
+#tip{position:fixed;z-index:60;max-width:300px;background:var(--surface);color:var(--fg);border:2.5px solid var(--line);border-radius:14px;box-shadow:4px 4px 0 var(--shadow);padding:10px 13px;pointer-events:none}
+#tip .row{display:flex;gap:7px;align-items:baseline}
+#tip .lg{font:500 10.5px var(--mono);border:1.5px solid var(--line);border-radius:5px;padding:0 4px;color:var(--muted)}
+#tip .de{font:800 18px/1.2 var(--display)}
+#tip .en{font-style:italic;color:var(--muted)}
+#tip p{margin:6px 0 0;font-size:14px;line-height:1.45}
+
+.ov{position:absolute;inset:0;background:var(--stage);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px;text-align:center}
+.ov .grid{font:500 clamp(22px,4.5vw,44px)/1.25 var(--mono);letter-spacing:.35em}
+.ov .grid div.cue{background:var(--hi);color:#18203a;border-radius:8px}
+.ov p{margin:0;max-width:52ch}
+.ov .arrow{font:800 clamp(28px,5vw,46px) var(--display);color:var(--glow)}
+
+section.lex{margin-top:56px}
+section.lex h2{font:800 clamp(28px,4vw,40px)/1.05 var(--display);margin:0 0 6px}
+section.lex .sub{color:var(--muted);margin:0 0 16px;max-width:70ch}
+.lexbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:16px}
+#q{font:16px var(--body);padding:10px 14px;border:2.5px solid var(--line);border-radius:12px;background:var(--surface);color:var(--fg);flex:1 1 260px;min-width:0;box-shadow:3px 3px 0 var(--shadow)}
+.count{font:500 13px var(--mono);color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.card{background:var(--surface);border:2px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.card .de{font:800 18px/1.2 var(--display)}
+.card .en{font-style:italic;color:var(--muted);font-size:14.5px}
+.card p{margin:4px 0 6px;font-size:14.5px;line-height:1.45;flex:1}
+.card button{align-self:flex-start;font:700 13px var(--body);background:transparent;border:0;color:var(--accent);padding:0;cursor:pointer}
+.card button:hover{text-decoration:underline}
+.card .ch{font:500 11.5px var(--mono);color:var(--muted)}
+footer{margin-top:44px;font-size:13.5px;color:var(--muted);max-width:90ch}
+footer b{color:var(--fg)}
+@media (prefers-reduced-motion: reduce){
+  #scene [data-from]:not(.off),#scene [data-until]:not(.off),#scene.enter,.pulse,.ring,.bob{animation:none}
+}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Grundwissen für sehn.ai · interaktiver Zeichentrick-Kurs</div>
+      <h1>Vom Licht zum Gedanken<span class="dot">.</span></h1>
+      <p class="lede">Wie das menschliche Auge Licht einfängt, wie Zellen daraus Signale machen, wie das Gehirn ein Bild baut – und wie es gespeichert wird. In 14 Kapiteln.</p>
+    </div>
+    <p class="hint"><b>Tipp:</b> Fahr mit der Maus über jedes Bauteil (am Handy antippen) – du siehst den Namen auf Deutsch und Englisch. <b>Leertaste</b> = Play/Pause, <b>← →</b> = Schritt.</p>
+  </header>
+
+  <div class="layout">
+    <section class="player" aria-label="Präsentation">
+      <div class="chap-head"><span class="chap-no" id="chapNo">Kapitel 1 / 14</span><h2 id="chapTitle">…</h2></div>
+      <div class="stagebox">
+        <svg id="stage" viewBox="0 0 800 450" role="img" aria-labelledby="chapTitle">
+          <defs>
+            
+            <g id="ph">
+              <circle r="17" fill="var(--sun)" opacity=".35"/>
+              <circle r="11" fill="var(--sun)" stroke="var(--ink)" stroke-width="2.5"/>
+              <circle cx="-3.6" cy="-2" r="1.7" fill="var(--ink)"/><circle cx="3.6" cy="-2" r="1.7" fill="var(--ink)"/>
+              <path d="M-4,3 Q0,6.5 4,3" fill="none" stroke="var(--ink)" stroke-width="1.8" stroke-linecap="round"/>
+            </g>
+            <marker id="mF" viewBox="0 0 10 10" refX="6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--fg)"/></marker>
+            <marker id="mG" viewBox="0 0 10 10" refX="6" refY="5" markerUnits="userSpaceOnUse" markerWidth="16" markerHeight="16" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--coneM)" stroke="var(--ink)" stroke-width="1"/></marker>
+            <marker id="mB" viewBox="0 0 10 10" refX="6" refY="5" markerUnits="userSpaceOnUse" markerWidth="16" markerHeight="16" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--fieldL)" stroke="var(--ink)" stroke-width="1"/></marker>
+            <marker id="mR" viewBox="0 0 10 10" refX="6" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--coneL)"/></marker>
+          </defs>
+          <g id="scene"></g>
+        </svg>
+        <div class="ov" id="ov" hidden></div>
+      </div>
+
+      <div class="subtitle" aria-live="polite">
+        <div class="sub-meta"><span class="lbl" id="stepLbl">Schritt 1 / 1</span><span id="dots"></span></div>
+        <p id="subText"></p>
+      </div>
+
+      <div class="controls">
+        <span class="tgroup"><button class="btn" id="bPrev" aria-label="Zurück"><svg viewBox="0 0 16 16"><path d="M10 2 L4 8 L10 14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button class="btn primary" id="bPlay"><svg viewBox="0 0 16 16" id="playIco"><path d="M4 2 L14 8 L4 14 Z" fill="currentColor"/></svg><span id="playTxt">Abspielen</span></button>
+        <button class="btn" id="bNext" aria-label="Weiter"><svg viewBox="0 0 16 16"><path d="M6 2 L12 8 L6 14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button></span>
+        <span class="spacer"></span>
+        <button class="btn" id="bSpeak" aria-pressed="false" hidden>Vorlesen</button>
+        <span class="seggroup" role="group" aria-label="Sprache der Beschriftung"><button id="lDE" aria-pressed="true">DE</button><button id="lEN" aria-pressed="false">EN</button></span>
+        <div class="progress" id="prog" aria-label="Fortschritt"></div>
+      </div>
+
+      <div class="panel" id="panel" hidden></div>
+    </section>
+
+    <aside class="chapters" aria-label="Kapitel">
+      <h3>Kapitel</h3>
+      <ol class="chap" id="chapList"></ol>
+    </aside>
+  </div>
+
+  <section class="lex" aria-labelledby="lexH">
+    <h2 id="lexH">Lexikon · Glossary</h2>
+    <p class="sub">Alle Begriffe aus dem Kurs, deutsch und englisch. „Im Bild zeigen“ springt zum passenden Kapitel und hebt das Teil hervor.</p>
+    <div class="lexbar"><input id="q" type="search" placeholder="Suchen, z. B. Zapfen, cone, Hippocampus …" aria-label="Lexikon durchsuchen"><span class="count" id="cnt"></span></div>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <footer>
+    <p><b>Hinweis:</b> Vereinfachte, didaktische Darstellung. Zahlen sind gerundete Richtwerte aus der Lehrbuchliteratur und schwanken zwischen Menschen.</p>
+    <p><b>Quellen (Auswahl):</b> Kandel et al., <i>Principles of Neural Science</i>; Purves et al., <i>Neuroscience</i>; Hubel &amp; Wiesel (1962); Ungerleider &amp; Mishkin (1982); Sperling (1960); Luck &amp; Vogel (1997); Thorpe et al. (1996); Quiroga et al. (2005); Brady et al. (2008); Bliss &amp; Lømo (1973); Fukushima (1980).</p>
+  </footer>
+</div>
+
+<div id="tip" role="tooltip" hidden><div class="row"><span class="lg">DE</span><span class="de" id="tDe"></span></div><div class="row"><span class="lg">EN</span><span class="en" id="tEn"></span></div><p id="tD"></p></div>
+
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s);
+
+/* ---------- Glossar: key: [Deutsch, English, Erklärung, Kapitel, kurzDE, kurzEN] ---------- */
+const G={
+ sun:['Lichtquelle','Light source','Sonne, Lampe oder Bildschirm senden Photonen aus.','start'],
+ brain:['Gehirn','Brain','Rund 86 Milliarden Nervenzellen. Grob 20–30 % der Großhirnrinde sind am Sehen beteiligt. Das ganze Gehirn braucht nur etwa 20 Watt.','start'],
+ photon:['Photon (Lichtteilchen)','Photon','Kleinstes Energiepaket des Lichts. Ein einziges Photon kann ein Stäbchen bereits aktivieren.','licht','Photon','Photon'],
+ spectrum:['Elektromagnetisches Spektrum','Electromagnetic spectrum','Von Radiowellen bis Gammastrahlung. Sichtbar ist nur ein winziger Ausschnitt davon.','licht'],
+ light:['Sichtbares Licht','Visible light','Elektromagnetische Strahlung von etwa 380 bis 780 Nanometern Wellenlänge.','licht'],
+ wavelength:['Wellenlänge','Wavelength','Abstand zwischen zwei Wellenbergen. Kurze Wellen erleben wir als Violett/Blau, lange als Rot.','licht'],
+ uv:['Ultraviolett (UV)','Ultraviolet','Kürzer als 380 nm. Für uns unsichtbar – Hornhaut und Linse filtern es größtenteils heraus.','licht'],
+ ir:['Infrarot','Infrared','Länger als 780 nm. Spüren wir als Wärme, sehen es aber nicht.','licht'],
+ reflection:['Reflexion','Reflection','Gegenstände werfen einen Teil des Lichts zurück. Ein Apfel wirkt rot, weil er vor allem langwelliges Licht reflektiert.','licht'],
+ eyeball:['Augapfel','Eyeball','Fast kugelrund, etwa 24 mm lang und rund 7 g schwer.','anatomie'],
+ tearfilm:['Tränenfilm','Tear film','Hauchdünne Schicht aus Öl, Wasser und Schleim. Hält die Hornhaut glatt, feucht und optisch sauber.','anatomie'],
+ cornea:['Hornhaut (Cornea)','Cornea','Klares, gewölbtes Fenster vorne. Bricht das Licht am stärksten: rund 43 Dioptrien, etwa zwei Drittel der gesamten Brechkraft.','anatomie','Hornhaut','Cornea'],
+ sclera:['Lederhaut (Sklera)','Sclera','Feste, weiße Außenhülle. Schützt das Auge und gibt ihm Form; hier setzen die Augenmuskeln an.','anatomie','Lederhaut','Sclera'],
+ aqueous:['Kammerwasser (Vorderkammer)','Aqueous humour (anterior chamber)','Klare Flüssigkeit zwischen Hornhaut und Iris, gebildet vom Ziliarkörper. Ernährt Hornhaut und Linse und hält den Augeninnendruck (ca. 10–21 mmHg).','anatomie','Kammerwasser','Aqueous humour'],
+ schlemm:['Schlemm-Kanal','Schlemm’s canal','Ringförmiger Abfluss für das Kammerwasser im Kammerwinkel. Ist er gestört, steigt der Augendruck – ein Risiko für Grünen Star (Glaukom).','anatomie'],
+ iris:['Regenbogenhaut (Iris)','Iris','Farbiger Muskelring. Regelt wie eine Kamerablende, wie viel Licht ins Auge fällt.','anatomie','Iris','Iris'],
+ pupil:['Pupille','Pupil','Das Loch in der Iris. Schwarz, weil das Licht im Auge verschluckt wird. Durchmesser etwa 2–8 mm.','anatomie'],
+ lens:['Linse','Lens','Elastische, glasklare Sammellinse aus Proteinen (Kristallinen). Stellt scharf, indem sie ihre Wölbung ändert.','anatomie'],
+ ciliary:['Ziliarkörper mit Ziliarmuskel','Ciliary body & ciliary muscle','Ringmuskel um die Linse. Spannt er sich an, lockern sich die Zonulafasern und die Linse wird runder (Nahsicht). Bildet außerdem das Kammerwasser.','anatomie','Ziliarkörper','Ciliary body'],
+ zonule:['Zonulafasern','Zonular fibres','Feine Aufhängefasern zwischen Ziliarkörper und Linse.','anatomie'],
+ vitreous:['Glaskörper','Vitreous body','Klares Gel (ca. 99 % Wasser). Füllt rund 80 % des Augapfels und hält ihn in Form.','anatomie'],
+ retina:['Netzhaut (Retina)','Retina','Lichtempfindliche Schicht hinten im Auge, nur etwa 0,25 mm dick. Entwicklungsgeschichtlich ein ausgelagerter Teil des Gehirns.','anatomie','Netzhaut','Retina'],
+ choroid:['Aderhaut','Choroid','Stark durchblutete Schicht zwischen Netzhaut und Lederhaut. Versorgt die Photorezeptoren mit Sauerstoff.','anatomie'],
+ macula:['Makula (Gelber Fleck)','Macula lutea','Zentrum der Netzhaut, ca. 5 mm groß. Gelb durch die Schutzpigmente Lutein und Zeaxanthin. Zuständig für scharfes Sehen und Lesen.','anatomie','Makula','Macula'],
+ fovea:['Sehgrube (Fovea centralis)','Fovea','Kleine Grube in der Mitte der Makula. Nur Zapfen, dicht gepackt – hier sehen wir am schärfsten (etwa 2° des Blickfelds).','anatomie','Fovea','Fovea'],
+ opticdisc:['Sehnervenpapille (blinder Fleck)','Optic disc (blind spot)','Hier verlassen die Nervenfasern das Auge. Keine Photorezeptoren – also blind. Liegt ca. 15° neben der Fovea, zur Nase hin.','anatomie','Blinder Fleck','Blind spot'],
+ opticnerve:['Sehnerv','Optic nerve','Bündel aus rund 1,2 Millionen Axonen der Ganglienzellen. Leitet die Signale zum Gehirn.','anatomie'],
+ eyemuscle:['Äußere Augenmuskeln','Extraocular muscles','Sechs Muskeln pro Auge (4 gerade, 2 schräge). Sie bewegen das Auge – auch bei den schnellen Sakkaden.','anatomie','Augenmuskel','Eye muscle'],
+ refraction:['Lichtbrechung','Refraction','Licht ändert die Richtung, wenn es von einem Stoff in einen anderen übergeht – z. B. von Luft in die Hornhaut.','fokus'],
+ diopter:['Dioptrie','Diopter','Maß für Brechkraft: 1 geteilt durch die Brennweite in Metern. Das ganze Auge hat rund 60 dpt.','fokus'],
+ accommodation:['Akkommodation','Accommodation','Scharfstellen auf nahe Dinge: Ziliarmuskel spannt an, Linse wölbt sich stärker. Junge Augen schaffen rund +10 dpt.','fokus'],
+ sphincter:['Pupillen-Schließmuskel','Sphincter pupillae','Ringmuskel der Iris. Macht die Pupille eng; gesteuert vom Parasympathikus.','fokus'],
+ dilator:['Pupillen-Erweiterer','Dilator pupillae','Strahlenförmiger Irismuskel. Macht die Pupille weit; gesteuert vom Sympathikus.','fokus'],
+ image:['Netzhautbild','Retinal image','Das Bild auf der Netzhaut steht auf dem Kopf und ist seitenverkehrt. Das Gehirn rechnet damit – es „dreht“ nichts um.','fokus'],
+ myopia:['Kurzsichtigkeit','Myopia','Augapfel zu lang oder Brechkraft zu stark: Der Fokus liegt vor der Netzhaut, Fernes ist unscharf.','fokus'],
+ presbyopia:['Alterssichtigkeit','Presbyopia','Ab etwa 45 wird die Linse steifer und kann sich kaum noch runden. Nahes wird unscharf.','fokus'],
+ nfl:['Nervenfaserschicht','Nerve fibre layer','Die Axone der Ganglienzellen laufen hier zur Papille und bilden dann den Sehnerv.','netzhaut'],
+ ganglion:['Ganglienzellen','Retinal ganglion cells','Ausgangsneurone der Netzhaut und die einzigen, die Aktionspotenziale („Spikes“) zum Gehirn schicken. Rund 1,2 Millionen pro Auge.','netzhaut','Ganglienzellen','Ganglion cells'],
+ amacrine:['Amakrine Zellen','Amacrine cells','Querverbinder in der inneren Netzhaut. Über 30 Typen; wichtig für Bewegungs- und Zeitsignale.','netzhaut'],
+ bipolar:['Bipolarzellen','Bipolar cells','Verbinden Photorezeptoren mit Ganglienzellen. ON-Typen reagieren auf „heller“, OFF-Typen auf „dunkler“.','netzhaut'],
+ horizontal:['Horizontalzellen','Horizontal cells','Verbinden Photorezeptoren seitlich und hemmen die Nachbarn: Kontraste und Kanten werden verstärkt.','netzhaut'],
+ photoreceptor:['Photorezeptoren','Photoreceptors','Die Lichtsinneszellen: Stäbchen und Zapfen. Sie wandeln Licht in ein elektrisches Signal um.','netzhaut'],
+ rpe:['Retinales Pigmentepithel (RPE)','Retinal pigment epithelium','Dunkle Zellschicht hinter den Rezeptoren. Schluckt Streulicht, recycelt das Sehpigment und „frisst“ täglich verbrauchte Außensegment-Scheibchen.','netzhaut','Pigmentepithel','Pigment epithelium'],
+ muller:['Müller-Zellen','Müller glia','Gliazellen, die die ganze Netzhaut durchspannen. Stützen und versorgen – und leiten Licht wie Glasfasern zu den Rezeptoren.','netzhaut'],
+ rod:['Stäbchen','Rods','Ca. 120 Millionen pro Auge. Extrem lichtempfindlich, für Dämmerung und Nacht. Sehen keine Farben.','rezeptoren'],
+ cone:['Zapfen','Cones','Ca. 6 Millionen pro Auge, konzentriert in der Fovea. Für Tageslicht, Schärfe und Farbe.','rezeptoren'],
+ coneS:['S-Zapfen („Blau“)','S-cones (short)','Am empfindlichsten bei ca. 420 nm. Nur rund 5–10 % aller Zapfen.','rezeptoren'],
+ coneM:['M-Zapfen („Grün“)','M-cones (medium)','Maximum bei ca. 534 nm.','rezeptoren'],
+ coneL:['L-Zapfen („Rot“)','L-cones (long)','Maximum bei ca. 564 nm. Der häufigste Zapfentyp.','rezeptoren'],
+ rhodopsin:['Rhodopsin (Sehpurpur)','Rhodopsin (visual purple)','Lichtempfindliches Molekül der Stäbchen: das Protein Opsin plus Retinal. Maximum bei ca. 498 nm.','rezeptoren','Rhodopsin','Rhodopsin'],
+ outerseg:['Außensegment','Outer segment','Stapel aus bis zu ~1.000 Membranscheibchen voller Sehpigment. Hier wird Licht eingefangen.','rezeptoren'],
+ innerseg:['Innensegment','Inner segment','Kraftwerk der Zelle, voller Mitochondrien.','rezeptoren'],
+ nucleus:['Zellkern','Nucleus','Enthält das Erbgut der Zelle.','rezeptoren'],
+ synterm:['Synaptische Endigung','Synaptic terminal','Hier gibt der Rezeptor den Botenstoff Glutamat an Bipolar- und Horizontalzellen ab.','rezeptoren','Synapse','Synaptic terminal'],
+ trichromacy:['Trichromatisches Sehen','Trichromacy','Farbe entsteht aus dem Verhältnis der drei Zapfensignale – ein einzelner Zapfen kennt keine Farbe.','rezeptoren'],
+ retinal:['Retinal','Retinal','Vitamin-A-Abkömmling im Sehpigment. Ein Photon biegt es von 11-cis zu all-trans – in rund 200 Femtosekunden.','transduktion'],
+ transducin:['Transducin','Transducin','G-Protein. Ein aktiviertes Rhodopsin schaltet viele Hundert Transducine an – erste Verstärkerstufe.','transduktion'],
+ pde:['Phosphodiesterase (PDE6)','Phosphodiesterase 6','Enzym, das cGMP in hohem Tempo abbaut – zweite Verstärkerstufe.','transduktion','PDE6','PDE6'],
+ cgmp:['cGMP','cGMP (cyclic GMP)','Botenstoff, der im Dunkeln die Ionenkanäle offen hält.','transduktion'],
+ cng:['CNG-Kanal','CNG channel','cGMP-gesteuerter Ionenkanal in der Zellmembran. Lässt Natrium- und Calcium-Ionen hinein.','transduktion'],
+ sodium:['Natrium-Ionen (Na⁺)','Sodium ions','Positiv geladene Ionen, die durch die offenen Kanäle einströmen.','transduktion','Na⁺','Na⁺'],
+ darkcurrent:['Dunkelstrom','Dark current','Im Dunkeln fließt ständig Strom in den Rezeptor. Er ist depolarisiert (ca. −40 mV) und schüttet pausenlos Glutamat aus.','transduktion'],
+ hyperpol:['Hyperpolarisation','Hyperpolarisation','Licht macht die Zelle negativer (bis ca. −70 mV). Sie gibt weniger Glutamat ab: Licht heißt für den Rezeptor „leiser“.','transduktion'],
+ glutamate:['Glutamat','Glutamate','Wichtigster erregender Botenstoff im Nervensystem. Photorezeptoren nutzen ihn an ihrer Synapse.','transduktion'],
+ visualcycle:['Sehzyklus','Visual cycle','Verbrauchtes all-trans-Retinal wird im Pigmentepithel wieder zu 11-cis-Retinal umgebaut.','transduktion'],
+ darkadapt:['Dunkeladaptation','Dark adaptation','Nach dem Wechsel ins Dunkle brauchen die Stäbchen 20–30 Minuten, bis ihr Pigment regeneriert und sie voll empfindlich sind.','transduktion'],
+ rf:['Rezeptives Feld','Receptive field','Der Bereich im Gesichtsfeld, auf den eine Nervenzelle reagiert.','verschaltung'],
+ center:['Zentrum','Centre','Innerer Teil des rezeptiven Felds.','verschaltung'],
+ surround:['Umfeld','Surround','Ringförmiger Außenteil des rezeptiven Felds. Wirkt dem Zentrum entgegen.','verschaltung'],
+ oncell:['ON-Zentrum-Zelle','ON-centre cell','Feuert mehr, wenn Licht ins Zentrum fällt, und weniger bei Licht im Umfeld.','verschaltung'],
+ offcell:['OFF-Zentrum-Zelle','OFF-centre cell','Genau umgekehrt: feuert, wenn das Zentrum dunkler wird.','verschaltung'],
+ spike:['Aktionspotenzial (Spike)','Action potential (spike)','Kurzer elektrischer Impuls von ~1 ms. Information steckt in Feuerrate und Timing.','verschaltung','Spikes','Spikes'],
+ lateralinh:['Laterale Hemmung','Lateral inhibition','Nachbarzellen bremsen sich gegenseitig. Dadurch werden Kanten und Kontraste betont.','verschaltung'],
+ hermann:['Hermann-Gitter','Hermann grid','Täuschung: An den weißen Kreuzungen erscheinen graue Flecken – ein Nebeneffekt der lateralen Hemmung.','verschaltung'],
+ convergence:['Konvergenz','Convergence','Viele Rezeptoren melden an eine Ganglienzelle: rund 126 Mio. Rezeptoren auf 1,2 Mio. Fasern, etwa 100 : 1.','verschaltung'],
+ midget:['Midget-Zellen (Parvo-Pfad)','Midget cells (parvocellular)','Kleine Felder: Details und Rot-Grün-Farbe. Rund 70 % der Ganglienzellen.','verschaltung','Midget: Details, Farbe','Midget: detail, colour'],
+ parasol:['Parasol-Zellen (Magno-Pfad)','Parasol cells (magnocellular)','Große Felder: Bewegung, Flimmern, schwache Kontraste.','verschaltung','Parasol: Bewegung','Parasol: motion'],
+ iprgc:['Melanopsin-Ganglienzellen (ipRGC)','Intrinsically photosensitive RGCs','Selbst lichtempfindliche Ganglienzellen (Melanopsin, ~480 nm). Melden Helligkeit an die innere Uhr und den Pupillenreflex.','verschaltung','Melanopsin: innere Uhr','Melanopsin: body clock'],
+ vfield:['Gesichtsfeld','Visual field','Alles, was man sieht, ohne die Augen zu bewegen: mit beiden Augen knapp 180° waagerecht.','sehbahn'],
+ nasal:['Nasale Netzhaut','Nasal retina','Netzhauthälfte zur Nase hin. Sieht die äußere Hälfte des Gesichtsfelds; ihre Fasern kreuzen im Chiasma.','sehbahn'],
+ temporal:['Temporale Netzhaut','Temporal retina','Netzhauthälfte zur Schläfe hin. Ihre Fasern bleiben auf derselben Seite.','sehbahn'],
+ chiasm:['Sehnervenkreuzung (Chiasma opticum)','Optic chiasm','Hier kreuzen die Fasern der nasalen Netzhauthälften zur Gegenseite.','sehbahn','Sehnervenkreuzung','Optic chiasm'],
+ tract:['Sehtrakt (Tractus opticus)','Optic tract','Faserbündel nach der Kreuzung. Trägt nur noch eine Gesichtsfeldhälfte.','sehbahn','Sehtrakt','Optic tract'],
+ lgn:['Seitlicher Kniehöcker (CGL)','Lateral geniculate nucleus (LGN)','Schaltstation im Thalamus mit 6 Schichten. Bekommt sogar mehr Eingänge vom Kortex zurück als von der Netzhaut.','sehbahn','Kniehöcker (CGL)','LGN'],
+ radiation:['Sehstrahlung','Optic radiation','Fächer aus Fasern vom Kniehöcker zur Sehrinde.','sehbahn'],
+ v1:['Primäre Sehrinde (V1)','Primary visual cortex (V1)','Erste Station im Großhirn, im Hinterhauptslappen. Auch Area 17 oder „gestreifter Kortex“ genannt.','v1','V1 (Sehrinde)','V1'],
+ sc:['Oberer Hügel (Colliculus superior)','Superior colliculus','Im Mittelhirn. Steuert schnelle Blick- und Kopfbewegungen zu allem, was plötzlich auftaucht.','sehbahn','Colliculus superior','Sup. colliculus'],
+ pretectum:['Prätektum','Pretectum','Steuert den Pupillenreflex: Licht in ein Auge – beide Pupillen werden eng.','sehbahn'],
+ scn:['Nucleus suprachiasmaticus (SCN)','Suprachiasmatic nucleus','Die innere Uhr direkt über dem Chiasma. Erhält Lichtinfos von den Melanopsin-Ganglienzellen.','sehbahn','SCN (innere Uhr)','SCN (clock)'],
+ occipital:['Hinterhauptslappen','Occipital lobe','Hinterster Hirnlappen – fast ganz dem Sehen gewidmet.','v1'],
+ calcarine:['Sulcus calcarinus','Calcarine sulcus','Furche an der Innenseite des Hinterhauptslappens; V1 liegt an ihren Ufern.','v1'],
+ retinotopy:['Retinotopie','Retinotopy','Benachbarte Punkte im Bild landen auf benachbarten Punkten im Kortex – eine Landkarte des Gesichtsfelds.','v1'],
+ magnification:['Kortikale Vergrößerung','Cortical magnification','Die Fovea bekommt überproportional viel Kortexfläche: Die zentralen 10° belegen etwa die Hälfte von V1.','v1'],
+ orientation:['Orientierungsselektivität','Orientation selectivity','Jedes V1-Neuron hat eine Lieblingsausrichtung von Kanten (Hubel & Wiesel, Nobelpreis 1981).','v1'],
+ simplecell:['Einfache Zellen','Simple cells','Reagieren auf eine Kante oder einen Balken in bestimmter Ausrichtung und Position.','v1'],
+ complexcell:['Komplexe Zellen','Complex cells','Reagieren auf eine Ausrichtung, egal wo genau im Feld; oft auch auf Bewegungsrichtung.','v1'],
+ hypercolumn:['Hyperkolumne','Hypercolumn','Ein etwa 1 mm großes Kortexmodul mit allen Ausrichtungen und beiden Augen für einen Fleck im Gesichtsfeld.','v1'],
+ oculardom:['Augendominanz-Säulen','Ocular dominance columns','Streifen in V1, die abwechselnd mehr vom linken oder vom rechten Auge bekommen.','v1'],
+ ventral:['Ventraler Pfad („Was?“)','Ventral stream (“what”)','Von V1 über V4 in den Schläfenlappen: Was ist das? Formen, Farben, Objekte, Gesichter.','pfade','Was-Pfad','“What” stream'],
+ dorsal:['Dorsaler Pfad („Wo? Wie?“)','Dorsal stream (“where/how”)','Von V1 über MT in den Scheitellappen: Wo ist es, wie bewegt es sich, wie greife ich danach?','pfade','Wo/Wie-Pfad','“Where” stream'],
+ v2:['V2','V2 (secondary visual cortex)','Verarbeitet Konturen, Texturen und auch Scheinkonturen.','pfade'],
+ v4:['V4','V4','Farbe und mittelkomplexe Formen wie Kurven und Ecken.','pfade'],
+ mt:['MT / V5','MT / V5','Bewegungsareal. Ein Ausfall führt zu Akinetopsie: Man sieht die Welt wie in Standbildern.','pfade'],
+ it:['Inferotemporaler Kortex (IT)','Inferior temporal cortex (IT)','Erkennt ganze Objekte, weitgehend unabhängig von Größe und Blickwinkel.','pfade','IT-Kortex','IT cortex'],
+ ffa:['Gesichtsareal (FFA)','Fusiform face area','Spezialisiert auf Gesichter. Eine Schädigung kann zu Gesichtsblindheit (Prosopagnosie) führen.','pfade','FFA (Gesichter)','FFA (faces)'],
+ ppc:['Hinterer Scheitellappen','Posterior parietal cortex','Raumkarte und Handlungsplanung: Greifen, Zeigen, räumliche Aufmerksamkeit.','pfade','Scheitellappen','Parietal cortex'],
+ fef:['Frontales Augenfeld (FEF)','Frontal eye field','Plant Blickbewegungen und lenkt die Aufmerksamkeit.','pfade','Augenfeld (FEF)','FEF'],
+ pfc:['Präfrontaler Kortex','Prefrontal cortex','Stirnhirn. Hält Informationen im Arbeitsgedächtnis und steuert, worauf wir achten.','pfade','Stirnhirn (PFC)','PFC'],
+ feedback:['Rückkopplung (Top-down)','Feedback (top-down)','Höhere Areale senden Erwartungen zurück an niedrigere. Sehen ist ein Abgleich von Vorhersage und Sinnesdaten.','pfade','Rückkopplung','Feedback'],
+ periphery:['Peripheres Sehen','Peripheral vision','Außerhalb der Fovea: unscharf und farbarm, aber gut für Bewegung.','konstruktion'],
+ fixation:['Fixation','Fixation','Kurzes Verweilen des Blicks (~200–300 ms). Nur jetzt nimmt das Auge Details auf.','konstruktion'],
+ saccade:['Sakkade','Saccade','Schneller Blicksprung, etwa 3-mal pro Sekunde, Dauer meist 20–50 ms.','konstruktion'],
+ saccsupp:['Sakkadische Suppression','Saccadic suppression','Während einer Sakkade dämpft das Gehirn die Wahrnehmung – wir sehen kein Verwischen.','konstruktion'],
+ fillingin:['Auffüllen (Filling-in)','Filling-in','Das Gehirn ergänzt fehlende Stellen, etwa den blinden Fleck, aus der Umgebung.','konstruktion'],
+ kanizsa:['Kanizsa-Dreieck','Kanizsa triangle','Man sieht ein Dreieck, das gar nicht gezeichnet ist: Scheinkonturen, die das Gehirn ergänzt.','konstruktion'],
+ iconic:['Ikonisches Gedächtnis','Iconic memory','Ultrakurzer Bildspeicher: Fast alles ist kurz da, verblasst aber in ~0,3–0,5 s (Sperling 1960).','gedaechtnis'],
+ workingmem:['Visuelles Arbeitsgedächtnis','Visual working memory','Hält etwa 3–4 Objekte für Sekunden aktiv – durch anhaltende Aktivität im Stirn- und Scheitelhirn (Luck & Vogel 1997).','gedaechtnis'],
+ ltm:['Langzeitgedächtnis','Long-term memory','Speicher über Jahre. Visuelle Erinnerungen sind verteilt über den Kortex abgelegt.','gedaechtnis'],
+ hippocampus:['Hippocampus','Hippocampus','Bindet Was, Wo und Wann zu einer Episode und hilft, sie dauerhaft im Kortex zu verankern.','gedaechtnis'],
+ perirhinal:['Perirhinaler Kortex','Perirhinal cortex','Meldet, ob ein Objekt vertraut ist („Das habe ich schon mal gesehen“).','gedaechtnis'],
+ conceptcell:['Konzeptzellen','Concept cells','Neurone im Schläfenlappen, die auf eine bestimmte Person oder Sache reagieren – egal ob Foto, Zeichnung oder Name (Quiroga 2005).','gedaechtnis'],
+ synapse:['Synapse','Synapse','Kontaktstelle zwischen zwei Nervenzellen. Hier wird Erinnerung physisch gespeichert.','gedaechtnis'],
+ ltp:['Langzeitpotenzierung (LTP)','Long-term potentiation','Werden zwei Zellen oft gleichzeitig aktiv, wird ihre Synapse dauerhaft stärker (Bliss & Lømo 1973).','gedaechtnis','LTP','LTP'],
+ hebb:['Hebbsche Regel','Hebb’s rule','„What fires together, wires together“: Was gemeinsam aktiv ist, verknüpft sich (Hebb 1949).','gedaechtnis'],
+ consolidation:['Konsolidierung','Consolidation','Im Schlaf spielt der Hippocampus Erlebtes erneut ab; der Kortex übernimmt es nach und nach.','gedaechtnis'],
+ imagery:['Bildliche Vorstellung','Mental imagery','Beim Erinnern und Vorstellen werden teils dieselben Sehareale aktiv wie beim Sehen.','gedaechtnis'],
+ cnn:['Faltungsnetz (CNN)','Convolutional neural network','KI-Modell, dessen Filter wie rezeptive Felder über das Bild gleiten. Inspiriert von Hubel & Wiesel (Neocognitron, Fukushima 1980).','ki'],
+ kernel:['Filterkern','Kernel / filter','Kleines Gewichtsmuster, das z. B. Kanten findet – das Gegenstück zur einfachen Zelle in V1.','ki'],
+ pooling:['Pooling','Pooling','Fasst benachbarte Antworten zusammen – ähnlich wie komplexe Zellen, die Position tolerieren.','ki'],
+ sensor:['Bildsensor','Image sensor','Gleichmäßiges Pixelraster, liefert ganze Einzelbilder – anders als die Netzhaut mit scharfer Mitte und Vorverarbeitung.','ki'],
+ eventcam:['Event-Kamera','Event camera','Sensor, der wie die Netzhaut nur Änderungen meldet statt ganzer Bilder.','ki'],
+ attention:['Aufmerksamkeit','Attention','Mensch: Fovea, Sakkaden und Top-down-Steuerung. KI: Attention-Mechanismen gewichten wichtige Bildteile.','ki']
+};
+const lang={cur:'de'};
+const nm=(k,short)=>{const g=G[k];if(!g)return k;const i=lang.cur==='de'?0:1;return (short&&g[4])?g[4+i]:g[i];};
+
+/* ---------- Helfer ---------- */
+const LBL=(k,lx,ly,px,py,a='end',from=0)=>{
+  let x1=lx,y1=ly,anc='middle';
+  if(a==='end'){anc='end';x1=lx+6;y1=ly-5}
+  else if(a==='start'){anc='start';x1=lx-6;y1=ly-5}
+  else if(a==='mt'){y1=ly+5}
+  else {y1=ly-17}
+  return `<g class="t lbl" data-t="${k}" data-from="${from}"><line x1="${x1}" y1="${y1}" x2="${px}" y2="${py}"/><circle cx="${px}" cy="${py}" r="3.5"/><text x="${lx}" y="${ly}" text-anchor="${anc}" data-l="${k}"></text></g>`;
+};
+const tube=(d,c,w=6,extra='')=>`<path d="${d}" fill="none" stroke="var(--ink)" stroke-width="${w+4}" stroke-linecap="round" ${extra}/><path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" ${extra}/>`;
+function wl2rgb(w){let r=0,g=0,b=0;
+  if(w<440){r=-(w-440)/60;b=1}else if(w<490){g=(w-440)/50;b=1}else if(w<510){g=1;b=-(w-510)/20}
+  else if(w<580){r=(w-510)/70;g=1}else if(w<645){r=1;g=-(w-645)/65}else{r=1}
+  const f=w<420?.3+.7*(w-380)/40:w>700?.3+.7*(780-w)/80:1;
+  const c=v=>Math.round(255*Math.pow(Math.max(0,v*f),.8));return `rgb(${c(r)},${c(g)},${c(b)})`;}
+const wlName=w=>w<450?'Violett':w<490?'Blau':w<510?'Türkis':w<565?'Grün':w<590?'Gelb':w<625?'Orange':'Rot';
+const specStops=(a,b,n=24)=>{let s='';for(let i=0;i<=n;i++){const w=a+(b-a)*i/n;s+=`<stop offset="${(i/n*100).toFixed(1)}%" stop-color="${wl2rgb(w)}"/>`}return s};
+const wave=(x0,x1,y,a,per)=>{let d=`M${x0},${y}`;for(let x=x0+2;x<=x1;x+=2)d+=` L${x},${(y-a*Math.sin((x-x0)/per*2*Math.PI)).toFixed(1)}`;return d};
+const rays=(cx,cy,r1,r2,n)=>{let s='';for(let i=0;i<n;i++){const a=i/n*2*Math.PI;s+=`<line x1="${(cx+r1*Math.cos(a)).toFixed(1)}" y1="${(cy+r1*Math.sin(a)).toFixed(1)}" x2="${(cx+r2*Math.cos(a)).toFixed(1)}" y2="${(cy+r2*Math.sin(a)).toFixed(1)}" stroke="var(--ink)" stroke-width="4" stroke-linecap="round"/>`}return s};
+const BRAIN=()=>`<g>
+<path d="M430,250 C432,275 437,300 434,318 L410,318 C412,295 408,272 400,252 Z" fill="var(--brain2)" stroke="var(--ink)" stroke-width="3"/>
+<path d="M470,238 C510,228 560,225 578,250 C588,278 545,295 505,288 C475,282 455,258 470,238 Z" fill="var(--brain2)" stroke="var(--ink)" stroke-width="3"/>
+<path d="M486,252 C510,247 540,248 565,258 M480,267 C505,264 535,268 560,274" fill="none" stroke="var(--ink)" stroke-width="1.6" opacity=".45"/>
+<path d="M130,170 C122,95 200,30 320,25 C440,20 545,55 585,125 C605,165 595,215 555,228 C515,238 485,232 455,242 C415,255 360,262 305,248 C255,236 205,222 168,210 C145,202 132,188 130,170 Z" fill="var(--brain)" stroke="var(--ink)" stroke-width="3.5"/>
+<path d="M215,190 C275,178 340,170 410,182 M360,30 C350,75 372,110 355,160 M190,110 C220,95 250,105 270,90 M420,60 C450,75 470,70 495,85 M240,150 C270,140 300,150 320,138 M440,140 C470,130 500,145 530,135 M300,215 C330,205 360,215 390,205 M170,160 C190,150 205,165 225,150 M520,180 C540,170 555,185 575,175" fill="none" stroke="var(--brain2)" stroke-width="3" stroke-linecap="round"/>
+</g>`;
+let beatTimers=[];
+const later=(f,ms)=>beatTimers.push(setTimeout(f,ms));
+const svgPt=e=>{const st=$('#stage');const p=st.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(st.getScreenCTM().inverse())};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+
+/* ---------- Kapitel ---------- */
+const CH=[];
+
+/* 1 · Intro */
+CH.push({id:'start',title:'Die Reise des Lichts',
+svg:()=>`
+<g class="art">
+ <path d="M-5,372 C150,360 300,382 450,368 C600,356 700,376 805,366 L805,455 L-5,455 Z" fill="var(--grass)" stroke="var(--ink)" stroke-width="3"/>
+ <g class="t" data-t="sun">${rays(85,95,50,66,10)}
+  <circle cx="85" cy="95" r="40" fill="var(--sun)" stroke="var(--ink)" stroke-width="3"/>
+  <circle cx="72" cy="88" r="3.5" fill="var(--ink)"/><circle cx="98" cy="88" r="3.5" fill="var(--ink)"/>
+  <path d="M70,102 Q85,115 100,102" fill="none" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/></g>
+ <g class="t" data-t="reflection">
+  <path d="M230,372 L234,290 L246,290 L250,372 Z" fill="#9a6a3f" stroke="var(--ink)" stroke-width="3"/>
+  <circle cx="205" cy="272" r="32" fill="#5cb85c" stroke="var(--ink)" stroke-width="3"/><circle cx="275" cy="272" r="32" fill="#5cb85c" stroke="var(--ink)" stroke-width="3"/>
+  <circle cx="240" cy="246" r="44" fill="#5cb85c" stroke="var(--ink)" stroke-width="3"/>
+  <circle cx="220" cy="252" r="7" fill="var(--coneL)" stroke="var(--ink)" stroke-width="2"/><circle cx="262" cy="236" r="7" fill="var(--coneL)" stroke="var(--ink)" stroke-width="2"/><circle cx="252" cy="278" r="7" fill="var(--coneL)" stroke="var(--ink)" stroke-width="2"/><circle cx="196" cy="284" r="7" fill="var(--coneL)" stroke="var(--ink)" stroke-width="2"/></g>
+ <g class="t" data-t="opticnerve">${tube('M534,222 C565,212 590,245 640,226','var(--nerve)',7)}</g>
+ <g class="t" data-t="eyeball">
+  <clipPath id="eyeClip0"><path d="M400,215 Q468,155 536,215 Q468,275 400,215 Z"/></clipPath>
+  <path d="M400,215 Q468,155 536,215 Q468,275 400,215 Z" fill="#fff" stroke="var(--ink)" stroke-width="3"/>
+  <g clip-path="url(#eyeClip0)"><circle cx="455" cy="215" r="27" fill="var(--iris)" stroke="var(--ink)" stroke-width="2.5"/><circle cx="455" cy="215" r="12" fill="var(--ink)"/><circle cx="447" cy="207" r="5" fill="#fff"/></g>
+  <path d="M434,192 L428,178 M468,185 L468,170 M502,192 L508,178" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/></g>
+ <g class="t" data-t="brain" transform="translate(700,205) scale(.36) translate(-365,-170)">${BRAIN()}<ellipse class="pulse" cx="575" cy="150" rx="22" ry="36" fill="var(--v1c)"/></g>
+</g>
+<path d="M110,120 L235,250 L455,215" fill="none" stroke="var(--sun)" stroke-width="3" stroke-dasharray="2 9" stroke-linecap="round"/>
+<use href="#ph"><animateMotion dur="3.6s" repeatCount="indefinite" path="M110,120 L235,250 L455,215"/></use>
+<circle class="spark" r="7"><animateMotion dur="3.6s" repeatCount="indefinite" keyPoints="0;0;1" keyTimes="0;0.55;1" calcMode="linear" path="M534,222 C565,212 590,245 640,226 L690,212"/></circle>
+${LBL('sun',85,182,85,137,'mb')}${LBL('photon',150,232,172,184,'end')}${LBL('reflection',240,420,240,374,'mb')}${LBL('eyeball',468,312,468,262,'mb')}${LBL('opticnerve',588,312,592,236,'mb')}${LBL('brain',712,312,712,262,'mb')}`,
+beats:[
+ {t:'Willkommen! In diesem Kurs folgen wir einem Lichtteilchen auf seiner Reise: von der Lichtquelle über einen Gegenstand ins Auge – und weiter ins Gehirn, bis daraus eine Erinnerung wird.'},
+ {t:'Alles beginnt mit Licht. Eine Lichtquelle sendet Photonen aus. Treffen sie auf einen Gegenstand, wird ein Teil zurückgeworfen – und manche dieser Photonen fliegen genau in dein Auge.',hl:['sun','photon','reflection']},
+ {t:'Im Auge bündeln Hornhaut und Linse das Licht zu einem Bild auf der Netzhaut. Dort verwandeln Sinneszellen Licht in elektrische Signale – in wenigen Tausendstelsekunden.',hl:['eyeball']},
+ {t:'Über den Sehnerv gelangen die Signale ins Gehirn. In vielen Stationen werden sie zerlegt, erkannt, mit Wissen verknüpft – und manches wird als Erinnerung gespeichert.',hl:['opticnerve','brain']},
+ {t:'So funktioniert der Kurs: „Abspielen“ läuft wie ein Film durch alle Kapitel, die Pfeile gehen Schritt für Schritt. Fahr mit der Maus über jedes Bauteil (am Handy: antippen), dann siehst du deutschen und englischen Namen und eine Erklärung.'}
+]});
+
+/* 2 · Licht */
+CH.push({id:'licht',title:'Was ist Licht?',
+svg:()=>{
+ const seg=[['Gamma',60,150,'#d8d0ee',''],['Röntgen',150,250,'#d0daf1',''],['UV',250,342,'#cdbdf3','uv'],['',342,378,'url(#visG)','light'],['Infrarot',378,480,'#f4c8bf','ir'],['Mikrowellen',480,600,'#f0dbbf',''],['Radio',600,740,'#e6e1c3','']];
+ let s=`<defs><linearGradient id="visG" x1="0" x2="1">${specStops(380,780)}</linearGradient><linearGradient id="visG2" x1="0" x2="1">${specStops(380,780)}</linearGradient></defs><g class="art">`;
+ seg.forEach(q=>{s+=`<g class="t" data-t="${q[4]||'spectrum'}"><rect x="${q[1]}" y="70" width="${q[2]-q[1]}" height="40" fill="${q[3]}"/>${q[0]?`<text class="tx sm dk" x="${(q[1]+q[2])/2}" y="95" text-anchor="middle">${q[0]}</text>`:''}</g>`});
+ s+=`<rect x="60" y="70" width="680" height="40" rx="6" fill="none" stroke="var(--ink)" stroke-width="3"/>
+ <line x1="70" y1="128" x2="730" y2="128" stroke="var(--fg)" stroke-width="2" marker-end="url(#mF)"/>
+ <text class="tx sm" x="60" y="148">kurze Wellen · viel Energie</text><text class="tx sm" x="740" y="148" text-anchor="end">lange Wellen · wenig Energie</text>
+ <path d="M342,110 L90,186 M378,110 L710,186" stroke="var(--lead)" stroke-width="2" stroke-dasharray="6 5" fill="none"/>
+ <g class="t" data-t="light"><rect x="90" y="186" width="620" height="48" rx="10" fill="url(#visG2)" stroke="var(--ink)" stroke-width="3"/></g>`;
+ [400,500,600,700].forEach(n=>{const x=90+(n-380)*1.55;s+=`<line x1="${x}" y1="234" x2="${x}" y2="242" stroke="var(--fg)" stroke-width="2"/><text class="tx mono" x="${x}" y="258" text-anchor="middle">${n}${n===400||n===700?' nm':''}</text>`});
+ s+=`<g class="t" data-t="wavelength" data-from="1">
+   <path d="${wave(90,330,302,18,28)}" fill="none" stroke="var(--coneS)" stroke-width="4" stroke-linecap="round"/>
+   <path d="${wave(90,330,384,18,66)}" fill="none" stroke="var(--coneL)" stroke-width="4" stroke-linecap="round"/>
+   <text class="tx" x="345" y="307">kurz ≈ 450 nm → Blau</text><text class="tx" x="345" y="389">lang ≈ 680 nm → Rot</text></g>
+ <g class="t" data-t="reflection" data-from="2">
+   ${rays(592,292,22,30,8)}<circle cx="592" cy="292" r="17" fill="var(--sun)" stroke="var(--ink)" stroke-width="3"/>
+   <line x1="606" y1="303" x2="672" y2="348" stroke="var(--coneL)" stroke-width="3.5"/><line x1="610" y1="298" x2="676" y2="343" stroke="var(--coneM)" stroke-width="3.5"/><line x1="602" y1="308" x2="668" y2="353" stroke="var(--coneS)" stroke-width="3.5"/>
+   <circle cx="700" cy="372" r="28" fill="var(--coneL)" stroke="var(--ink)" stroke-width="3"/><path d="M700,345 L704,333" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/><ellipse cx="714" cy="336" rx="9" ry="4.5" fill="var(--coneM)" stroke="var(--ink)" stroke-width="2"/>
+   <path d="M722,350 L762,304" stroke="var(--coneL)" stroke-width="4" marker-end="url(#mR)"/>
+   <text class="tx sm" x="560" y="425">Blau &amp; Grün: verschluckt</text><text class="tx sm" x="560" y="442">Rot: zurückgeworfen → Auge</text></g>
+ </g>
+ <use href="#ph" x="560" y="158" class="bob"/>
+ ${LBL('spectrum',400,42,400,68,'mt')}`;
+ return s;},
+beats:[
+ {t:'Licht ist elektromagnetische Strahlung – genau wie Radiowellen, Wärmestrahlung oder Röntgenstrahlen. Es kommt in winzigen Energiepaketen: den Photonen.',hl:['spectrum','light','uv','ir']},
+ {t:'Unsere Augen nutzen davon nur einen schmalen Ausschnitt: Wellenlängen von etwa 380 bis 780 Nanometern. Kurze Wellen erleben wir als Violett und Blau, lange als Rot.',hl:['light','wavelength']},
+ {t:'Wir sehen Dinge, weil sie Licht zurückwerfen. Ein Apfel verschluckt vor allem kurz- und mittelwelliges Licht und reflektiert langwelliges – deshalb wirkt er rot. Farbe ist also keine Eigenschaft des Apfels, sondern eine Leistung des Gehirns.',hl:['reflection']}
+]});
+
+/* 3 · Anatomie */
+CH.push({id:'anatomie',title:'Aufbau des Auges',
+svg:()=>`
+<g class="art">
+ <g class="t" data-t="eyemuscle">
+  <path d="M430,82 C480,66 570,58 740,56 L740,82 C590,84 510,92 452,102 Z" fill="var(--muscle)" stroke="var(--ink)" stroke-width="3"/>
+  <path d="M430,368 C480,384 570,392 740,394 L740,368 C590,366 510,358 452,348 Z" fill="var(--muscle)" stroke="var(--ink)" stroke-width="3"/>
+  <path d="M480,80 C560,70 640,66 735,66 M480,370 C560,380 640,384 735,384" fill="none" stroke="var(--ink)" stroke-width="1.5" opacity=".4"/></g>
+ <g class="t" data-t="opticnerve">
+  <path d="M546,248 L566,246 C600,250 650,258 740,258 L740,300 C650,300 600,296 566,282 L546,272 Z" fill="var(--nerve)" stroke="var(--ink)" stroke-width="3"/>
+  <path d="M556,262 C600,270 650,279 740,279" fill="none" stroke="#d64545" stroke-width="2.5"/></g>
+ <circle class="t" data-t="vitreous" cx="420" cy="225" r="131.5" fill="var(--vitreous)"/>
+ <path class="t" data-t="aqueous" d="M293,146 A93,93 0 0 0 293,304 L301,304 L301,146 Z" fill="var(--aqueous)"/>
+ <path d="M150,200 L262,203 L551,225 M150,225 L551,225 M150,250 L262,247 L551,225" fill="none" stroke="var(--sun)" stroke-width="2.5" stroke-dasharray="7 6" opacity=".9"/>
+ <path class="t" data-t="choroid" d="M313.5,135.7 A139,139 0 1 1 313.5,314.3" fill="none" stroke="var(--choroid)" stroke-width="5"/>
+ <path class="t" data-t="retina" d="M317.4,138.9 A134,134 0 1 1 317.4,311.1" fill="none" stroke="var(--retina)" stroke-width="5"/>
+ <path class="t" data-t="macula" d="M551.1,197.1 A134,134 0 0 1 551.1,252.9" fill="none" stroke="var(--macula)" stroke-width="7"/>
+ <circle class="t" data-t="fovea" cx="551" cy="225" r="6" fill="var(--vitreous)" stroke="var(--ink)" stroke-width="2"/>
+ <circle class="t" data-t="opticdisc" cx="549.4" cy="259.7" r="8" fill="var(--nerve)" stroke="var(--ink)" stroke-width="2"/>
+ <g class="t" data-t="sclera">
+  <path d="M295.8,147.4 A146.5,146.5 0 1 1 295.8,302.6" fill="none" stroke="var(--ink)" stroke-width="11"/>
+  <path d="M295.8,147.4 A146.5,146.5 0 1 1 295.8,302.6" fill="none" stroke="var(--sclera)" stroke-width="5"/></g>
+ <g class="t" data-t="ciliary"><path d="M297,150 L314,141 L320,160 L304,165 Z M297,300 L314,309 L320,290 L304,285 Z" fill="var(--muscle)" stroke="var(--ink)" stroke-width="2.5" stroke-linejoin="round"/></g>
+ <g class="t" data-t="zonule"><path d="M308,162 L318,178 M314,160 L325,175 M319,158 L332,177 M308,288 L318,272 M314,290 L325,275 M319,292 L332,273" stroke="var(--ink)" stroke-width="1.6"/><path d="M314,160 L325,177 M314,290 L325,273" stroke="transparent" stroke-width="16"/></g>
+ <ellipse class="t" data-t="lens" cx="325" cy="225" rx="20" ry="50" fill="var(--lens)" stroke="var(--ink)" stroke-width="3"/>
+ <g class="t" data-t="iris"><rect x="297" y="150" width="8" height="55" rx="3" fill="var(--iris)" stroke="var(--ink)" stroke-width="2"/><rect x="297" y="245" width="8" height="55" rx="3" fill="var(--iris)" stroke="var(--ink)" stroke-width="2"/></g>
+ <rect class="t" data-t="pupil" x="295" y="206" width="12" height="38" fill="transparent"/>
+ <g class="t" data-t="cornea"><path d="M293,146 A93,93 0 0 0 293,304" fill="none" stroke="var(--ink)" stroke-width="10"/><path d="M293,146 A93,93 0 0 0 293,304" fill="none" stroke="var(--cornea)" stroke-width="5"/></g>
+ <g class="t" data-t="tearfilm"><path d="M289,140 A100,100 0 0 0 289,310" fill="none" stroke="#6fcaf0" stroke-width="3"/><path d="M289,140 A100,100 0 0 0 289,310" fill="none" stroke="transparent" stroke-width="12"/></g>
+ <g class="t" data-t="schlemm"><circle cx="300" cy="147" r="3.8" fill="#3a5ccc" stroke="var(--ink)" stroke-width="1.2"/><circle cx="300" cy="303" r="3.8" fill="#3a5ccc" stroke="var(--ink)" stroke-width="1.2"/></g>
+</g>
+<use href="#ph"><animateMotion dur="3.2s" repeatCount="indefinite" path="M110,225 L545,225"/><animate attributeName="opacity" values="1;1;0" keyTimes="0;.9;1" dur="3.2s" repeatCount="indefinite"/></use>
+${LBL('tearfilm',205,95,246,188,'end',0)}${LBL('cornea',205,135,251,205,'end',0)}${LBL('sclera',490,40,480,91,'mt',0)}
+${LBL('aqueous',205,180,278,215,'end',1)}${LBL('pupil',205,228,300,225,'end',1)}${LBL('iris',205,275,301,268,'end',1)}${LBL('schlemm',205,322,300,303,'end',1)}
+${LBL('ciliary',245,40,312,150,'mt',2)}${LBL('zonule',370,40,322,170,'mt',2)}${LBL('lens',325,432,325,272,'mb',2)}
+${LBL('vitreous',430,432,430,320,'mb',3)}${LBL('choroid',600,128,519,127,'start',3)}${LBL('retina',600,165,541,168,'start',3)}
+${LBL('macula',600,200,552,206,'start',4)}${LBL('fovea',600,232,557,226,'start',4)}${LBL('opticdisc',560,432,550,268,'mb',4)}${LBL('opticnerve',600,330,650,287,'start',4)}
+${LBL('eyemuscle',650,40,650,68,'mt',5)}`,
+beats:[
+ {t:'Das Auge ist eine fast runde Kugel von etwa 24 Millimetern. Außen hält die feste, weiße Lederhaut es in Form; vorne geht sie in die durchsichtige, gewölbte Hornhaut über, die ein hauchdünner Tränenfilm glatt hält.',hl:['sclera','cornea','tearfilm']},
+ {t:'Hinter der Hornhaut liegt die Vorderkammer mit Kammerwasser. Die farbige Iris lässt in der Mitte ein Loch frei: die Pupille. Das Kammerwasser fließt über den Schlemm-Kanal ab – staut es sich, steigt der Augendruck.',hl:['aqueous','iris','pupil','schlemm']},
+ {t:'Dahinter hängt die Linse an feinen Zonulafasern. Der ringförmige Ziliarkörper verändert über sie die Wölbung der Linse – so stellen wir scharf.',hl:['lens','zonule','ciliary']},
+ {t:'Das Innere füllt der gallertige Glaskörper. Die Augenwand hat drei Schichten: außen die Lederhaut, in der Mitte die gut durchblutete Aderhaut und innen die Netzhaut, die das Licht einfängt.',hl:['vitreous','sclera','choroid','retina']},
+ {t:'Gegenüber der Pupille liegt die Makula mit der Sehgrube (Fovea) – der Ort des schärfsten Sehens. Etwas zur Nase hin verlässt der Sehnerv das Auge. Dort gibt es keine Sinneszellen: den blinden Fleck.',hl:['macula','fovea','opticdisc','opticnerve']},
+ {t:'Sechs äußere Augenmuskeln pro Auge drehen den Augapfel – mehrmals pro Sekunde, blitzschnell und auf Bruchteile eines Grads genau.',hl:['eyemuscle']}
+]});
+
+/* 4 · Fokus */
+CH.push({id:'fokus',title:'Scharfstellen & Pupille',
+svg:()=>`
+<defs><filter id="fBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"/></filter></defs>
+<rect id="fDark" x="0" y="0" width="800" height="450" fill="#060a14" opacity="0" style="transition:opacity .6s"/>
+<g id="fObj"></g>
+<g class="art">
+ <circle class="t" data-t="vitreous" cx="520" cy="225" r="112" fill="var(--vitreous)"/>
+ <path class="t" data-t="aqueous" d="M411.5,157.2 A82,82 0 0 0 411.5,292.8 L419,292.8 L419,157.2 Z" fill="var(--aqueous)"/>
+ <path class="t" data-t="choroid" d="M426.9,146.9 A121.5,121.5 0 1 1 426.9,303.1" fill="none" stroke="var(--choroid)" stroke-width="5"/>
+ <path class="t" data-t="retina" d="M431.1,150.4 A116,116 0 1 1 431.1,299.6" fill="none" stroke="var(--retina)" stroke-width="5"/>
+ <g class="t" data-t="sclera"><path d="M411.5,157.2 A128,128 0 1 1 411.5,292.8" fill="none" stroke="var(--ink)" stroke-width="10"/><path d="M411.5,157.2 A128,128 0 1 1 411.5,292.8" fill="none" stroke="var(--sclera)" stroke-width="4.5"/></g>
+ <g class="t" data-t="ciliary"><path d="M412,160 L428,151 L434,168 L418,172 Z M412,290 L428,299 L434,282 L418,278 Z" fill="var(--muscle)" stroke="var(--ink)" stroke-width="2.5" stroke-linejoin="round"/></g>
+ <g class="t" data-t="zonule"><path d="M424,168 L434,184 M429,165 L440,181 M434,163 L446,183 M424,282 L434,266 M429,285 L440,269 M434,287 L446,267" stroke="var(--ink)" stroke-width="1.5"/></g>
+</g>
+<g id="fRays"></g>
+<ellipse id="fLens" class="t" data-t="lens" cx="440" cy="225" rx="14" ry="44" fill="var(--lens)" fill-opacity=".8" stroke="var(--ink)" stroke-width="3"/>
+<rect id="fIrisT" class="t" data-t="iris" x="413" y="158" width="8" height="50" rx="3" fill="var(--iris)" stroke="var(--ink)" stroke-width="2"/>
+<rect id="fIrisB" class="t" data-t="iris" x="413" y="242" width="8" height="50" rx="3" fill="var(--iris)" stroke="var(--ink)" stroke-width="2"/>
+<rect id="fPup" class="t" data-t="pupil" x="411" y="208" width="12" height="34" fill="transparent"/>
+<g class="t" data-t="cornea"><path d="M411.5,157.2 A82,82 0 0 0 411.5,292.8" fill="none" stroke="var(--ink)" stroke-width="9"/><path d="M411.5,157.2 A82,82 0 0 0 411.5,292.8" fill="none" stroke="var(--cornea)" stroke-width="4.5"/></g>
+<g id="fImg"></g>
+${LBL('cornea',355,60,383,195,'end')}${LBL('pupil',355,110,414,212,'end')}${LBL('ciliary',470,58,430,158,'mt')}${LBL('lens',440,372,440,268,'mb')}${LBL('retina',690,120,620,167,'start')}${LBL('image',690,330,645,260,'start',1)}
+<g id="fChips" font-family="var(--body)"></g>`,
+panel:()=>`<h3>Probier es aus</h3>
+<div class="ctl"><span class="ctl-l">Baum</span><button class="btn" data-m="far">weit weg</button><button class="btn" data-m="blur">nah · Linse flach</button><button class="btn" data-m="near">nah · scharfgestellt</button></div>
+<div class="ctl"><span class="ctl-l">Licht</span><button class="btn" data-p="hell">Hell</button><button class="btn" data-p="normal">Normal</button><button class="btn" data-p="dunkel">Dunkel</button></div>`,
+init(){
+ const MODES={far:{ox:70,h:110,f:127.7,rx:14},blur:{ox:250,h:150,f:127.7,rx:14},near:{ox:250,h:150,f:96.2,rx:24}};
+ const PUP={hell:7,normal:17,dunkel:29};
+ const mode={m:'far',p:'normal'};
+ const st={...MODES.far,gap:17};let tgt={...st};let raf=null;
+ const lens=$('#fLens'),it=$('#fIrisT'),ib=$('#fIrisB'),pup=$('#fPup'),obj=$('#fObj'),raysG=$('#fRays'),img=$('#fImg'),dark=$('#fDark'),chips=$('#fChips');
+ const hit=(Q,I)=>{const dx=I[0]-Q[0],dy=I[1]-Q[1],fx=Q[0]-520,fy=Q[1]-225;const a=dx*dx+dy*dy,b=2*(fx*dx+fy*dy),c=fx*fx+fy*fy-114*114;const t=(-b+Math.sqrt(b*b-4*a*c))/(2*a);return [Q[0]+t*dx,Q[1]+t*dy]};
+ const tree=(x,top,bot,sc=1)=>{const H=bot-top,cy=top+H*.32,r=Math.abs(H)*.3,t1=top+H*.55,y0=Math.min(t1,bot),hh=Math.abs(bot-t1);
+   return `<rect x="${x-5*sc}" y="${y0}" width="${10*sc}" height="${hh}" fill="#9a6a3f" stroke="var(--ink)" stroke-width="${2*sc}"/><circle cx="${x}" cy="${cy}" r="${r}" fill="#5cb85c" stroke="var(--ink)" stroke-width="${2.5*sc}"/>`};
+ function chip(x,txt){return `<rect x="${x}" y="398" width="236" height="34" rx="17" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/><text class="tx" x="${x+118}" y="420" text-anchor="middle">${txt}</text>`}
+ function draw(){
+  lens.setAttribute('rx',st.rx.toFixed(1));
+  const g=st.gap;it.setAttribute('height',(225-g-158).toFixed(1));ib.setAttribute('y',(225+g).toFixed(1));ib.setAttribute('height',(292-225-g).toFixed(1));
+  pup.setAttribute('y',(225-g).toFixed(1));pup.setAttribute('height',(2*g).toFixed(1));
+  dark.setAttribute('opacity',mode.p==='dunkel'?.4:0);
+  const top=225-st.h*.42,bot=225+st.h*.42;
+  obj.innerHTML=`<g class="t" data-t="refraction">${tree(st.ox,top,bot)}<circle cx="${st.ox}" cy="${top}" r="5" fill="var(--fieldR)" stroke="var(--ink)" stroke-width="2"/><circle cx="${st.ox}" cy="${bot}" r="5" fill="var(--fieldL)" stroke="var(--ink)" stroke-width="2"/></g>`;
+  const dO=440-st.ox,di=1/(1/st.f-1/dO);let s='',blur='',E0=[];
+  [[top,'var(--fieldR)'],[bot,'var(--fieldL)']].forEach(([py,col],k)=>{
+   const Ix=440+di,Iy=225-(py-225)*di/dO;
+   [-(g-3),0,g-3].forEach(h=>{const hc=h*1.25,Qc=[385,225+hc],Q=[440,225+h],E=hit(Q,[Ix,Iy]);
+    if(h===0)E0[k]=E;
+    s+=`<polyline points="${st.ox},${py.toFixed(1)} ${Qc[0]},${Qc[1].toFixed(1)} ${Q[0]},${Q[1].toFixed(1)} ${E[0].toFixed(1)},${E[1].toFixed(1)}" fill="none" stroke="${col}" stroke-width="2.3" stroke-linejoin="round" opacity=".92"/>`;
+    blur+=`<circle cx="${E[0].toFixed(1)}" cy="${E[1].toFixed(1)}" r="7" fill="${col}" opacity=".7"/>`;});
+  });
+  raysG.innerHTML=s;
+  const sharp=Math.abs(di-195)<9;
+  img.innerHTML=sharp?`<g class="t" data-t="image"><line x1="${(E0[1][0]-7).toFixed(1)}" y1="${E0[1][1].toFixed(1)}" x2="${(E0[0][0]-7).toFixed(1)}" y2="${E0[0][1].toFixed(1)}" stroke="#9a6a3f" stroke-width="6" stroke-linecap="round"/><circle cx="${(E0[0][0]-9).toFixed(1)}" cy="${(E0[0][1]-14).toFixed(1)}" r="15" fill="#5cb85c" stroke="var(--ink)" stroke-width="2.5"/></g>`:`<g class="t" data-t="image"><g filter="url(#fBlur)">${blur}</g><text class="tx halo" x="652" y="230" fill="var(--coneL)" style="fill:var(--coneL)">unscharf!</text></g>`;
+  const pm=mode.p==='hell'?'≈ 2 mm':mode.p==='dunkel'?'≈ 8 mm':'≈ 4 mm';
+  chips.innerHTML=chip(20,mode.m==='near'?'Ziliarmuskel: angespannt':'Ziliarmuskel: entspannt')+chip(282,mode.m==='near'?'Linse rund · ≈ 70 dpt':mode.m==='blur'?'Fokus hinter der Netzhaut':'Linse flach · ≈ 60 dpt')+chip(544,'Pupille '+pm);
+ }
+ function anim(){let done=true;for(const k in tgt){const d=tgt[k]-st[k];if(Math.abs(d)>.05){st[k]+=d*.13;done=false}else st[k]=tgt[k]}draw();raf=done?null:requestAnimationFrame(anim)}
+ function upd(){document.querySelectorAll('#panel [data-m]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===mode.m));document.querySelectorAll('#panel [data-p]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.p===mode.p))}
+ function set(m,p){if(m)mode.m=m;if(p)mode.p=p;tgt={...MODES[mode.m],gap:PUP[mode.p]};upd();if(!raf)raf=requestAnimationFrame(anim)}
+ document.querySelectorAll('#panel [data-m]').forEach(b=>b.onclick=()=>set(b.dataset.m));
+ document.querySelectorAll('#panel [data-p]').forEach(b=>b.onclick=()=>set(null,b.dataset.p));
+ draw();upd();
+ return {set,destroy(){cancelAnimationFrame(raf)}};
+},
+beats:[
+ {t:'Für ein scharfes Bild muss das Licht gebündelt werden. Den größten Teil leistet die gewölbte Hornhaut mit rund 43 Dioptrien, die Linse steuert etwa 15–20 Dioptrien bei. Zusammen sind es rund 60 Dioptrien.',hl:['cornea','lens'],act:a=>a.set('far','normal')},
+ {t:'Schau auf die Netzhaut: Das Bild steht auf dem Kopf (die orange Baumspitze landet unten) und ist seitenverkehrt. Das ist kein Problem – das Gehirn hat nie etwas anderes kennengelernt.',hl:['image','retina'],act:a=>a.set('far')},
+ {t:'Jetzt rückt der Baum näher. Mit flacher Linse läge der Brennpunkt hinter der Netzhaut – die Strahlen treffen verteilt auf, das Bild wird unscharf.',hl:['image','lens'],act:a=>a.set('blur')},
+ {t:'Akkommodation: Der Ziliarmuskel spannt sich an, die Zonulafasern werden locker und die elastische Linse rundet sich. Mehr Brechkraft – wieder scharf! Ab etwa 45 Jahren wird die Linse steifer: Alterssichtigkeit.',hl:['ciliary','lens','image'],act:a=>a.set('near')},
+ {t:'Die Iris arbeitet wie eine Kamerablende. Bei Helligkeit zieht der Schließmuskel die Pupille auf etwa 2 mm zusammen, im Dunkeln weitet der Erweiterer sie auf bis zu 8 mm. Gesteuert wird das automatisch vom Hirnstamm.',hl:['iris','pupil'],act:a=>{a.set(null,'hell');later(()=>a.set(null,'dunkel'),3500);later(()=>a.set(null,'normal'),7500)},hold:2500},
+ {t:'Bei Kurzsichtigkeit ist der Augapfel meist etwas zu lang: Der Brennpunkt liegt vor der Netzhaut. Brillen und Kontaktlinsen verschieben ihn zurück. Probier die Knöpfe unten selbst aus.',act:a=>a.set('far','normal')}
+]});
+
+/* 5 · Netzhaut */
+CH.push({id:'netzhaut',title:'Die Netzhaut',
+svg:()=>{
+ const RX=[...Array(16)].map((_,i)=>40+i*36),coneCols=['coneL','coneM','coneL','coneS','coneM'];
+ const BX=[58,148,238,328,418,508,575],GX=[100,238,370,500];
+ let s='<g class="art">';
+ s+=`<g class="t" data-t="choroid"><rect x="20" y="414" width="572" height="36" fill="var(--choroid)" stroke="var(--ink)" stroke-width="2.5"/>`;
+ for(let x=55;x<590;x+=68)s+=`<ellipse cx="${x}" cy="433" rx="15" ry="8" fill="#d95b5b" stroke="var(--ink)" stroke-width="1.5"/>`;
+ s+='</g><g class="t" data-t="rpe">';
+ for(let i=0;i<17;i++){const x=20+i*33.6;s+=`<rect x="${x.toFixed(1)}" y="386" width="33.6" height="28" rx="6" fill="var(--rpe)" stroke="var(--ink)" stroke-width="2"/><circle cx="${(x+10).toFixed(1)}" cy="398" r="2.5" fill="#2c1a12"/><circle cx="${(x+22).toFixed(1)}" cy="405" r="2.5" fill="#2c1a12"/>`}
+ s+='</g><g class="t" data-t="muller">';
+ for(const x of [195,535])s+=`<path d="M${x-18},38 L${x+18},38 L${x+6},62 L${x+6},384 L${x-6},384 L${x-6},62 Z" fill="#d9eef6" stroke="#7fb8cf" stroke-width="2" stroke-dasharray="5 4"/>`;
+ s+='</g><g class="t" data-t="nfl">'+[40,45,50].map(y=>`<path d="M22,${y} L592,${y}" stroke="var(--nerve)" stroke-width="3.4" stroke-linecap="round"/>`).join('')+'</g>';
+ // Photorezeptoren
+ let ci=0;
+ RX.forEach((x,i)=>{
+  if(i%3===2){const col=coneCols[ci++%5];
+   s+=`<g class="t" data-t="cone"><rect x="${x-7}" y="262" width="14" height="8" rx="2" fill="var(--cell)" stroke="var(--ink)" stroke-width="1.5"/><line x1="${x}" y1="270" x2="${x}" y2="281" stroke="var(--ink)" stroke-width="2"/><ellipse cx="${x}" cy="290" rx="7" ry="9" fill="#e9d9f5" stroke="var(--ink)" stroke-width="1.5"/><path d="M${x-9},334 Q${x-11},312 ${x-5},302 L${x+5},302 Q${x+11},312 ${x+9},334 Z" fill="var(--cell)" stroke="var(--ink)" stroke-width="1.5"/><path d="M${x-8},336 L${x+8},336 L${x+2},374 L${x-2},374 Z" fill="var(--${col})" stroke="var(--ink)" stroke-width="1.5"/></g>`;
+  }else{
+   s+=`<g class="t" data-t="rod"><circle cx="${x}" cy="266" r="4.5" fill="var(--cell)" stroke="var(--ink)" stroke-width="1.5"/><line x1="${x}" y1="270" x2="${x}" y2="281" stroke="var(--ink)" stroke-width="2"/><ellipse cx="${x}" cy="290" rx="6" ry="8.5" fill="#e9d9f5" stroke="var(--ink)" stroke-width="1.5"/><rect x="${x-5}" y="302" width="10" height="32" rx="3" fill="var(--cell)" stroke="var(--ink)" stroke-width="1.5"/><rect x="${x-5}" y="336" width="10" height="50" rx="4" fill="var(--rod)" stroke="var(--ink)" stroke-width="1.5"/></g>`;
+  }});
+ s+='<g class="t" data-t="horizontal">';
+ for(const hx of [130,420]){s+=`<path d="M${hx-95},257 C${hx-40},252 ${hx+40},261 ${hx+95},257" fill="none" stroke="var(--hor)" stroke-width="4" stroke-linecap="round"/>`;
+  RX.filter(x=>Math.abs(x-hx)<95).forEach(x=>{s+=`<line x1="${x}" y1="257" x2="${x}" y2="263" stroke="var(--hor)" stroke-width="2.5"/>`});
+  s+=`<ellipse cx="${hx}" cy="248" rx="18" ry="8" fill="var(--hor)" stroke="var(--ink)" stroke-width="2"/>`}
+ s+='</g><g class="t" data-t="bipolar">';
+ BX.forEach(bx=>{RX.filter(x=>Math.abs(x-bx)<40).forEach(x=>{s+=`<line x1="${bx}" y1="214" x2="${x}" y2="262" stroke="var(--bip)" stroke-width="2.2"/>`});
+  s+=`<line x1="${bx}" y1="186" x2="${bx}" y2="130" stroke="var(--bip)" stroke-width="3"/><circle cx="${bx}" cy="130" r="3.5" fill="var(--bip)"/><ellipse cx="${bx}" cy="200" rx="8" ry="15" fill="var(--bip)" stroke="var(--ink)" stroke-width="2"/>`});
+ s+='</g><g class="t" data-t="amacrine">';
+ for(const ax of [180,450])s+=`<path d="M${ax-85},134 C${ax-50},128 ${ax-20},140 ${ax},134 C${ax+25},128 ${ax+55},140 ${ax+85},134" fill="none" stroke="var(--ama)" stroke-width="3.5" stroke-linecap="round"/><path d="M${ax},138 L${ax},146" stroke="var(--ama)" stroke-width="3"/><circle cx="${ax}" cy="153" r="11" fill="var(--ama)" stroke="var(--ink)" stroke-width="2"/>`;
+ s+='</g><g class="t" data-t="ganglion">';
+ GX.forEach(gx=>{BX.filter(b=>Math.abs(b-gx)<95).forEach(b=>{s+=`<line x1="${gx}" y1="106" x2="${b}" y2="130" stroke="var(--gang)" stroke-width="2.2"/>`});
+  s+=`<path d="M${gx},77 L${gx},54 Q${gx},47 ${gx-9},46" fill="none" stroke="var(--gang)" stroke-width="3.5"/><circle cx="${gx}" cy="92" r="15" fill="var(--gang)" stroke="var(--ink)" stroke-width="2.2"/><circle cx="${gx}" cy="92" r="5" fill="#fff3e0" stroke="var(--ink)" stroke-width="1.2"/>`});
+ s+='</g></g>';
+ s+=`<text class="tx sm" x="270" y="24">↓ Licht fällt von vorne (Glaskörper) ein</text><text class="tx sm" x="24" y="24">← zum Sehnerv</text><text class="tx mono" x="592" y="24" text-anchor="end">≈ 0,25 mm</text>`;
+ s+=`<use href="#ph" data-from="1"><animateMotion dur="4s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;0.45;1" calcMode="linear" path="M256,-10 L256,352"/><animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.45;0.5;1" dur="4s" repeatCount="indefinite"/></use>`;
+ s+=`<circle class="spark" r="7" data-from="3"><animateMotion dur="4s" repeatCount="indefinite" keyPoints="0;0;1" keyTimes="0;0.45;1" calcMode="linear" path="M256,300 L256,266 L238,214 L238,132 L238,106 L238,77 L238,54 Q238,47 229,46 L22,46"/><animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.44;0.46;0.97;1" dur="4s" repeatCount="indefinite"/></circle>`;
+ s+=LBL('nfl',606,50,592,45,'start')+LBL('ganglion',606,97,515,92,'start')+LBL('muller',606,125,541,124,'start')+LBL('amacrine',606,158,535,136,'start')+LBL('bipolar',606,204,583,200,'start')+LBL('horizontal',606,252,515,257,'start')+LBL('photoreceptor',606,322,586,330,'start')+LBL('rpe',606,404,592,400,'start')+LBL('choroid',606,438,592,432,'start');
+ return s;},
+beats:[
+ {t:'Zoomen wir in die Netzhaut: ein nur etwa 0,25 mm dünnes Gewebe aus mehreren Zellschichten. Die Netzhaut ist ausgelagertes Gehirn – sie entsteht im Embryo aus einer Ausstülpung des Zwischenhirns.'},
+ {t:'Kurios: Die Lichtsinneszellen liegen ganz hinten. Das Licht muss erst durch alle anderen Schichten. Müller-Zellen helfen, indem sie das Licht wie Glasfasern zu den Rezeptoren leiten.',hl:['muller','photoreceptor','rod','cone']},
+ {t:'Hinter den Rezeptoren liegt das dunkle Pigmentepithel. Es schluckt Streulicht, recycelt Sehpigment und frisst jeden Tag die verbrauchten Spitzen der Außensegmente. Dahinter versorgt die Aderhaut alles mit Blut.',hl:['rpe','choroid']},
+ {t:'Das Signal läuft dann zurück nach vorne: Photorezeptor → Bipolarzelle → Ganglienzelle. Das ist der direkte, „vertikale“ Weg durch die Netzhaut.',hl:['photoreceptor','rod','cone','bipolar','ganglion']},
+ {t:'Horizontalzellen und amakrine Zellen verknüpfen quer. Sie vergleichen Nachbarn und schärfen so Kontraste und Bewegungssignale – die Netzhaut rechnet also schon kräftig mit.',hl:['horizontal','amacrine']},
+ {t:'Die Axone der Ganglienzellen sammeln sich in der Nervenfaserschicht und verlassen das Auge als Sehnerv. In der Fovea sind die vorderen Schichten zur Seite geschoben, damit das Licht dort ungehindert auf die Zapfen fällt.',hl:['nfl','ganglion']}
+]});
+
+/* 6 · Rezeptoren */
+CH.push({id:'rezeptoren',title:'Stäbchen & Zapfen',
+svg:()=>{
+ const X=nmv=>390+(nmv-380)*1.1875,Y=v=>300-v*225;
+ const curve=(p,sd)=>{let d='';for(let w=380;w<=700;w+=4){d+=(w===380?'M':' L')+X(w).toFixed(1)+','+Y(Math.exp(-((w-p)**2)/(2*sd*sd))).toFixed(1)}return d};
+ let s=`<defs><linearGradient id="visR" x1="0" x2="1">${specStops(380,700)}</linearGradient></defs>`;
+ // Zellen
+ s+=`<g data-until="3"><g class="art">
+  <g class="t" data-t="rod"><rect x="157" y="45" width="36" height="125" rx="10" fill="var(--rod)" stroke="var(--ink)" stroke-width="3"/>
+   ${[...Array(12)].map((_,i)=>`<line x1="161" y1="${56+i*9.5}" x2="189" y2="${56+i*9.5}" stroke="#c8b4ee" stroke-width="2"/>`).join('')}
+   <rect x="171" y="170" width="8" height="9" fill="var(--cell)" stroke="var(--ink)" stroke-width="1.5"/>
+   <rect x="159" y="178" width="32" height="55" rx="8" fill="var(--cell)" stroke="var(--ink)" stroke-width="2.5"/>
+   <ellipse cx="168" cy="196" rx="4" ry="8" fill="#e8a65a"/><ellipse cx="182" cy="214" rx="4" ry="8" fill="#e8a65a"/>
+   <line x1="175" y1="233" x2="175" y2="253" stroke="var(--ink)" stroke-width="3"/><circle cx="175" cy="270" r="17" fill="#e9d9f5" stroke="var(--ink)" stroke-width="2.5"/>
+   <line x1="175" y1="287" x2="175" y2="336" stroke="var(--ink)" stroke-width="3"/><circle cx="175" cy="345" r="9" fill="var(--cell)" stroke="var(--ink)" stroke-width="2.5"/></g>
+  <g class="t" data-t="cone"><path d="M276,80 L294,80 L305,170 L265,170 Z" fill="var(--coneL)" stroke="var(--ink)" stroke-width="3" stroke-linejoin="round"/>
+   ${[...Array(8)].map((_,i)=>{const y=92+i*10.5,w=9+i*1.25;return `<line x1="${285-w}" y1="${y}" x2="${285+w}" y2="${y}" stroke="#f6a3a3" stroke-width="2"/>`}).join('')}
+   <rect x="281" y="170" width="8" height="8" fill="var(--cell)" stroke="var(--ink)" stroke-width="1.5"/>
+   <ellipse cx="285" cy="206" rx="22" ry="29" fill="var(--cell)" stroke="var(--ink)" stroke-width="2.5"/><ellipse cx="277" cy="200" rx="4" ry="8" fill="#e8a65a"/><ellipse cx="293" cy="214" rx="4" ry="8" fill="#e8a65a"/>
+   <line x1="285" y1="235" x2="285" y2="247" stroke="var(--ink)" stroke-width="3"/><circle cx="285" cy="262" r="15" fill="#e9d9f5" stroke="var(--ink)" stroke-width="2.5"/>
+   <line x1="285" y1="277" x2="285" y2="334" stroke="var(--ink)" stroke-width="3"/><rect x="270" y="334" width="30" height="16" rx="4" fill="var(--cell)" stroke="var(--ink)" stroke-width="2.5"/></g>
+ </g>
+ ${LBL('rhodopsin',175,22,175,48,'mt')}${LBL('outerseg',130,110,160,110,'end',2)}${LBL('innerseg',130,208,160,208,'end',2)}${LBL('nucleus',130,272,158,270,'end',2)}${LBL('synterm',130,348,166,345,'end',2)}${LBL('rod',175,404,175,358,'mb')}${LBL('cone',285,404,285,354,'mb',1)}
+ </g>`;
+ // Verteilung
+ const DX=e=>50+(e+60)*2.375,DY=d=>320-d*1.25;
+ let cd='',rd='';for(let e=-60;e<=60;e+=.5){const a=Math.abs(e),bs=e>=13&&e<=18.5;const c=bs?0:6+190*Math.exp(-a/1.1),r=(bs||a<.5)?0:155*(a/18)*Math.exp(1-a/18);cd+=(e===-60?'M':' L')+DX(e).toFixed(1)+','+DY(c).toFixed(1);rd+=(e===-60?'M':' L')+DX(e).toFixed(1)+','+DY(r).toFixed(1)}
+ s+=`<g data-from="4">
+  <rect class="t" data-t="opticdisc" x="${DX(13)}" y="70" width="${DX(18.5)-DX(13)}" height="250" fill="var(--lead)" opacity=".3"/>
+  <line x1="50" y1="320" x2="335" y2="320" stroke="var(--fg)" stroke-width="2"/><line x1="50" y1="320" x2="50" y2="62" stroke="var(--fg)" stroke-width="2"/>
+  ${[-60,-30,0,30,60].map(e=>`<text class="tx mono" x="${DX(e)}" y="338" text-anchor="middle">${e}°</text>`).join('')}
+  ${[100,200].map(d=>`<text class="tx mono" x="44" y="${DY(d)+4}" text-anchor="end">${d}</text>`).join('')}
+  <path class="t" data-t="rod" d="${rd}" fill="none" stroke="var(--rod)" stroke-width="3.5"/>
+  <path class="t" data-t="cone" d="${cd}" fill="none" stroke="var(--coneL)" stroke-width="3.5"/>
+  <text class="tx" x="${DX(0)}" y="58" text-anchor="middle">Fovea</text><text class="tx sm" x="${DX(13)-2}" y="58">blinder Fleck</text>
+  <text class="tx" x="95" y="150" style="fill:var(--rod)">Stäbchen</text><text class="tx" x="${DX(0)+10}" y="120" style="fill:var(--coneL)">Zapfen</text>
+  <text class="tx sm" x="192" y="360" text-anchor="middle">Abstand von der Fovea · temporal ← → nasal</text>
+  <text class="tx sm" x="14" y="200" transform="rotate(-90 14 200)" text-anchor="middle">Tausend pro mm²</text>
+ </g>`;
+ // Kurven
+ s+=`<line x1="390" y1="300" x2="772" y2="300" stroke="var(--fg)" stroke-width="2"/><line x1="390" y1="300" x2="390" y2="58" stroke="var(--fg)" stroke-width="2"/>
+  <rect x="390" y="303" width="380" height="9" fill="url(#visR)"/>
+  ${[400,450,500,550,600,650,700].map(w=>`<text class="tx mono" x="${X(w)}" y="328" text-anchor="middle">${w}</text>`).join('')}
+  <text class="tx sm" x="772" y="344" text-anchor="end">Wellenlänge (nm)</text>
+  <text class="tx sm" x="378" y="180" transform="rotate(-90 378 180)" text-anchor="middle">Empfindlichkeit</text>
+  <path class="t" data-t="rod" d="${curve(498,38)}" fill="none" stroke="var(--rod)" stroke-width="3" stroke-dasharray="7 5"/>
+  <path class="t" data-t="coneS" d="${curve(420,24)}" fill="none" stroke="var(--coneS)" stroke-width="4"/>
+  <path class="t" data-t="coneM" d="${curve(534,40)}" fill="none" stroke="var(--coneM)" stroke-width="4"/>
+  <path class="t" data-t="coneL" d="${curve(564,44)}" fill="none" stroke="var(--coneL)" stroke-width="4"/>
+  <text class="tx" x="${X(420)}" y="${Y(1)-8}" text-anchor="middle" style="fill:var(--coneS)">S</text><text class="tx" x="${X(527)}" y="${Y(1)-8}" text-anchor="middle" style="fill:var(--coneM)">M</text><text class="tx" x="${X(572)}" y="${Y(1)-8}" text-anchor="middle" style="fill:var(--coneL)">L</text><text class="tx sm" x="${X(492)}" y="${Y(1)-8}" text-anchor="middle" style="fill:var(--rod)">Stäbchen</text>
+  <line id="wlLine" x1="0" y1="62" x2="0" y2="300" stroke="var(--fg)" stroke-width="2" stroke-dasharray="4 4"/>
+  <g class="t" data-t="trichromacy">
+  ${['S','M','L','R'].map((k,i)=>`<text class="tx" x="390" y="${377+i*22}">${['S-Zapfen','M-Zapfen','L-Zapfen','Stäbchen'][i]}</text><rect x="470" y="${365+i*22}" width="200" height="14" rx="7" fill="var(--track)"/><rect id="b${k}" x="470" y="${365+i*22}" width="0" height="14" rx="7" fill="var(--${['coneS','coneM','coneL','rod'][i]})"/><text class="tx mono" id="v${k}" x="678" y="${377+i*22}">0</text>`).join('')}
+  <circle id="wlSw" cx="748" cy="392" r="30" fill="#fff" stroke="var(--ink)" stroke-width="3"/><text class="tx" id="wlNm" x="748" y="442" text-anchor="middle"></text></g>`;
+ return s;},
+panel:()=>`<h3>Farbmischer der Netzhaut</h3><div class="ctl"><label class="ctl-l" for="wl">Wellenlänge</label><input type="range" id="wl" min="380" max="700" value="580" step="1"><output class="out" id="wlOut" for="wl">580 nm</output></div>`,
+init(){
+ const X=nmv=>390+(nmv-380)*1.1875,Y=v=>300-v*225,P={S:[420,24],M:[534,40],L:[564,44],R:[498,38]};
+ const inp=$('#wl'),out=$('#wlOut');let raf=null;
+ function upd(w){const x=X(w);$('#wlLine').setAttribute('x1',x);$('#wlLine').setAttribute('x2',x);
+  for(const k in P){const v=Math.exp(-((w-P[k][0])**2)/(2*P[k][1]**2));$('#b'+k).setAttribute('width',(v*200).toFixed(1));$('#v'+k).textContent=Math.round(v*100)+' %'}
+  $('#wlSw').setAttribute('fill',wl2rgb(w));$('#wlNm').textContent=wlName(w);out.textContent=w+' nm';inp.value=w}
+ inp.oninput=()=>{cancelAnimationFrame(raf);upd(+inp.value)};
+ upd(580);
+ return {sweep(){cancelAnimationFrame(raf);const t0=performance.now();const f=t=>{const p=Math.min(1,(t-t0)/9000);upd(Math.round(400+p*280));if(p<1)raf=requestAnimationFrame(f)};raf=requestAnimationFrame(f)},set:upd,destroy(){cancelAnimationFrame(raf)}};
+},
+beats:[
+ {t:'Es gibt zwei Sorten Lichtsinneszellen. Stäbchen (ca. 120 Millionen pro Auge) sind extrem empfindlich – sie reagieren schon auf ein einzelnes Photon. Farben sehen sie nicht: Nachts sind alle Katzen grau.',hl:['rod','rhodopsin']},
+ {t:'Zapfen (ca. 6 Millionen) brauchen mehr Licht, liefern aber Schärfe und Farbe. Es gibt drei Typen: S („blau“, ~420 nm), M („grün“, ~534 nm) und L („rot“, ~564 nm).',hl:['cone','coneS','coneM','coneL']},
+ {t:'Jede Zelle hat ein Außensegment mit Hunderten gestapelter Membranscheibchen voller Sehpigment, ein Innensegment voller Mitochondrien, den Zellkern und eine Synapse, an der sie den Botenstoff Glutamat abgibt.',hl:['outerseg','innerseg','nucleus','synterm']},
+ {t:'Farbe entsteht aus dem Verhältnis der drei Zapfensignale. Bei 580 nm feuern L-Zapfen stark und M-Zapfen etwas – das Gehirn macht daraus „Gelb“. Schieb den Regler unten und beobachte die Balken.',hl:['trichromacy','coneS','coneM','coneL'],act:a=>a.sweep(),hold:2500},
+ {t:'Die Verteilung ist ungleich: In der Fovea sitzen nur Zapfen, dicht an dicht (bis zu ~200.000 pro mm²). Stäbchen sind rund 20° außerhalb am dichtesten. Am blinden Fleck gibt es gar keine Rezeptoren.',hl:['cone','rod','opticdisc'],act:a=>a.set(580)}
+]});
+
+/* 7 · Transduktion */
+CH.push({id:'transduktion',title:'Aus Licht wird Strom',
+svg:()=>{
+ const tdc=(x,y,on)=>`<ellipse cx="${x}" cy="${y}" rx="14" ry="10" fill="${on?'#5cc29f':'#c3cbd6'}" stroke="var(--ink)" stroke-width="2"/><circle cx="${x+16}" cy="${y-4}" r="7" fill="${on?'#98dcc4':'#d7dde5'}" stroke="var(--ink)" stroke-width="2"/><circle cx="${x+22}" cy="${y-13}" r="4.5" fill="${on?'#c3ecdc':'#e3e7ed'}" stroke="var(--ink)" stroke-width="1.6"/>`;
+ const cg=(n,seed)=>{let s='',r=seed;const rnd=()=>{r=(r*9301+49297)%233280;return r/233280};for(let i=0;i<n;i++){const x=150+rnd()*390,y=225+rnd()*120;s+=`<path d="M${x},${y-6} L${x+5.5},${y-2} L${x+3.5},${y+5} L${x-3.5},${y+5} L${x-5.5},${y-2} Z" fill="var(--coneM)" stroke="var(--ink)" stroke-width="1.2"/>`}return s};
+ const ves=(n,full)=>{let s='';for(let i=0;i<n;i++){const x=665+(i%6)*15,y=402+Math.floor(i/6)*12;s+=`<circle cx="${x}" cy="${y}" r="3.5" fill="#ffcf3f" stroke="var(--ink)" stroke-width="1"/>`}return s};
+ const MV=v=>70+(-30-v)*5.2;
+ return `<g class="art">
+ <rect x="20" y="20" width="540" height="345" rx="18" fill="#fdeef4" stroke="var(--ink)" stroke-width="2.5"/>
+ <text class="tx sm dk" x="36" y="44">Ausschnitt aus dem Außensegment eines Stäbchens</text>
+ <g class="t" data-t="outerseg"><rect x="40" y="125" width="500" height="40" rx="20" fill="#f2c4da" stroke="var(--ink)" stroke-width="2"/><text class="tx sm dk" x="530" y="150" text-anchor="end">Membranscheibchen</text></g>
+ <g class="t" data-t="rhodopsin">${[...Array(7)].map((_,i)=>`<rect x="${76+i*10}" y="117" width="9" height="56" rx="4" fill="var(--rod)" stroke="var(--ink)" stroke-width="1.5"/>`).join('')}</g>
+ <circle class="pulse" data-from="1" cx="110" cy="145" r="36" fill="var(--sun)" opacity=".35"/>
+ <g class="t" data-t="retinal"><path data-until="0" d="M92,150 L102,141 L112,152 L120,143 L130,147" fill="none" stroke="#ffb300" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/><path data-from="1" d="M90,146 L130,146" fill="none" stroke="#ffb300" stroke-width="4.5" stroke-linecap="round"/></g>
+ <g class="t" data-t="transducin"><g data-until="1">${tdc(220,192,false)}</g><g data-from="2">${tdc(195,192,true)}${tdc(245,198,true)}${tdc(295,192,true)}<text class="tx dk" x="330" y="222">× Hunderte</text></g></g>
+ <g class="t" data-t="pde"><g data-until="2"><ellipse cx="402" cy="192" rx="13" ry="10" fill="#c3cbd6" stroke="var(--ink)" stroke-width="2"/><ellipse cx="420" cy="192" rx="13" ry="10" fill="#c3cbd6" stroke="var(--ink)" stroke-width="2"/></g><g data-from="3"><circle class="pulse" cx="411" cy="192" r="24" fill="#ffb347" opacity=".35"/><ellipse cx="402" cy="192" rx="13" ry="10" fill="#f6a35f" stroke="var(--ink)" stroke-width="2"/><ellipse cx="420" cy="192" rx="13" ry="10" fill="#f6a35f" stroke="var(--ink)" stroke-width="2"/></g></g>
+ <g class="t" data-t="cgmp"><g data-until="2">${cg(26,7)}</g><g data-from="3">${cg(6,11)}${[...Array(10)].map((_,i)=>`<circle cx="${380+(i%5)*14}" cy="${222+Math.floor(i/5)*12}" r="3" fill="#aab3c0"/>`).join('')}</g></g>
+ <g class="t" data-t="cng">
+  <rect x="20" y="360" width="540" height="32" fill="#f2c4da" stroke="var(--ink)" stroke-width="2"/>
+  <g data-until="3"><rect x="452" y="352" width="14" height="46" rx="5" fill="#5aa0e6" stroke="var(--ink)" stroke-width="2"/><rect x="478" y="352" width="14" height="46" rx="5" fill="#5aa0e6" stroke="var(--ink)" stroke-width="2"/><path d="M459,345 l4,4 l-4,4 l-4,-4 Z M485,345 l4,4 l-4,4 l-4,-4 Z" fill="var(--coneM)"/></g>
+  <g data-from="4"><rect x="456" y="352" width="16" height="46" rx="5" fill="#5aa0e6" stroke="var(--ink)" stroke-width="2"/><rect x="472" y="352" width="16" height="46" rx="5" fill="#5aa0e6" stroke="var(--ink)" stroke-width="2"/></g></g>
+ <rect x="20" y="392" width="540" height="50" fill="#dcecfb" stroke="var(--ink)" stroke-width="2"/>
+ <text class="tx sm dk" x="30" y="436">außen</text><text class="tx sm dk" x="30" y="352">innen</text>
+ <g class="t" data-t="sodium">
+  <g data-until="3">${[0,.55,1.1].map(b=>`<g><circle class="ion" r="7"/><text class="tx sm dk" text-anchor="middle" y="4">+</text><animateMotion dur="1.65s" begin="-${b}s" repeatCount="indefinite" path="M472,428 L472,300"/></g>`).join('')}</g>
+  <g data-from="4">${[478,496,514,532].map(x=>`<circle class="ion" cx="${x}" cy="408" r="7"/><text class="tx sm dk" x="${x}" y="412" text-anchor="middle">+</text>`).join('')}</g></g>
+ <g data-from="5" class="t" data-t="visualcycle"><rect x="190" y="56" width="300" height="40" rx="12" fill="#e7d4c4" stroke="var(--ink)" stroke-width="2"/><text class="tx dk" x="340" y="81" text-anchor="middle">Pigmentepithel: all-trans → 11-cis</text><path d="M132,138 C140,100 160,82 186,77" fill="none" stroke="var(--rpe)" stroke-width="3" marker-end="url(#mF)"/></g>
+ </g>
+ <g class="t" data-t="hyperpol">
+  <text class="tx" x="680" y="40" text-anchor="middle">Membranpotenzial</text>
+  <rect x="628" y="${MV(-30)}" width="14" height="${MV(-80)-MV(-30)}" rx="7" fill="var(--track)" stroke="var(--line)" stroke-width="2"/>
+  ${[-30,-40,-50,-60,-70,-80].map(v=>`<text class="tx mono" x="620" y="${MV(v)+4}" text-anchor="end">${v}</text>`).join('')}
+  <g data-until="3"><path d="M646,${MV(-40)} l14,-8 l0,16 Z" fill="var(--coneL)" stroke="var(--ink)" stroke-width="1.5"/><text class="tx sm" x="664" y="${MV(-40)+4}">−40 mV (dunkel)</text></g>
+  <g data-from="4"><path d="M646,${MV(-70)} l14,-8 l0,16 Z" fill="var(--coneS)" stroke="var(--ink)" stroke-width="1.5"/><text class="tx sm" x="664" y="${MV(-70)+4}">−70 mV (Licht)</text></g></g>
+ <g class="t" data-t="glutamate"><rect x="650" y="355" width="110" height="38" rx="12" fill="var(--cell)" stroke="var(--ink)" stroke-width="2.5"/><text class="tx sm dk" x="705" y="379" text-anchor="middle">Synapse</text>
+  <g data-until="3">${ves(12)}</g><g data-from="4">${ves(3)}</g></g>
+ <use href="#ph" data-from="1" data-until="1"><animateMotion dur="2.2s" repeatCount="indefinite" path="M110,-20 L110,128"/></use>
+ ${LBL('rhodopsin',100,250,110,176,'mb')}${LBL('retinal',222,116,128,144,'start')}${LBL('transducin',250,262,245,210,'mb')}${LBL('pde',420,262,412,204,'mb')}${LBL('cgmp',145,300,175,290,'end')}${LBL('cng',440,338,458,352,'end')}${LBL('darkcurrent',440,436,464,424,'end')}${LBL('sodium',512,436,490,424,'start')}${LBL('glutamate',642,425,664,410,'end')}`;},
+beats:[
+ {t:'Wie wird aus Licht Strom? Im Dunkeln stehen die Ionenkanäle des Stäbchens offen: Natrium strömt ständig hinein. Dieser „Dunkelstrom“ hält die Zelle bei etwa −40 mV, und sie gibt pausenlos Glutamat ab.',hl:['cng','sodium','darkcurrent','glutamate','hyperpol']},
+ {t:'Ein Photon trifft ein Rhodopsin-Molekül. Das Retinal darin klappt von der geknickten 11-cis- in die gestreckte all-trans-Form – in rund 200 Femtosekunden, eine der schnellsten Reaktionen der Biologie.',hl:['rhodopsin','retinal']},
+ {t:'Das aktivierte Rhodopsin schaltet nacheinander viele Hundert Transducin-Moleküle an. Das ist die erste Verstärkerstufe.',hl:['transducin','rhodopsin']},
+ {t:'Transducin aktiviert die Phosphodiesterase PDE6. Sie baut den Botenstoff cGMP rasend schnell ab – zweite Verstärkerstufe.',hl:['pde','cgmp']},
+ {t:'Ohne cGMP schließen sich die Kanäle. Die Zelle wird negativer (bis etwa −70 mV) und schüttet weniger Glutamat aus. Paradox, aber wahr: Licht macht den Photorezeptor leiser.',hl:['cng','hyperpol','glutamate','sodium']},
+ {t:'Das verbrauchte all-trans-Retinal wandert ins Pigmentepithel und wird dort wieder „gespannt“. Dieser Sehzyklus erklärt, warum wir nach dem Lichtausschalten 20–30 Minuten brauchen, um im Dunkeln richtig zu sehen.',hl:['visualcycle','retinal']}
+]});
+
+/* 8 · Verschaltung */
+CH.push({id:'verschaltung',title:'Rechnen in der Netzhaut',
+svg:()=>{
+ let s=`<g class="art">
+ <g class="t" data-t="surround"><circle cx="200" cy="240" r="120" fill="#cfe2ff" stroke="var(--ink)" stroke-width="3"/></g>
+ <g class="t" data-t="center"><circle cx="200" cy="240" r="55" fill="#fff1a8" stroke="var(--ink)" stroke-width="3" stroke-dasharray="7 5"/></g>
+ <g id="rfSigns"></g>
+ <path d="M300,170 C340,140 380,135 414,135" fill="none" stroke="var(--lead)" stroke-width="2.5" stroke-dasharray="6 5"/>
+ <g id="cellG" class="t" data-t="oncell"><circle cx="432" cy="135" r="18" fill="var(--gang)" stroke="var(--ink)" stroke-width="3"/><circle cx="432" cy="135" r="6" fill="#fff3e0" stroke="var(--ink)" stroke-width="1.5"/><line x1="450" y1="135" x2="495" y2="135" stroke="var(--gang)" stroke-width="4"/></g>
+ </g>
+ <text id="cellLbl" class="tx" x="432" y="180" text-anchor="middle">ON-Zentrum-Zelle</text>
+ <g class="t" data-t="spike"><rect x="495" y="72" width="285" height="122" rx="10" fill="#0e1a2b" stroke="var(--ink)" stroke-width="3"/>
+  ${[100,130,160].map(y=>`<line x1="500" y1="${y}" x2="775" y2="${y}" stroke="#1f3550" stroke-width="1"/>`).join('')}
+  <line x1="500" y1="176" x2="775" y2="176" stroke="#2e5a46" stroke-width="1.5"/><path id="spk" d="" stroke="#7cffb2" stroke-width="2"/></g>
+ <text id="rateT" class="tx mono" x="637" y="214" text-anchor="middle" style="font-size:15px">0 Spikes/s</text>
+ <g id="spot" class="drag"><circle id="spotGlow" cx="360" cy="380" r="40" fill="var(--sun)" opacity=".3"/><circle id="spotC" cx="360" cy="380" r="28" fill="var(--sun)" fill-opacity=".85" stroke="var(--ink)" stroke-width="2.5"/></g>
+ <text id="dragHint" class="tx sm" x="360" y="436" text-anchor="middle">← zieh mich!</text>
+ <g data-from="3" data-until="3" class="t" data-t="hermann"><rect x="458" y="232" width="292" height="216" fill="#ffffff" stroke="var(--ink)" stroke-width="2"/>
+  ${[0,1,2,3].map(i=>[0,1,2].map(j=>`<rect x="${470+i*70}" y="${243+j*68}" width="56" height="56" fill="#111"/>`).join('')).join('')}</g>
+ <g data-from="4" class="t" data-t="convergence">
+  ${[...Array(18)].map((_,i)=>`<circle cx="${452+i*10.5}" cy="252" r="4" fill="${i%3===2?'var(--coneL)':'var(--rod)'}" stroke="var(--ink)" stroke-width="1"/>`).join('')}
+  <path d="M450,262 L540,352 M640,262 L552,352" stroke="var(--fg)" stroke-width="2.5"/>
+  <circle cx="546" cy="366" r="14" fill="var(--gang)" stroke="var(--ink)" stroke-width="2.5"/><line x1="546" y1="380" x2="546" y2="420" stroke="var(--gang)" stroke-width="4" marker-end="url(#mF)"/>
+  <text class="tx halo" x="546" y="302" text-anchor="middle">≈ 100 : 1</text><text class="tx sm" x="560" y="430">1 Faser im Sehnerv</text></g>
+ ${LBL('rf',200,98,200,120,'mt')}${LBL('center',150,404,190,252,'mb')}${LBL('surround',262,404,276,326,'mb')}${LBL('spike',637,52,637,72,'mt')}
+ ${LBL('midget',600,318,560,362,'start',4)}${LBL('parasol',600,352,561,368,'start',4)}${LBL('iprgc',600,386,560,374,'start',4)}`;
+ return s;},
+panel:()=>`<h3>Sei der Forscher</h3>
+<div class="ctl"><span class="ctl-l">Licht</span><button class="btn" data-s="small">Kleiner Lichtpunkt</button><button class="btn" data-s="big">Ganzes Feld beleuchten</button></div>
+<div class="ctl"><span class="ctl-l">Zelltyp</span><button class="btn" data-c="on">ON-Zentrum</button><button class="btn" data-c="off">OFF-Zentrum</button><button class="btn" id="sndB" aria-pressed="false">Spikes hörbar machen</button></div>`,
+init(){
+ const st=$('#stage'),spotC=$('#spotC'),spotG=$('#spotGlow'),spk=$('#spk'),rateT=$('#rateT'),cellG=$('#cellG'),cellL=$('#cellLbl'),signs=$('#rfSigns'),hint=$('#dragHint');
+ const S={x:360,y:380,r:28,type:'on',sound:false,drag:false,auto:null};
+ const pts=[];for(let i=0;i<120;i++){const a=i*2.39996,rr=Math.sqrt((i+.5)/120);pts.push([Math.cos(a)*rr,Math.sin(a)*rr])}
+ const spikes=[];let raf,last=performance.now(),shown=0,actx=null;
+ function drawSigns(){const on=S.type==='on';let s='';[[-22,-14],[18,-18],[0,16],[-18,22],[24,14]].forEach(p=>{s+=`<text class="tx dk" x="${200+p[0]}" y="${245+p[1]}" text-anchor="middle" style="font-size:20px">${on?'+':'−'}</text>`});
+  for(let k=0;k<8;k++){const a=k/8*2*Math.PI+.3;s+=`<text class="tx dk" x="${(200+88*Math.cos(a)).toFixed(1)}" y="${(246+88*Math.sin(a)).toFixed(1)}" text-anchor="middle" style="font-size:20px">${on?'−':'+'}</text>`}
+  signs.innerHTML=s;cellG.dataset.t=on?'oncell':'offcell';cellL.textContent=on?'ON-Zentrum-Zelle':'OFF-Zentrum-Zelle'}
+ function rate(){let c=0,s=0;for(const p of pts){const d=Math.hypot(S.x+p[0]*S.r-200,S.y+p[1]*S.r-240);if(d<55)c++;else if(d<120)s++}
+  const A=Math.PI*S.r*S.r/pts.length,cf=Math.min(1,c*A/(Math.PI*55*55)*2.2),sf=Math.min(1,s*A/(Math.PI*(120*120-55*55))*6);
+  return S.type==='on'?clamp(18+125*cf*(1-.8*sf)-25*sf*(1-cf),0,150):clamp(18+110*sf*(1-.7*cf)-18*cf*(1-sf),0,150)}
+ function place(){spotC.setAttribute('cx',S.x);spotC.setAttribute('cy',S.y);spotC.setAttribute('r',S.r);spotG.setAttribute('cx',S.x);spotG.setAttribute('cy',S.y);spotG.setAttribute('r',S.r+12)}
+ function click(){if(!actx)return;const b=actx.createBuffer(1,220,actx.sampleRate),d=b.getChannelData(0);for(let i=0;i<220;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/30);const src=actx.createBufferSource();src.buffer=b;const g=actx.createGain();g.gain.value=.35;src.connect(g).connect(actx.destination);src.start()}
+ function loop(now){
+  const dt=Math.min(.05,(now-last)/1000);last=now;
+  if(S.auto){const a=S.auto,t=now-a.t0;let i=0;while(i<a.k.length-1&&t>a.k[i+1][3])i++;
+   if(i>=a.k.length-1){const k=a.k[a.k.length-1];S.x=k[0];S.y=k[1];S.r=k[2];S.auto=null}else{const k0=a.k[i],k1=a.k[i+1],p=(t-k0[3])/(k1[3]-k0[3]),e=p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;S.x=k0[0]+(k1[0]-k0[0])*e;S.y=k0[1]+(k1[1]-k0[1])*e;S.r=k0[2]+(k1[2]-k0[2])*e}
+   place()}
+  const r=rate();let k=r*dt,n=0;while(k>0){if(Math.random()<Math.min(1,k)){spikes.push(now-Math.random()*dt*1000);n++}k-=1}
+  if(n&&S.sound)click();
+  while(spikes.length&&now-spikes[0]>2500)spikes.shift();
+  let d='';for(const t of spikes){const x=(778-(now-t)/2500*280).toFixed(1);d+=`M${x},92 L${x},170 `}spk.setAttribute('d',d);
+  shown+=(r-shown)*.08;rateT.textContent=Math.round(shown)+' Spikes/s';
+  raf=requestAnimationFrame(loop)}
+ const down=e=>{if(!e.target.closest('#spot')&&!e.target.closest('[data-t="center"],[data-t="surround"]'))return;S.drag=true;S.auto=null;hint.classList.add('off');const p=svgPt(e);S.x=clamp(p.x,20,400);S.y=clamp(p.y,40,430);place();try{st.setPointerCapture(e.pointerId)}catch(_){}e.preventDefault()};
+ const move=e=>{if(!S.drag)return;const p=svgPt(e);S.x=clamp(p.x,20,400);S.y=clamp(p.y,40,430);place()};
+ const up=()=>{S.drag=false};
+ st.addEventListener('pointerdown',down);st.addEventListener('pointermove',move);st.addEventListener('pointerup',up);st.addEventListener('pointercancel',up);
+ function setSize(m){S.auto=null;if(m==='big'){S.x=200;S.y=240;S.r=125}else{S.r=28}place();updB()}
+ function setType(t){S.type=t;drawSigns();updB()}
+ function updB(){document.querySelectorAll('#panel [data-s]').forEach(b=>b.setAttribute('aria-pressed',(b.dataset.s==='big')===(S.r>100)));document.querySelectorAll('#panel [data-c]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.c===S.type))}
+ document.querySelectorAll('#panel [data-s]').forEach(b=>b.onclick=()=>setSize(b.dataset.s));
+ document.querySelectorAll('#panel [data-c]').forEach(b=>b.onclick=()=>setType(b.dataset.c));
+ const sb=$('#sndB');sb.onclick=()=>{S.sound=!S.sound;sb.setAttribute('aria-pressed',S.sound);if(S.sound&&!actx){try{actx=new (window.AudioContext||window.webkitAudioContext)()}catch(_){}}};
+ drawSigns();place();updB();raf=requestAnimationFrame(loop);
+ return {
+  path(k){S.auto={k,t0:performance.now()};updB()},
+  set(x,y,r){S.auto=null;S.x=x;S.y=y;S.r=r;place();updB()},
+  type:setType,
+  destroy(){cancelAnimationFrame(raf);st.removeEventListener('pointerdown',down);st.removeEventListener('pointermove',move);st.removeEventListener('pointerup',up);st.removeEventListener('pointercancel',up);if(actx)try{actx.close()}catch(_){}}
+ };
+},
+beats:[
+ {t:'Jede Ganglienzelle „überwacht“ einen kleinen Fleck im Bild: ihr rezeptives Feld. Es besteht aus einem Zentrum und einem ringförmigen Umfeld, die gegeneinander arbeiten. Rechts siehst du die Spikes der Zelle.',hl:['rf','center','surround','spike'],act:a=>{a.type('on');a.set(360,380,28)}},
+ {t:'Bei einer ON-Zentrum-Zelle löst Licht im Zentrum ein Feuerwerk an Spikes aus. Licht im Umfeld bremst sie sogar unter ihre Grundrate. Zieh den gelben Lichtpunkt selbst herum!',hl:['oncell','offcell','center','surround','spike'],act:a=>a.path([[360,380,28,0],[200,240,28,1400],[200,240,28,4200],[290,300,28,5400],[290,300,28,8200],[200,240,28,9400]]),hold:3000},
+ {t:'Leuchtet das ganze Feld gleichmäßig, heben sich Zentrum und Umfeld weitgehend auf. Die Netzhaut meldet also vor allem Kontraste und Kanten, kaum absolute Helligkeit – das spart enorm Bandbreite.',hl:['rf','spike'],act:a=>a.path([[200,240,28,0],[200,240,125,1200]])},
+ {t:'Dahinter steckt laterale Hemmung über Horizontal- und amakrine Zellen. Ein Nebeneffekt: Siehst du die grauen Flecken an den weißen Kreuzungen des Gitters? Sie existieren gar nicht.',hl:['lateralinh','hermann'],act:a=>a.set(200,240,28)},
+ {t:'Rund 126 Millionen Rezeptoren melden an nur etwa 1,2 Millionen Ganglienzellen – Kompression ungefähr 100 : 1. Es gibt über 20 Ganglienzell-Typen, etwa Midget-Zellen für Details und Farbe, Parasol-Zellen für Bewegung und Melanopsin-Zellen für die innere Uhr.',hl:['convergence','midget','parasol','iprgc']}
+]});
+
+/* 9 · Sehbahn */
+CH.push({id:'sehbahn',title:'Die Sehbahn',
+svg:()=>{
+ const B1='M350,147 C357,168 385,182 400,192 C425,206 470,242 495,280',B2='M470,147 C467,170 428,182 409,194 C430,212 475,245 495,280',O1='M330,147 C333,170 372,182 391,194 C370,212 325,245 305,280',O2='M450,147 C443,168 415,182 400,192 C375,206 330,242 305,280';
+ const RB='M505,292 C560,330 520,400 450,425',RB2='M498,298 C535,345 498,395 440,418',RO='M295,292 C240,330 280,400 350,425',RO2='M302,298 C265,345 302,395 360,418';
+ return `<g id="pathG"><g class="art">
+ <ellipse cx="400" cy="285" rx="218" ry="176" fill="#f5dcc4" stroke="var(--ink)" stroke-width="3"/>
+ <path d="M386,112 L400,90 L414,112" fill="#f5dcc4" stroke="var(--ink)" stroke-width="3" stroke-linejoin="round"/>
+ <ellipse cx="400" cy="302" rx="182" ry="136" fill="var(--brain)" stroke="var(--ink)" stroke-width="3"/>
+ <path d="M400,170 L400,438" stroke="var(--brain2)" stroke-width="3" stroke-dasharray="3 7"/>
+ <g class="t" data-t="vfield"><path d="M400,78 L338,78 A62,62 0 0 1 400,16 Z" fill="var(--fieldL)" opacity=".85" stroke="var(--ink)" stroke-width="2.5"/><path d="M400,78 L400,16 A62,62 0 0 1 462,78 Z" fill="var(--fieldR)" opacity=".85" stroke="var(--ink)" stroke-width="2.5"/></g>
+ <g class="fL"><path d="M365,50 L342,106 L350,147 M365,50 L460,106 L470,147" fill="none" stroke="var(--fieldL)" stroke-width="2.2"/></g>
+ <g class="fR"><path d="M435,50 L340,106 L330,147 M435,50 L458,106 L450,147" fill="none" stroke="var(--fieldR)" stroke-width="2.2"/></g>
+ ${[340,460].map(x=>`<g class="t" data-t="eyeball"><circle cx="${x}" cy="128" r="22" fill="#fff" stroke="var(--ink)" stroke-width="2.5"/><ellipse cx="${x}" cy="108" rx="10" ry="4.5" fill="var(--iris)" stroke="var(--ink)" stroke-width="1.5"/><path d="M${x-20},${136} A22,22 0 0 0 ${x+20},136" fill="none" stroke="var(--retina)" stroke-width="4"/></g>`).join('')}
+ <g class="t fR" data-t="temporal"><circle cx="330" cy="147" r="4" fill="var(--fieldR)" stroke="var(--ink)" stroke-width="1.2"/></g><g class="t fL" data-t="nasal"><circle cx="350" cy="147" r="4" fill="var(--fieldL)" stroke="var(--ink)" stroke-width="1.2"/></g>
+ <g class="t fR" data-t="nasal"><circle cx="450" cy="147" r="4" fill="var(--fieldR)" stroke="var(--ink)" stroke-width="1.2"/></g><g class="t fL" data-t="temporal"><circle cx="470" cy="147" r="4" fill="var(--fieldL)" stroke="var(--ink)" stroke-width="1.2"/></g>
+ <g class="t" data-t="opticnerve"><g class="fR">${tube(O1,'var(--fieldR)',4.5)}</g><g class="fL">${tube(B1.split(' C425')[0],'var(--fieldL)',4.5)}</g><g class="fR">${tube(O2.split(' C375')[0],'var(--fieldR)',4.5)}</g><g class="fL">${tube(B2,'var(--fieldL)',4.5)}</g></g>
+ <g class="t" data-t="tract"><g class="fL">${tube(B1,'var(--fieldL)',4.5)}</g><g class="fR">${tube(O2,'var(--fieldR)',4.5)}</g></g>
+ <g class="t" data-t="chiasm"><ellipse cx="400" cy="192" rx="16" ry="9" fill="none" stroke="var(--ink)" stroke-width="2" stroke-dasharray="3 3"/></g>
+ <circle class="t" data-t="scn" cx="400" cy="174" r="6" fill="var(--sun)" stroke="var(--ink)" stroke-width="2"/>
+ <g class="t" data-t="sc"><path d="M470,252 C452,280 428,310 414,328" fill="none" stroke="var(--fieldL)" stroke-width="2.4" class="fL"/><path d="M330,252 C348,280 372,310 386,328" fill="none" stroke="var(--fieldR)" stroke-width="2.4" class="fR"/><circle cx="388" cy="336" r="10" fill="#9fd3c7" stroke="var(--ink)" stroke-width="2"/><circle cx="412" cy="336" r="10" fill="#9fd3c7" stroke="var(--ink)" stroke-width="2"/></g>
+ <ellipse class="t" data-t="pretectum" cx="400" cy="312" rx="10" ry="6" fill="#f2a65a" stroke="var(--ink)" stroke-width="2"/>
+ <g class="t" data-t="radiation"><g class="fL">${tube(RB,'var(--fieldL)',4)}${tube(RB2,'var(--fieldL)',3)}</g><g class="fR">${tube(RO,'var(--fieldR)',4)}${tube(RO2,'var(--fieldR)',3)}</g></g>
+ <g class="t" data-t="lgn">${[300,500].map(x=>`<ellipse cx="${x}" cy="286" rx="21" ry="14" fill="#c7a4e8" stroke="var(--ink)" stroke-width="2.5"/><path d="M${x-14},283 Q${x},275 ${x+14},283 M${x-15},289 Q${x},281 ${x+15},289" fill="none" stroke="var(--ink)" stroke-width="1.2" opacity=".55"/>`).join('')}</g>
+ <g class="t" data-t="v1"><ellipse class="fR" cx="356" cy="423" rx="32" ry="12" fill="var(--fieldR)" stroke="var(--ink)" stroke-width="2.5"/><ellipse class="fL" cx="444" cy="423" rx="32" ry="12" fill="var(--fieldL)" stroke="var(--ink)" stroke-width="2.5"/></g>
+ </g>
+ <text class="tx sm halo" x="270" y="384" text-anchor="middle">linke Hirnhälfte</text><text class="tx sm halo" x="530" y="384" text-anchor="middle">rechte Hirnhälfte</text>
+ <text class="tx sm" x="368" y="12" text-anchor="end" style="fill:var(--fieldL)">links</text><text class="tx sm" x="432" y="12" style="fill:var(--fieldR)">rechts</text>
+ <circle class="spark fL" r="6"><animateMotion dur="3.4s" repeatCount="indefinite" path="${B1} L505,292 C560,330 520,400 450,425"/></circle>
+ <circle class="spark fR" r="6"><animateMotion dur="3.4s" begin="-1.7s" repeatCount="indefinite" path="${O1} L295,292 C240,330 280,400 350,425"/></circle>
+ </g>
+ ${LBL('vfield',482,40,452,52,'start')}${LBL('opticnerve',250,165,340,165,'end')}${LBL('chiasm',560,186,408,192,'start',1)}${LBL('scn',250,200,394,175,'end',4)}
+ ${LBL('tract',600,236,468,246,'start',2)}${LBL('lgn',612,288,522,287,'start',2)}${LBL('radiation',622,342,536,338,'start',3)}${LBL('v1',600,416,476,423,'start',3)}
+ ${LBL('pretectum',250,302,390,312,'end',4)}${LBL('sc',250,342,378,336,'end',4)}`;},
+panel:()=>`<h3>Welche Hälfte wohin?</h3><div class="ctl"><span class="ctl-l">Zeigen</span><button class="btn" data-f="L">Linkes Gesichtsfeld</button><button class="btn" data-f="R">Rechtes Gesichtsfeld</button><button class="btn" data-f="B">Beide</button></div>`,
+init(){
+ const pg=$('#pathG');let css=document.getElementById('fstyle');if(!css){css=document.createElement('style');css.id='fstyle';css.textContent='#pathG.onlyL .fR,#pathG.onlyR .fL{opacity:.1;transition:opacity .4s}';document.head.appendChild(css)}
+ const set=f=>{pg.classList.toggle('onlyL',f==='L');pg.classList.toggle('onlyR',f==='R');document.querySelectorAll('#panel [data-f]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.f===f))};
+ document.querySelectorAll('#panel [data-f]').forEach(b=>b.onclick=()=>set(b.dataset.f));set('B');
+ return {set,destroy(){}};
+},
+beats:[
+ {t:'Jetzt verlässt das Signal das Auge. Jeder Sehnerv ist ein Kabel aus rund 1,2 Millionen Nervenfasern. Blau zeigt hier alles aus dem linken Gesichtsfeld, Orange alles aus dem rechten.',hl:['opticnerve','vfield','eyeball'],act:a=>a.set('B')},
+ {t:'An der Sehnervenkreuzung (Chiasma) wechseln die Fasern der nasalen Netzhauthälften die Seite. Ergebnis: Alles aus dem linken Gesichtsfeld landet in der rechten Hirnhälfte – und umgekehrt.',hl:['chiasm','vfield','nasal','temporal'],act:a=>{a.set('L');later(()=>a.set('R'),4500);later(()=>a.set('B'),9000)},hold:2500},
+ {t:'Erste Schaltstation ist der seitliche Kniehöcker im Thalamus (CGL, englisch LGN). Er hat sechs Schichten und wird stark vom Kortex zurückgesteuert – eine Art Filter für Aufmerksamkeit.',hl:['lgn','tract'],act:a=>a.set('B')},
+ {t:'Über die Sehstrahlung erreicht das Signal die primäre Sehrinde (V1) ganz hinten im Hinterhauptslappen – rund 60 bis 80 Millisekunden, nachdem das Licht das Auge traf.',hl:['radiation','v1']},
+ {t:'Einige Fasern zweigen ab: zum oberen Hügel im Mittelhirn (schnelle Blicksprünge), zum Prätektum (Pupillenreflex) und zum Nucleus suprachiasmaticus, der inneren Uhr.',hl:['sc','pretectum','scn']}
+]});
+
+/* 10 · V1 */
+CH.push({id:'v1',title:'Primäre Sehrinde V1',
+svg:()=>{
+ const ring=[[60,'#9ad17a'],[40,'#ffd166'],[18,'#ffa45c'],[7,'#ea4d4d']];
+ const half=(r,c)=>`<path d="M95,${365-r} A${r},${r} 0 0 1 95,${365+r} Z" fill="${c}" stroke="var(--ink)" stroke-width="1.5"/>`;
+ const strip=[[200,51,'#ea4d4d','Fovea'],[251,43,'#ffa45c','2–10°'],[294,56,'#ffd166','10–40°'],[350,21,'#9ad17a','>40°']];
+ let pin='';const PC=['#ea4d4d','#f0862a','#ffd166','#9ad17a','#2fae55','#4cc2cf','#4c78f0','#8b67d0'];
+ for(let k=0;k<8;k++){const a0=k/8*2*Math.PI,a1=(k+1)/8*2*Math.PI,cx=520,cy=372,r=60;pin+=`<path d="M${cx},${cy} L${(cx+r*Math.cos(a0)).toFixed(1)},${(cy+r*Math.sin(a0)).toFixed(1)} A${r},${r} 0 0 1 ${(cx+r*Math.cos(a1)).toFixed(1)},${(cy+r*Math.sin(a1)).toFixed(1)} Z" fill="${PC[k]}" stroke="var(--ink)" stroke-width="1.2"/>`;
+  const am=(a0+a1)/2,mx=cx+38*Math.cos(am),my=cy+38*Math.sin(am),o=k*22.5*Math.PI/180;pin+=`<line x1="${(mx-8*Math.cos(o)).toFixed(1)}" y1="${(my-8*Math.sin(o)).toFixed(1)}" x2="${(mx+8*Math.cos(o)).toFixed(1)}" y2="${(my+8*Math.sin(o)).toFixed(1)}" stroke="#18203a" stroke-width="3" stroke-linecap="round"/>`}
+ return `<g class="art">
+ <g transform="translate(30,20) scale(.7) translate(-130,-20)">
+  <g class="t" data-t="occipital">${BRAIN()}</g>
+  <ellipse class="t" data-t="v1" cx="572" cy="150" rx="22" ry="44" fill="var(--v1c)" stroke="var(--ink)" stroke-width="3"/>
+  <path class="t" data-t="calcarine" d="M520,152 C540,146 560,154 590,148" fill="none" stroke="var(--ink)" stroke-width="4" stroke-dasharray="8 5"/>
+ </g>
+ <g class="t" data-t="retinotopy">${ring.map(q=>half(q[0],q[1])).join('')}<text class="tx sm" x="95" y="292" text-anchor="middle">Gesichtsfeld</text></g>
+ <path d="M162,365 L192,365" stroke="var(--fg)" stroke-width="2.5" marker-end="url(#mF)"/>
+ <g class="t" data-t="magnification">${strip.map(q=>`<rect x="${q[0]}" y="335" width="${q[1]}" height="60" fill="${q[2]}" stroke="var(--ink)" stroke-width="1.5"/><text class="tx mono" x="${q[0]+q[1]/2}" y="412" text-anchor="middle">${q[3]}</text>`).join('')}<text class="tx sm" x="285" y="326" text-anchor="middle">Fläche in V1</text></g>
+ <g class="t" data-t="orientation"><circle cx="520" cy="160" r="82" fill="#101828" stroke="var(--ink)" stroke-width="3"/><g id="barG"><rect x="512" y="98" width="16" height="124" rx="6" fill="#fff6c8" stroke="var(--ink)" stroke-width="2"/></g></g>
+ <g class="t" data-t="simplecell" id="neurons">${[0,45,90,135].map((o,i)=>{const y=82+i*58,r=o*Math.PI/180;return `<circle id="ng${i}" cx="652" cy="${y}" r="24" fill="var(--sun)" opacity="0"/><circle cx="652" cy="${y}" r="17" fill="#ffd9c2" stroke="var(--ink)" stroke-width="2.5"/><line x1="${(652+9*Math.sin(r)).toFixed(1)}" y1="${(y-9*Math.cos(r)).toFixed(1)}" x2="${(652-9*Math.sin(r)).toFixed(1)}" y2="${(y+9*Math.cos(r)).toFixed(1)}" stroke="#18203a" stroke-width="3.5" stroke-linecap="round"/><rect x="678" y="${y-7}" width="105" height="14" rx="7" fill="var(--track)"/><rect id="nb${i}" x="678" y="${y-7}" width="0" height="14" rx="7" fill="var(--v1c)"/>`}).join('')}</g>
+ <g data-from="3" class="t" data-t="hypercolumn">${pin}</g>
+ <g data-from="3" data-until="3" class="t" data-t="oculardom">${[0,1,2,3,4,5].map(i=>`<rect x="${620+i*26}" y="316" width="26" height="110" fill="${i%2?'#d7dde5':'#5b6578'}"/><text class="tx mono" x="${633+i*26}" y="440" text-anchor="middle">${i%2?'R':'L'}</text>`).join('')}</g>
+ <g data-from="4" class="t" data-t="complexcell"><circle cx="645" cy="355" r="17" fill="#ffd9c2" stroke="var(--ink)" stroke-width="2.5"/><circle class="ring" cx="645" cy="355" r="17" fill="none" stroke="var(--glow)" stroke-width="3"/><rect x="675" y="318" width="110" height="76" rx="8" fill="#101828" stroke="var(--ink)" stroke-width="2"/>${[692,728,764].map(x=>`<rect x="${x-4}" y="328" width="8" height="56" rx="3" fill="#fff6c8" opacity=".9"/>`).join('')}<text class="tx sm" x="730" y="412" text-anchor="middle">Position egal</text></g>
+ </g>
+ ${LBL('v1',338,256,338,133,'mb')}${LBL('occipital',230,20,300,60,'mt')}${LBL('calcarine',180,256,320,120,'mb')}${LBL('orientation',520,262,520,243,'mb',2)}${LBL('hypercolumn',420,440,470,400,'end',3)}`;},
+panel:()=>`<h3>Dreh den Balken</h3><div class="ctl"><label class="ctl-l" for="ori">Ausrichtung</label><input type="range" id="ori" min="0" max="180" value="0" step="1"><output class="out" id="oriOut" for="ori">0°</output></div>`,
+init(){
+ const inp=$('#ori'),out=$('#oriOut'),bar=$('#barG');let raf=null,t=0;
+ function upd(a){bar.setAttribute('transform',`rotate(${a} 520 160)`);out.textContent=a+'°';inp.value=a;
+  [0,45,90,135].forEach((o,i)=>{let d=Math.abs(a-o)%180;d=Math.min(d,180-d);const r=4+96*Math.exp(-(d*d)/(2*18*18));$('#nb'+i).setAttribute('width',(r*1.05).toFixed(1));$('#ng'+i).setAttribute('opacity',(r/100*.9).toFixed(2))})}
+ inp.oninput=()=>{cancelAnimationFrame(raf);upd(+inp.value)};
+ upd(0);
+ return {sweep(){cancelAnimationFrame(raf);const t0=performance.now();const f=n=>{const p=Math.min(1,(n-t0)/10000);upd(Math.round(p*180));if(p<1)raf=requestAnimationFrame(f)};raf=requestAnimationFrame(f)},set:upd,destroy(){cancelAnimationFrame(raf)}};
+},
+beats:[
+ {t:'Willkommen in V1, der primären Sehrinde im Hinterhauptslappen. Sie heißt auch „gestreifter Kortex“, weil man dort sogar mit bloßem Auge einen hellen Faserstreifen sieht.',hl:['v1','occipital','calcarine']},
+ {t:'V1 ist eine Landkarte des Gesichtsfelds (Retinotopie) – aber stark verzerrt: Die winzige Fovea bekommt riesig viel Fläche. Die zentralen 10° belegen etwa die Hälfte von V1.',hl:['retinotopy','magnification']},
+ {t:'1959 entdeckten David Hubel und Torsten Wiesel: V1-Neurone lieben Kanten in einer bestimmten Ausrichtung. Dreh den Balken und beobachte, welches Neuron feuert. Dafür gab es 1981 den Nobelpreis.',hl:['orientation','simplecell'],act:a=>a.sweep(),hold:3000},
+ {t:'Neurone mit ähnlicher Vorliebe liegen nebeneinander und bilden Windrad-Muster. Ein etwa 1 mm großes Modul – die Hyperkolumne – enthält alle Ausrichtungen und beide Augen für einen Fleck im Gesichtsfeld.',hl:['hypercolumn','oculardom'],act:a=>a.set(45)},
+ {t:'Komplexe Zellen reagieren auf ihre Ausrichtung egal wo im Feld, manche zusätzlich auf Bewegungsrichtung oder Farbe. V1 zerlegt das Bild so in ein riesiges Set aus Kanten-Merkmalen – das Rohmaterial für alles Weitere.',hl:['complexcell','simplecell']}
+]});
+
+/* 11 · Pfade */
+CH.push({id:'pfade',title:'Was- und Wo-Pfad',
+svg:()=>{
+ const icons=[
+  cx=>`<line x1="${cx-30}" y1="372" x2="${cx-14}" y2="350" stroke="var(--fg)" stroke-width="4" stroke-linecap="round"/><line x1="${cx-6}" y1="350" x2="${cx-6}" y2="374" stroke="var(--fg)" stroke-width="4" stroke-linecap="round"/><line x1="${cx+4}" y1="362" x2="${cx+30}" y2="362" stroke="var(--fg)" stroke-width="4" stroke-linecap="round"/>`,
+  cx=>`<path d="M${cx-28},374 L${cx-28},350 L${cx-4},350" fill="none" stroke="var(--fg)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M${cx+4},374 Q${cx+10},348 ${cx+30},352" fill="none" stroke="var(--fg)" stroke-width="4" stroke-linecap="round"/>`,
+  cx=>`<circle cx="${cx-14}" cy="362" r="12" fill="var(--coneS)" stroke="var(--ink)" stroke-width="2"/><path d="M${cx+14},348 L${cx+28},374 L${cx},374 Z" fill="var(--hor)" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round"/>`,
+  cx=>`<ellipse cx="${cx-18}" cy="356" rx="9" ry="5" fill="#fff" stroke="var(--ink)" stroke-width="2"/><circle cx="${cx-18}" cy="356" r="2.5" fill="var(--ink)"/><path d="M${cx+4},348 L${cx},366 L${cx+8},366" fill="none" stroke="var(--fg)" stroke-width="2.5" stroke-linecap="round"/><path d="M${cx+14},372 Q${cx+24},380 ${cx+32},370" fill="none" stroke="var(--coneL)" stroke-width="3" stroke-linecap="round"/>`,
+  cx=>`<circle cx="${cx}" cy="361" r="19" fill="#ffd9b8" stroke="var(--ink)" stroke-width="2.5"/><circle cx="${cx-7}" cy="356" r="2.5" fill="var(--ink)"/><circle cx="${cx+7}" cy="356" r="2.5" fill="var(--ink)"/><path d="M${cx-8},366 Q${cx},373 ${cx+8},366" fill="none" stroke="var(--ink)" stroke-width="2.2" stroke-linecap="round"/>`];
+ const T=[['V1','Kanten','v1','≈ 60 ms'],['V2','Konturen','v2','≈ 80 ms'],['V4','Formen','v4','≈ 100 ms'],['IT','Objektteile','it','≈ 120 ms'],['FFA','Gesichter','ffa','≈ 150 ms']];
+ return `<g class="art">${BRAIN()}
+ <ellipse class="t" data-t="pfc" cx="185" cy="125" rx="42" ry="36" fill="#d9b3ff"/>
+ <ellipse class="t" data-t="fef" cx="300" cy="70" rx="20" ry="13" fill="#c08af0"/>
+ <ellipse class="t" data-t="ppc" cx="470" cy="85" rx="46" ry="26" fill="#8db8ff"/>
+ <ellipse class="t" data-t="v2" cx="556" cy="150" rx="32" ry="56" fill="#ffc29e"/>
+ <ellipse class="t" data-t="v1" cx="577" cy="150" rx="16" ry="36" fill="var(--v1c)"/>
+ <ellipse class="t" data-t="mt" cx="522" cy="186" rx="16" ry="12" fill="#7cc6f2"/>
+ <ellipse class="t" data-t="v4" cx="498" cy="221" rx="22" ry="11" fill="#ffd166"/>
+ <ellipse class="t" data-t="it" cx="385" cy="236" rx="62" ry="13" fill="#9ad17a"/>
+ <ellipse class="t" data-t="ffa" cx="446" cy="240" rx="18" ry="8" fill="#3fa47a"/>
+ </g>
+ <g class="t" data-t="ventral"><path d="M548,198 C530,222 505,236 470,242 C440,247 400,248 350,244" fill="none" stroke="var(--ink)" stroke-width="10" stroke-linecap="round"/><path d="M548,198 C530,222 505,236 470,242 C440,247 400,248 350,244" fill="none" stroke="var(--coneM)" stroke-width="6" stroke-linecap="round" marker-end="url(#mG)"/></g>
+ <g class="t" data-t="dorsal"><path d="M548,106 C530,80 505,64 470,62 C440,60 415,66 398,74" fill="none" stroke="var(--ink)" stroke-width="10" stroke-linecap="round"/><path d="M548,106 C530,80 505,64 470,62 C440,60 415,66 398,74" fill="none" stroke="var(--fieldL)" stroke-width="6" stroke-linecap="round" marker-end="url(#mB)"/></g>
+ <g class="t" data-t="feedback" data-from="4"><path d="M320,58 C400,18 520,28 562,100" fill="none" stroke="var(--fg)" stroke-width="3" stroke-dasharray="8 6" marker-end="url(#mF)"/><path d="M360,226 C430,200 500,180 548,168" fill="none" stroke="var(--fg)" stroke-width="3" stroke-dasharray="8 6" marker-end="url(#mF)"/></g>
+ ${LBL('v1',640,150,593,150,'start')}${LBL('v2',640,108,580,108,'start')}${LBL('v4',640,228,520,222,'start',1)}${LBL('mt',640,190,538,187,'start',2)}${LBL('ppc',640,62,516,84,'start',2)}
+ ${LBL('fef',300,16,300,57,'mt',4)}${LBL('pfc',125,40,165,100,'end',4)}${LBL('it',330,292,370,250,'mb',1)}${LBL('ffa',470,292,446,249,'mb',1)}
+ ${LBL('ventral',150,250,340,245,'end')}${LBL('dorsal',440,16,440,60,'mt')}${LBL('feedback',575,16,520,58,'mt',4)}
+ <g data-from="3"><text class="tx sm" x="400" y="326" text-anchor="middle">rezeptive Felder werden größer, Merkmale komplexer →</text>
+ ${T.map((q,i)=>{const x=30+i*152,cx=x+64;return `<g class="t" data-t="${q[2]}"><rect x="${x}" y="334" width="128" height="86" rx="12" fill="var(--surface)" stroke="var(--line)" stroke-width="2.5"/>${icons[i](cx)}<text class="tx sm" x="${cx}" y="410" text-anchor="middle"><tspan font-weight="700">${q[0]}</tspan> · ${q[1]}</text></g><text class="tx mono" x="${cx}" y="440" text-anchor="middle">${q[3]}</text>${i<4?`<line x1="${x+131}" y1="377" x2="${x+148}" y2="377" stroke="var(--fg)" stroke-width="2.5" marker-end="url(#mF)"/>`:''}`}).join('')}</g>`;},
+beats:[
+ {t:'Von V1 aus teilt sich die Verarbeitung grob in zwei Ströme – ein Konzept von Leslie Ungerleider und Mortimer Mishkin (1982). Danach folgen viele weitere Areale: Insgesamt sind über 30 Hirnareale am Sehen beteiligt.',hl:['ventral','dorsal','v1','v2']},
+ {t:'Der ventrale Pfad („Was?“) führt über V4 in den unteren Schläfenlappen. V4 verarbeitet Farbe und Formen, der IT-Kortex ganze Objekte. Spezialareale wie die FFA reagieren besonders auf Gesichter.',hl:['ventral','v4','it','ffa']},
+ {t:'Der dorsale Pfad („Wo?“ und „Wie?“) läuft über MT/V5, das Bewegungsareal, in den Scheitellappen. Dort entsteht eine Raumkarte, mit der wir greifen, ausweichen und den Blick steuern.',hl:['dorsal','mt','ppc']},
+ {t:'Entlang des Weges werden die rezeptiven Felder größer und die Merkmale komplexer: Kanten → Konturen → Formen → Objektteile → ganze Objekte. Schon nach rund 150 Millisekunden „weiß“ das Gehirn, ob es ein Tier sieht (Thorpe et al. 1996).'},
+ {t:'Wichtig: Es geht nicht nur vorwärts. Höhere Areale senden massenhaft Erwartungen zurück. Das Gehirn gleicht ständig Vorhersage und Sinnesdaten ab, und Stirnhirn samt frontalem Augenfeld lenken die Aufmerksamkeit.',hl:['feedback','fef','pfc']}
+]});
+
+/* 12 · Konstruktion */
+CH.push({id:'konstruktion',title:'Das Gehirn konstruiert',
+svg:()=>{
+ const pac=(vx,vy,cx,cy,r)=>{const f=Math.atan2(cy-vy,cx-vx),a=f+Math.PI/6,b=f-Math.PI/6;return `<path d="M${vx},${vy} L${(vx+r*Math.cos(a)).toFixed(1)},${(vy+r*Math.sin(a)).toFixed(1)} A${r},${r} 0 1 1 ${(vx+r*Math.cos(b)).toFixed(1)},${(vy+r*Math.sin(b)).toFixed(1)} Z" fill="var(--fg)"/>`};
+ return `<defs>
+ <clipPath id="frameClip"><rect x="20" y="20" width="500" height="390" rx="14"/></clipPath>
+ <filter id="perif" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="5"/><feColorMatrix type="saturate" values=".35"/></filter>
+ <clipPath id="fovClip"><circle id="fovC" cx="170" cy="260" r="38"/></clipPath>
+ <g id="land">
+  <rect x="20" y="20" width="500" height="390" fill="var(--sky)"/>
+  ${rays(440,80,36,48,10)}<circle cx="440" cy="80" r="30" fill="var(--sun)" stroke="#18203a" stroke-width="3"/>
+  <ellipse cx="150" cy="75" rx="45" ry="18" fill="#fff"/><ellipse cx="180" cy="64" rx="30" ry="16" fill="#fff"/>
+  <path d="M20,300 C120,240 220,260 300,290 C380,320 450,250 520,270 L520,410 L20,410 Z" fill="#8fd17c" stroke="#18203a" stroke-width="3"/>
+  <path d="M20,345 C150,305 300,335 520,322 L520,410 L20,410 Z" fill="#6fbf63" stroke="#18203a" stroke-width="3"/>
+  <rect x="110" y="220" width="120" height="95" fill="#f6e3c0" stroke="#18203a" stroke-width="3"/><path d="M98,224 L170,165 L242,224 Z" fill="#ea4d4d" stroke="#18203a" stroke-width="3" stroke-linejoin="round"/>
+  <rect x="128" y="242" width="36" height="30" fill="#9fd7f0" stroke="#18203a" stroke-width="2.5"/><path d="M146,242 L146,272 M128,257 L164,257" stroke="#18203a" stroke-width="2"/>
+  <rect x="186" y="262" width="30" height="53" fill="#9a6a3f" stroke="#18203a" stroke-width="2.5"/><circle cx="208" cy="290" r="2.5" fill="#ffd23f"/>
+  <rect x="338" y="248" width="14" height="72" fill="#9a6a3f" stroke="#18203a" stroke-width="2.5"/><circle cx="345" cy="222" r="42" fill="#4fae5a" stroke="#18203a" stroke-width="3"/><circle cx="330" cy="210" r="6" fill="#ea4d4d" stroke="#18203a" stroke-width="1.5"/><circle cx="360" cy="232" r="6" fill="#ea4d4d" stroke="#18203a" stroke-width="1.5"/>
+  <rect x="297" y="322" width="6" height="40" fill="#9a6a3f"/><rect x="258" y="294" width="84" height="32" rx="5" fill="#fff" stroke="#18203a" stroke-width="2.5"/><text x="300" y="316" text-anchor="middle" font-family="var(--display)" font-weight="800" font-size="17" fill="#18203a">HALLO!</text>
+  ${[[70,360,'#ff7eb6'],[96,374,'#ffd23f'],[430,362,'#ff7eb6'],[468,350,'#ffd23f'],[410,380,'#4c78f0']].map(f=>`<circle cx="${f[0]}" cy="${f[1]}" r="7" fill="${f[2]}" stroke="#18203a" stroke-width="2"/>`).join('')}
+ </g></defs>
+ <g clip-path="url(#frameClip)"><g class="t" data-t="periphery"><use href="#land" filter="url(#perif)"/></g><g class="t" data-t="fixation" clip-path="url(#fovClip)"><use href="#land"/></g></g>
+ <rect x="20" y="20" width="500" height="390" rx="14" fill="none" stroke="var(--ink)" stroke-width="3"/>
+ <g id="scanP"></g>
+ <circle id="fovR" cx="170" cy="260" r="38" fill="none" stroke="var(--glow)" stroke-width="3.5"/>
+ <text class="tx sm" x="270" y="432" text-anchor="middle">So „sieht“ die Netzhaut: nur im Kreis scharf. Rot = Blickspur der Sakkaden.</text>
+ <g data-until="2">
+  <g class="t" data-t="saccade"><text class="tx" x="545" y="60">Ein Blick-Protokoll</text>
+   ${[[545,48],[600,12],[618,60],[684,10],[700,46],[752,10]].map((b,i)=>`<rect x="${b[0]}" y="76" width="${b[1]}" height="24" rx="5" fill="${i%2?'var(--coneL)':'var(--accent)'}"/>`).join('')}
+   <text class="tx sm" x="545" y="122">■ Fixation ≈ 250 ms</text><text class="tx sm" x="545" y="140" style="fill:var(--coneL)">■ Sakkade ≈ 30 ms</text>
+   <text class="tx" x="545" y="186">≈ 3 Sakkaden pro Sekunde</text><text class="tx sm" x="545" y="206">≈ 170.000 pro Tag</text></g>
+  <g class="t" data-t="saccsupp" data-from="1"><rect x="545" y="236" width="235" height="74" rx="12" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/><text class="tx" x="560" y="264">Während des Sprungs:</text><text class="tx sm" x="560" y="286">Bild wird ausgeblendet –</text><text class="tx sm" x="560" y="302">kein Verwischen sichtbar.</text></g>
+ </g>
+ <g data-from="3" class="t" data-t="kanizsa">${pac(668,150,668,243,36)}${pac(588,290,668,243,36)}${pac(748,290,668,243,36)}<text class="tx sm" x="668" y="350" text-anchor="middle">Siehst du das Dreieck?</text></g>
+ <g data-from="2" data-until="2"><rect x="0" y="0" width="800" height="450" fill="var(--stage)"/>
+  <text class="tx big" x="400" y="62" text-anchor="middle">Finde deinen blinden Fleck</text>
+  <text class="tx sm" x="400" y="88" text-anchor="middle">Linkes Auge zu · mit dem rechten Auge aufs Kreuz schauen · Kopf langsam näher zum Bildschirm bewegen</text>
+  <text class="tx" x="180" y="208" text-anchor="middle" style="font-size:44px">+</text>
+  <circle class="t" data-t="opticdisc" cx="540" cy="193" r="15" fill="var(--fg)"/>
+  <text class="tx" x="180" y="338" text-anchor="middle" style="font-size:44px">+</text>
+  <g class="t" data-t="fillingin"><line x1="420" y1="323" x2="525" y2="323" stroke="var(--fg)" stroke-width="6"/><line x1="555" y1="323" x2="660" y2="323" stroke="var(--fg)" stroke-width="6"/></g>
+  <text class="tx sm" x="400" y="400" text-anchor="middle">Oben verschwindet der Punkt. Unten wirkt die Linie plötzlich durchgehend – das Gehirn füllt die Lücke.</text></g>`;},
+init(){
+ const P=[[170,258],[345,215],[440,80],[300,310],[85,365],[170,190],[455,355],[210,290],[350,265]];
+ const c=$('#fovC'),r=$('#fovR'),sp=$('#scanP');let i=0,trail=[[170,258]],tm;
+ function step(){i=(i+1+Math.floor(Math.random()*2))%P.length;const [x,y]=P[i];r.setAttribute('opacity',0);c.setAttribute('r',0);
+  setTimeout(()=>{c.setAttribute('cx',x);c.setAttribute('cy',y);c.setAttribute('r',38);r.setAttribute('cx',x);r.setAttribute('cy',y);r.setAttribute('opacity',1);trail.push([x,y]);if(trail.length>6)trail.shift();
+   sp.innerHTML=`<polyline points="${trail.map(p=>p.join(',')).join(' ')}" fill="none" stroke="var(--coneL)" stroke-width="2.5" stroke-linejoin="round" opacity=".85"/>`+trail.map((p,k)=>`<circle cx="${p[0]}" cy="${p[1]}" r="${k===trail.length-1?5:3.5}" fill="var(--coneL)"/>`).join('')},45);
+  tm=setTimeout(step,260+Math.random()*180)}
+ tm=setTimeout(step,500);
+ return {destroy(){clearTimeout(tm)}};
+},
+beats:[
+ {t:'Scharf sehen wir nur mit der Fovea – ein Fleck von etwa 2°, ungefähr ein Daumennagel bei ausgestrecktem Arm. Der Rest des Blickfelds ist unscharf und farbarm.',hl:['fixation','periphery']},
+ {t:'Deshalb springen die Augen etwa dreimal pro Sekunde (Sakkaden). Während der Sprünge blendet das Gehirn das Bild aus. Trotzdem erleben wir eine stabile, überall scharfe Welt – das Gehirn setzt sie aus Puzzlestücken zusammen.',hl:['saccade','saccsupp','fixation']},
+ {t:'Probier den blinden Fleck aus: Linkes Auge schließen, mit dem rechten auf das Kreuz schauen und den Kopf langsam zum Bildschirm bewegen. Irgendwann verschwindet der Punkt – und die Lücke in der Linie darunter wird einfach aufgefüllt.',hl:['opticdisc','fillingin'],hold:6000},
+ {t:'Wahrnehmung ist Interpretation. Hier siehst du ein Dreieck, das niemand gezeichnet hat: Das Gehirn ergänzt Konturen, die es für wahrscheinlich hält. Was wir „sehen“, ist seine beste Vermutung über die Welt.',hl:['kanizsa']}
+]});
+
+/* 13 · Gedächtnis */
+CH.push({id:'gedaechtnis',title:'Speichern & Erinnern',
+svg:()=>{
+ const syn=(big)=>{const R=big?36:30,sx=big?42:30,n=big?7:3;let s=`<line x1="705" y1="34" x2="705" y2="${92-R+4}" stroke="var(--ink)" stroke-width="12" stroke-linecap="round"/><line x1="705" y1="34" x2="705" y2="${92-R+4}" stroke="#f5c27a" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="705" cy="92" r="${R}" fill="#f5c27a" stroke="var(--ink)" stroke-width="3"/>`;
+  [[-12,-8],[8,-14],[-3,8],[13,4],[-16,10],[3,-2],[18,-6]].slice(0,big?7:4).forEach(p=>s+=`<circle cx="${705+p[0]}" cy="${92+p[1]}" r="6" fill="#fff6dc" stroke="var(--ink)" stroke-width="1.3"/>`);
+  for(let i=0;i<(big?8:3);i++)s+=`<circle cx="${690+i*(big?4.5:12)}" cy="${92+R+6+(i%2)*3}" r="2.6" fill="#ffcf3f" stroke="var(--ink)" stroke-width=".8"/>`;
+  const hy=92+R+26;s+=`<rect x="699" y="${hy+8}" width="12" height="${208-hy-8}" fill="#9fd3c7" stroke="var(--ink)" stroke-width="2.5"/><rect x="630" y="206" width="150" height="26" rx="13" fill="#9fd3c7" stroke="var(--ink)" stroke-width="3"/><ellipse cx="705" cy="${hy}" rx="${sx}" ry="${big?18:14}" fill="#9fd3c7" stroke="var(--ink)" stroke-width="3"/>`;
+  for(let i=0;i<n;i++){const x=705-(n-1)*6+i*12;s+=`<rect x="${x-3}" y="${hy-(big?18:14)-4}" width="6" height="8" rx="1.5" fill="var(--fieldL)" stroke="var(--ink)" stroke-width="1"/>`}
+  return s};
+ const box=(x,k,t1,t2,t3,f)=>`<g class="t" data-t="${k}" data-from="${f}"><rect x="${x}" y="330" width="225" height="82" rx="14" fill="var(--surface)" stroke="var(--line)" stroke-width="2.5"/><text class="tx" x="${x+112}" y="356" text-anchor="middle">${t1}</text><text class="tx sm" x="${x+112}" y="378" text-anchor="middle">${t2}</text><text class="tx mono" x="${x+112}" y="398" text-anchor="middle">${t3}</text></g>`;
+ return `<g class="art">${BRAIN()}
+ <ellipse class="t" data-t="pfc" cx="185" cy="125" rx="42" ry="36" fill="#d9b3ff"/>
+ <ellipse class="t" data-t="ppc" cx="470" cy="85" rx="46" ry="26" fill="#8db8ff"/>
+ <ellipse class="t" data-t="v1" cx="577" cy="150" rx="16" ry="36" fill="var(--v1c)"/>
+ <ellipse class="t" data-t="it" cx="480" cy="240" rx="28" ry="10" fill="#9ad17a"/>
+ <ellipse class="t" data-t="perirhinal" cx="318" cy="240" rx="20" ry="8" fill="#f7a6c1"/>
+ <path class="t" data-t="hippocampus" d="M330,226 C350,212 392,206 422,213 C442,218 446,232 431,236 C410,241 380,233 352,238 C340,240 328,236 330,226 Z" fill="#ffd27f" stroke="var(--ink)" stroke-width="2" stroke-dasharray="4 3"/>
+ </g>
+ <path d="M562,180 C548,210 528,228 512,236" fill="none" stroke="var(--coneM)" stroke-width="4" marker-end="url(#mG)"/>
+ <path d="M462,236 C455,226 446,220 438,218" fill="none" stroke="var(--coneM)" stroke-width="3.5" marker-end="url(#mG)"/>
+ <g data-from="1">${[[185,125,42],[470,85,46]].map(c=>`<circle class="ring" cx="${c[0]}" cy="${c[1]}" r="${c[2]}" fill="none" stroke="var(--glow)" stroke-width="3"/>`).join('')}</g>
+ <g data-from="4" class="t" data-t="consolidation"><path d="M420,210 C470,170 530,150 558,150" fill="none" stroke="var(--fg)" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#mF)"/><path d="M336,222 C290,190 245,160 222,145" fill="none" stroke="var(--fg)" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#mF)"/><path d="M398,208 C415,160 445,125 462,112" fill="none" stroke="var(--fg)" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#mF)"/>
+  <path d="M300,32 A16,16 0 1 0 318,56 A12,12 0 1 1 300,32 Z" fill="var(--sun)" stroke="var(--ink)" stroke-width="2"/><text class="tx" x="324" y="38">Z</text><text class="tx sm" x="336" y="28">z</text></g>
+ <text class="tx sm" x="705" y="22" text-anchor="middle">Synapse, stark vergrößert</text>
+ <g class="t" data-t="synapse" data-until="2">${syn(false)}<text class="tx" x="705" y="262" text-anchor="middle">vorher</text></g>
+ <g class="t" data-t="ltp" data-from="3">${syn(true)}<text class="tx" x="705" y="262" text-anchor="middle">nach LTP: stärker</text></g>
+ <text class="tx sm t" data-t="hebb" data-from="3" x="705" y="284" text-anchor="middle" font-style="italic">„fire together, wire together“</text>
+ ${box(30,'iconic','Ikonisches Gedächtnis','fast alles, aber flüchtig','< 0,5 s',0)}${box(285,'workingmem','Arbeitsgedächtnis','nur das Beachtete','3–4 Objekte · Sekunden',1)}${box(540,'ltm','Langzeitgedächtnis','verteilt im Kortex','riesig · Jahre',2)}
+ <g data-from="1"><path d="M257,371 L282,371" stroke="var(--fg)" stroke-width="2.5" marker-end="url(#mF)"/></g><g data-from="2"><path d="M512,371 L537,371" stroke="var(--fg)" stroke-width="2.5" marker-end="url(#mF)"/></g>
+ <text class="tx sm" x="400" y="436" text-anchor="middle">Aufmerksamkeit entscheidet, was weiterkommt · Wiederholung und Schlaf festigen</text>
+ ${LBL('v1',560,16,577,114,'mt')}${LBL('pfc',125,40,165,100,'end',1)}${LBL('ppc',440,16,466,59,'mt',1)}${LBL('hippocampus',385,302,385,236,'mb',2)}${LBL('perirhinal',240,302,318,248,'mb',2)}${LBL('it',515,302,486,250,'mb',2)}`;},
+panel:()=>`<h3>Sperling-Experiment (1960)</h3><p style="margin:0;max-width:70ch">Für 0,15 Sekunden blitzen 12 Buchstaben auf. Danach markiert ein Pfeil eine Zeile – versuch dich an genau diese Zeile zu erinnern.</p><div class="ctl"><button class="btn primary" id="spB">Test starten</button></div>`,
+init(){
+ const ov=$('#ov'),b=$('#spB');let tms=[];
+ const L='BCDFGHJKLMNPRSTVWXZ';
+ function run(){tms.forEach(clearTimeout);tms=[];const rows=[0,1,2].map(()=>[...Array(4)].map(()=>L[Math.floor(Math.random()*L.length)]).join(''));const cue=Math.floor(Math.random()*3);
+  ov.hidden=false;ov.innerHTML='<p class="arrow">Gleich geht’s los …</p><p>Schau in die Mitte.</p>';
+  tms.push(setTimeout(()=>{ov.innerHTML=`<div class="grid">${rows.map(r=>`<div>${r}</div>`).join('')}</div>`},1400));
+  tms.push(setTimeout(()=>{ov.innerHTML=''},1550));
+  tms.push(setTimeout(()=>{ov.innerHTML=`<div class="grid">${rows.map((r,i)=>`<div>${i===cue?'→ ? ? ? ?':'&nbsp;'}</div>`).join('')}</div><p>Welche Buchstaben standen in der markierten Zeile? Sag sie laut.</p><button class="btn primary" id="spR">Auflösen</button>`;$('#spR').onclick=()=>{ov.innerHTML=`<div class="grid">${rows.map((r,i)=>`<div class="${i===cue?'cue':''}">${r}</div>`).join('')}</div><p>Die meisten schaffen 3 von 4 – egal welche Zeile markiert wird. Also waren kurz rund 9 von 12 Buchstaben verfügbar, obwohl man sonst nur etwa 4 nennen kann. Genau das ist das ikonische Gedächtnis.</p><div class="ctl" style="justify-content:center"><button class="btn" id="spAg">Nochmal</button><button class="btn" id="spX">Schließen</button></div>`;$('#spAg').onclick=run;$('#spX').onclick=()=>{ov.hidden=true}}},1700));}
+ b.onclick=run;
+ return {destroy(){tms.forEach(clearTimeout);ov.hidden=true;ov.innerHTML=''}};
+},
+beats:[
+ {t:'Was das Auge sieht, landet zuerst im ikonischen Gedächtnis: ein ultrakurzes Abbild, das fast alles enthält, aber nach einer halben Sekunde verblasst ist. Teste es unten mit dem Sperling-Experiment!',hl:['iconic']},
+ {t:'Was wir beachten, gelangt ins visuelle Arbeitsgedächtnis. Es hält nur etwa 3–4 Objekte für einige Sekunden – durch Dauerfeuer von Neuronen im Stirn- und Scheitelhirn.',hl:['workingmem','pfc','ppc']},
+ {t:'Für das Langzeitgedächtnis bindet der Hippocampus das Was (vom IT-Kortex), das Wo und das Wann zu einer Episode. Im Schläfenlappen gibt es sogar Konzeptzellen, die auf eine bestimmte Person reagieren – egal ob Foto, Zeichnung oder geschriebener Name.',hl:['ltm','hippocampus','perirhinal','it']},
+ {t:'Gespeichert wird in den Synapsen: Feuern zwei Neurone oft gemeinsam, wird ihre Verbindung stärker – mehr Rezeptoren, größere Kontaktfläche. Das ist Langzeitpotenzierung (LTP), die Hebbsche Regel in Aktion.',hl:['ltp','synapse','hebb']},
+ {t:'Im Schlaf spielt der Hippocampus das Erlebte im Zeitraffer erneut ab. So wandert die Erinnerung nach und nach in die Großhirnrinde. Erinnern wir uns später, werden teils wieder dieselben Sehareale aktiv – wir sehen „vor dem inneren Auge“.',hl:['consolidation','hippocampus','v1']},
+ {t:'Unser Bildgedächtnis ist erstaunlich: Nachdem Testpersonen 2.500 Objektbilder je drei Sekunden gesehen hatten, erkannten sie später rund 90 % davon sicher wieder (Brady et al. 2008).',hl:['ltm']}
+]});
+
+/* 14 · KI */
+CH.push({id:'ki',title:'Auge, Gehirn & KI',
+svg:()=>{
+ const X=i=>22+i*156,W=136;
+ const ic={
+  eye:cx=>`<path d="M${cx-30},72 Q${cx},48 ${cx+30},72 Q${cx},96 ${cx-30},72 Z" fill="#fff" stroke="var(--ink)" stroke-width="2.5"/><circle cx="${cx}" cy="72" r="11" fill="var(--iris)" stroke="var(--ink)" stroke-width="2"/><circle cx="${cx}" cy="72" r="5" fill="var(--ink)"/>`,
+  ret:cx=>[['var(--gang)',56],['var(--bip)',66],['var(--hor)',76],['var(--rod)',86]].map(q=>`<rect x="${cx-34}" y="${q[1]}" width="68" height="8" rx="4" fill="${q[0]}" stroke="var(--ink)" stroke-width="1.2"/>`).join(''),
+  v1:cx=>`<line x1="${cx-30}" y1="90" x2="${cx-14}" y2="58" stroke="var(--fg)" stroke-width="4" stroke-linecap="round"/><line x1="${cx-4}" y1="56" x2="${cx-4}" y2="92" stroke="var(--fg)" stroke-width="4" stroke-linecap="round"/><line x1="${cx+8}" y1="74" x2="${cx+32}" y2="74" stroke="var(--fg)" stroke-width="4" stroke-linecap="round"/>`,
+  it:cx=>`<circle cx="${cx-16}" cy="74" r="12" fill="var(--coneS)" stroke="var(--ink)" stroke-width="2"/><path d="M${cx+8},60 L${cx+30},90 L${cx+2},90 Z" fill="var(--hor)" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round"/>`,
+  face:cx=>`<circle cx="${cx}" cy="74" r="20" fill="#ffd9b8" stroke="var(--ink)" stroke-width="2.5"/><circle cx="${cx-7}" cy="69" r="2.5" fill="var(--ink)"/><circle cx="${cx+7}" cy="69" r="2.5" fill="var(--ink)"/><path d="M${cx-8},80 Q${cx},87 ${cx+8},80" fill="none" stroke="var(--ink)" stroke-width="2.2" stroke-linecap="round"/>`,
+  cam:cx=>`<rect x="${cx-30}" y="268" width="60" height="40" rx="7" fill="#5b6578" stroke="var(--ink)" stroke-width="2.5"/><rect x="${cx-12}" y="261" width="20" height="9" rx="2" fill="#5b6578" stroke="var(--ink)" stroke-width="2"/><circle cx="${cx}" cy="288" r="13" fill="#9fd7f0" stroke="var(--ink)" stroke-width="2.5"/>`,
+  pix:cx=>{let s='';for(let i=0;i<6;i++)for(let j=0;j<4;j++){const v=(i*37+j*61)%5;s+=`<rect x="${cx-33+i*11}" y="${266+j*11}" width="11" height="11" fill="${['#c3e5f5','#8fd17c','#ffd23f','#ea4d4d','#4c78f0'][v]}" stroke="var(--ink)" stroke-width=".8"/>`}return s},
+  ker:cx=>{const k=[-1,0,1];let s='';for(let i=0;i<3;i++)for(let j=0;j<3;j++)s+=`<rect x="${cx-24+i*16}" y="${264+j*14}" width="16" height="14" fill="${k[i]<0?'#ffb3b3':k[i]>0?'#b3d4ff':'#eee'}" stroke="var(--ink)" stroke-width="1"/><text x="${cx-16+i*16}" y="${275+j*14}" text-anchor="middle" font-family="var(--mono)" font-size="9" fill="#18203a">${k[i]}</text>`;return s},
+  deep:cx=>[0,1,2,3].map(i=>`<rect x="${cx-30+i*8}" y="${262+i*6}" width="38" height="30" rx="3" fill="${['#ffd9c2','#ffc29e','#ffd166','#9ad17a'][i]}" stroke="var(--ink)" stroke-width="1.6"/>`).join(''),
+  cls:cx=>[[.97,'Katze'],[.02,'Hund'],[.01,'Auto']].map((q,i)=>`<text x="${cx-34}" y="${272+i*15}" font-family="var(--mono)" font-size="10" fill="var(--fg)">${q[1]}</text><rect x="${cx-2}" y="${264+i*15}" width="${Math.max(2,q[0]*36)}" height="10" rx="3" fill="var(--accent)"/>`).join('')
+ };
+ const H=[['eyeball','eye','Auge'],['retina','ret','Netzhaut · ON/OFF'],['simplecell','v1','V1 · Kanten'],['ventral','it','V4 → IT · Formen'],['ltm','face','Erkennen & Erinnern']];
+ const M=[['sensor','cam','Kamera · Objektiv'],['sensor','pix','Bildsensor · Pixel'],['kernel','ker','Faltung · Filter'],['pooling','deep','Tiefe Schichten'],['cnn','cls','Klassifikator']];
+ const C=[['Linse ↔','Objektiv'],['Netzhaut ↔','Bildsensor'],['rezeptives Feld','↔ Filterkern'],['Hierarchie ↔','tiefe Schichten'],['IT-Kortex ↔','Klassifikator']];
+ let s=`<text class="tx halo" x="22" y="30" style="letter-spacing:.12em">MENSCH</text><text class="tx halo" x="22" y="244" style="letter-spacing:.12em">MASCHINE (CNN)</text>`;
+ H.forEach((h,i)=>{s+=`<g class="t" data-t="${h[0]}"><rect x="${X(i)}" y="40" width="${W}" height="92" rx="14" fill="var(--surface)" stroke="var(--line)" stroke-width="2.5"/>${ic[h[1]](X(i)+W/2)}<text class="tx sm" x="${X(i)+W/2}" y="122" text-anchor="middle" font-weight="700">${h[2]}</text></g>`});
+ M.forEach((m,i)=>{s+=`<g class="t" data-t="${m[0]}"><rect x="${X(i)}" y="252" width="${W}" height="92" rx="14" fill="var(--surface)" stroke="var(--line)" stroke-width="2.5"/>${ic[m[1]](X(i)+W/2)}<text class="tx sm" x="${X(i)+W/2}" y="334" text-anchor="middle" font-weight="700">${m[2]}</text></g>`});
+ for(let i=0;i<4;i++){s+=`<line x1="${X(i)+W+2}" y1="86" x2="${X(i+1)-3}" y2="86" stroke="var(--fg)" stroke-width="2.5" marker-end="url(#mF)"/><line x1="${X(i)+W+2}" y1="298" x2="${X(i+1)-3}" y2="298" stroke="var(--fg)" stroke-width="2.5" marker-end="url(#mF)"/>`}
+ C.forEach((c,i)=>{const cx=X(i)+W/2;s+=`<line x1="${cx}" y1="134" x2="${cx}" y2="250" stroke="var(--lead)" stroke-width="2" stroke-dasharray="5 5"/><text class="tx sm halo" x="${cx}" y="186" text-anchor="middle">${c[0]}</text><text class="tx sm halo" x="${cx}" y="203" text-anchor="middle">${c[1]}</text>`});
+ const D=[['eventcam','Spikes statt Einzelbilder'],['attention','Fovea + Sakkaden ≈ Attention'],['feedback','Rückkopplung überall'],['brain','Ganzes Gehirn ≈ 20 Watt']];
+ s+=`<g data-from="2"><text class="tx" x="22" y="372">Wo sich Auge und KI unterscheiden</text>${D.map((d,i)=>`<g class="t" data-t="${d[0]}"><rect x="${22+i*192}" y="384" width="180" height="40" rx="20" fill="var(--hi)" stroke="var(--ink)" stroke-width="2"/><text class="tx sm dk" x="${112+i*192}" y="409" text-anchor="middle" font-weight="700">${d[1]}</text></g>`).join('')}</g>`;
+ return s;},
+panel:()=>`<h3>Spickzettel: die wichtigsten Zahlen</h3><div class="facts">${[
+ ['24 mm','Länge des Augapfels'],['≈ 60 dpt','Brechkraft, davon ≈ 43 Hornhaut'],['2–8 mm','Pupillendurchmesser'],['120 Mio.','Stäbchen pro Auge'],['6 Mio.','Zapfen pro Auge'],['1,2 Mio.','Fasern im Sehnerv'],['≈ 100 : 1','Kompression in der Netzhaut'],['420 · 534 · 564 nm','Maxima S-, M-, L-Zapfen'],['498 nm','Maximum der Stäbchen'],['200 fs','Retinal klappt um'],['≈ 2°','scharfer Bereich (Fovea)'],['≈ 3 / s','Sakkaden'],['60–80 ms','bis zur Sehrinde V1'],['≈ 150 ms','bis zur Objekterkennung'],['3–4','Objekte im Arbeitsgedächtnis'],['≈ 20 W','Leistung des ganzen Gehirns']].map(f=>`<div class="fact"><b>${f[0]}</b><span>${f[1]}</span></div>`).join('')}</div>`,
+beats:[
+ {t:'Viele Ideen der Bild-KI stammen direkt aus der Sehforschung. Faltungsnetze (CNNs) übertragen Hubel & Wiesels einfache und komplexe Zellen in Filter und Pooling – zuerst im Neocognitron von Kunihiko Fukushima (1980).',hl:['cnn','kernel','pooling','simplecell']},
+ {t:'Die Hierarchie ähnelt dem ventralen Pfad: Frühe Schichten finden Kanten, tiefe Schichten Objektteile und ganze Objekte. Trainierte Netze sagen sogar die Antworten von IT-Neuronen erstaunlich gut voraus.',hl:['ventral','pooling','cnn','ltm']},
+ {t:'Aber es gibt große Unterschiede: Die Netzhaut sendet keine Einzelbilder, sondern Änderungen als Spikes – ähnlich wie Event-Kameras. Sie ist in der Mitte scharf und am Rand grob, und das Gehirn holt sich per Sakkade gezielt Details. Bei KI übernimmt das ein Attention-Mechanismus.',hl:['eventcam','attention','sensor','retina']},
+ {t:'Dazu kommt: Das Gehirn arbeitet mit massiver Rückkopplung, lernt aus sehr wenigen Beispielen und braucht für alles rund 20 Watt. Unten findest du die wichtigsten Zahlen als Spickzettel – und darunter das komplette Lexikon.',hl:['feedback','brain']}
+]});
+
+/* ---------- Player ---------- */
+const stage=$('#stage'),scene=$('#scene'),panel=$('#panel'),sub=$('#subText'),dotsEl=$('#dots'),stepLbl=$('#stepLbl');
+let ci=0,bi=0,playing=false,timer=null,api=null,beatStart=performance.now(),beatDur=8000,narr=false,curUtt=null,voices=[];
+const speechOK='speechSynthesis' in window&&'SpeechSynthesisUtterance' in window;
+
+function fillLabels(){scene.querySelectorAll('text[data-l]').forEach(t=>t.textContent=nm(t.dataset.l,true))}
+function load(i,b=0){
+ beatTimers.forEach(clearTimeout);beatTimers=[];
+ if(api&&api.destroy)try{api.destroy()}catch(_){}
+ api=null;ci=i;const ch=CH[i];
+ scene.innerHTML=ch.svg();fillLabels();
+ scene.classList.remove('enter');void scene.getBBox;scene.getBoundingClientRect();scene.classList.add('enter');
+ if(ch.panel){panel.innerHTML=ch.panel();panel.hidden=false}else{panel.innerHTML='';panel.hidden=true}
+ if(ch.init)api=ch.init();
+ $('#chapNo').textContent=`Kapitel ${i+1} / ${CH.length}`;$('#chapTitle').textContent=ch.title;
+ document.querySelectorAll('#chapList button').forEach((btn,k)=>btn.setAttribute('aria-current',k===i));
+ try{history.replaceState(null,'','#'+ch.id)}catch(_){}
+ setBeat(b);
+}
+function setBeat(b){
+ beatTimers.forEach(clearTimeout);beatTimers=[];
+ const ch=CH[ci];bi=clamp(b,0,ch.beats.length-1);const beat=ch.beats[bi];
+ scene.querySelectorAll('[data-from],[data-until]').forEach(el=>{const f=+(el.dataset.from||0),u=el.dataset.until!==undefined?+el.dataset.until:99;el.classList.toggle('off',bi<f||bi>u)});
+ const hl=beat.hl||[];stage.classList.toggle('focus',hl.length>0);
+ scene.querySelectorAll('.t').forEach(el=>el.classList.toggle('hl',hl.includes(el.dataset.t)));
+ sub.textContent=beat.t;stepLbl.textContent=`Schritt ${bi+1} / ${ch.beats.length}`;
+ dotsEl.innerHTML=ch.beats.map((_,k)=>`<button class="bd${k<=bi?' on':''}" data-k="${k}" aria-label="Schritt ${k+1}"></button>`).join(' ');
+ if(beat.act&&api)try{beat.act(api)}catch(e){console.error(e)}
+ speak(beat.t);schedule();
+}
+function schedule(){
+ clearTimeout(timer);const beat=CH[ci].beats[bi];
+ beatDur=clamp(beat.t.length*62,5500,17000)+(beat.hold||0);beatStart=performance.now();
+ if(!playing)return;
+ if(narr&&speechOK){beatDur=Math.max(beatDur,beat.t.length*75+(beat.hold||0));timer=setTimeout(next,beat.t.length*110+6000+(beat.hold||0))}
+ else timer=setTimeout(next,beatDur);
+}
+function next(){const ch=CH[ci];if(bi<ch.beats.length-1)setBeat(bi+1);else if(ci<CH.length-1)load(ci+1,0);else{playing=false;updPlay();schedule()}}
+function prev(){if(bi>0)setBeat(bi-1);else if(ci>0)load(ci-1,CH[ci-1].beats.length-1)}
+function updPlay(){$('#playTxt').textContent=playing?'Pause':'Abspielen';$('#playIco').innerHTML=playing?'<rect x="3" y="2" width="4" height="12" fill="currentColor"/><rect x="9" y="2" width="4" height="12" fill="currentColor"/>':'<path d="M4 2 L14 8 L4 14 Z" fill="currentColor"/>'}
+function togglePlay(){playing=!playing;updPlay();if(playing){if(ci===CH.length-1&&bi===CH[ci].beats.length-1)load(0,0);else{speak(CH[ci].beats[bi].t);schedule()}}else{clearTimeout(timer);if(speechOK)speechSynthesis.cancel()}}
+function speak(text){
+ if(!narr||!speechOK)return;
+ try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text.replace(/[„“”]/g,''));u.lang='de-DE';const v=voices.find(v=>/^de/i.test(v.lang));if(v)u.voice=v;u.rate=1.03;
+  u.onend=()=>{if(playing&&u===curUtt){clearTimeout(timer);timer=setTimeout(next,700+(CH[ci].beats[bi].hold||0))}};curUtt=u;speechSynthesis.speak(u)}catch(_){}
+}
+if(speechOK){const lv=()=>{try{voices=speechSynthesis.getVoices()}catch(_){}};lv();try{speechSynthesis.onvoiceschanged=lv}catch(_){}$('#bSpeak').hidden=false}
+$('#bSpeak').onclick=()=>{narr=!narr;$('#bSpeak').setAttribute('aria-pressed',narr);if(narr){speak(CH[ci].beats[bi].t);schedule()}else{try{speechSynthesis.cancel()}catch(_){}schedule()}};
+$('#bPlay').onclick=togglePlay;$('#bNext').onclick=()=>next();$('#bPrev').onclick=()=>prev();
+dotsEl.addEventListener('click',e=>{const d=e.target.closest('[data-k]');if(d)setBeat(+d.dataset.k)});
+const setLang=l=>{lang.cur=l;$('#lDE').setAttribute('aria-pressed',l==='de');$('#lEN').setAttribute('aria-pressed',l==='en');fillLabels()};
+$('#lDE').onclick=()=>setLang('de');$('#lEN').onclick=()=>setLang('en');
+document.addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select,button'))return;if(e.key==='ArrowRight'){next();e.preventDefault()}else if(e.key==='ArrowLeft'){prev();e.preventDefault()}else if(e.key===' '){togglePlay();e.preventDefault()}});
+
+// Kapitel-Liste & Fortschritt
+$('#chapList').innerHTML=CH.map((c,i)=>`<li><button data-i="${i}"><span class="n">${String(i+1).padStart(2,'0')}</span><span>${c.title}</span></button></li>`).join('');
+$('#chapList').addEventListener('click',e=>{const b=e.target.closest('[data-i]');if(b)load(+b.dataset.i,0)});
+$('#prog').innerHTML=CH.map((c,i)=>`<button class="seg" data-i="${i}" title="${i+1}. ${c.title}" aria-label="Kapitel ${i+1}: ${c.title}"><i></i></button>`).join('');
+$('#prog').addEventListener('click',e=>{const b=e.target.closest('[data-i]');if(b)load(+b.dataset.i,0)});
+const segs=[...document.querySelectorAll('#prog .seg i')];
+(function tick(){const n=CH[ci].beats.length,fr=playing?Math.min(1,(performance.now()-beatStart)/beatDur):1;segs.forEach((s,i)=>{s.style.width=(i<ci?100:i>ci?0:((bi+fr)/n*100))+'%'});requestAnimationFrame(tick)})();
+
+// Tooltip
+const tip=$('#tip');
+function showTip(k,x,y){const g=G[k];if(!g)return;$('#tDe').textContent=g[0];$('#tEn').textContent=g[1];$('#tD').textContent=g[2];tip.hidden=false;
+ const w=tip.offsetWidth,h=tip.offsetHeight,vw=innerWidth,vh=innerHeight;let l=x+16,t=y+18;if(l+w>vw-8)l=x-w-14;if(l<8)l=8;if(t+h>vh-8)t=y-h-14;if(t<8)t=8;tip.style.left=l+'px';tip.style.top=t+'px'}
+const hideTip=()=>{tip.hidden=true};
+let lastPT='mouse';
+stage.addEventListener('pointermove',e=>{lastPT=e.pointerType;if(e.pointerType==='touch')return;const el=e.target.closest('[data-t]');if(el)showTip(el.dataset.t,e.clientX,e.clientY);else hideTip()});
+stage.addEventListener('pointerleave',e=>{if(e.pointerType!=='touch')hideTip()});
+stage.addEventListener('pointerup',e=>{lastPT=e.pointerType;if(e.pointerType!=='touch')return;const el=e.target.closest('[data-t]');if(el)showTip(el.dataset.t,e.clientX,e.clientY);else hideTip()});
+document.addEventListener('pointerdown',e=>{if(!stage.contains(e.target))hideTip()});
+addEventListener('scroll',()=>{if(lastPT!=='touch')hideTip()},{passive:true});
+
+// Lexikon
+const order=Object.fromEntries(CH.map((c,i)=>[c.id,i]));
+const keys=Object.keys(G).sort((a,b)=>(order[G[a][3]]-order[G[b][3]]));
+function renderLex(q=''){q=q.trim().toLowerCase();const ks=keys.filter(k=>!q||(G[k][0]+' '+G[k][1]+' '+G[k][2]).toLowerCase().includes(q));
+ $('#cards').innerHTML=ks.map(k=>{const g=G[k],c=order[g[3]];return `<article class="card"><span class="ch">Kapitel ${c+1} · ${CH[c].title}</span><span class="de">${g[0]}</span><span class="en">${g[1]}</span><p>${g[2]}</p><button data-k="${k}">Im Bild zeigen →</button></article>`}).join('');
+ $('#cnt').textContent=`${ks.length} Begriffe`}
+$('#q').addEventListener('input',e=>renderLex(e.target.value));
+$('#cards').addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(!b)return;const k=b.dataset.k,c=order[G[k][3]],bs=CH[c].beats;let bix=bs.findIndex(x=>(x.hl||[]).includes(k));if(bix<0)bix=0;
+ playing=false;updPlay();load(c,bix);
+ scene.querySelectorAll('.t').forEach(el=>el.classList.toggle('hl',el.dataset.t===k));if(scene.querySelector(`.t[data-t="${k}"]`))stage.classList.add('focus');
+ document.querySelector('.player').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'})});
+renderLex();
+
+if(matchMedia('(prefers-reduced-motion: reduce)').matches){try{stage.pauseAnimations()}catch(_){}}
+const h=(location.hash||'').slice(1);const start=CH.findIndex(c=>c.id===h);
+load(start>=0?start:0,0);
+})();
+</script>
+
+</body>
+</html>
