@@ -82,7 +82,13 @@
     if (x + r > b[2]) b[2] = x + r;
     if (y + r > b[3]) b[3] = y + r;
   };
+  // While the forest is painted, strokes swell and thin along their length, like a brush.
+  var wobble = 0, wob = Math.random;
   Ink.prototype.taper = function (pts) {
+    if (wobble) {
+      var ph = wob() * TAU, ph2 = wob() * TAU;
+      pts = pts.map(function (pt, i) { return [pt[0], pt[1], pt[2] * (1 + wobble * (0.6 * Math.sin(i * 0.9 + ph) + 0.4 * Math.sin(i * 2.3 + ph2)))]; });
+    }
     taper(this.path, pts);
     for (var i = 0; i < pts.length; i++) this.fit(pts[i][0], pts[i][1], pts[i][2]);
   };
@@ -196,6 +202,10 @@
     // pigment settling unevenly in a wash: soft dark blotches
     var nz = noiseTile(256, 4, 4, rnd);
     TEX.mottle = pixels(256, function (i) { return [34, 12, 14, clamp((nz[i] - 0.38) * 2.2, 0, 1) * 255]; });
+    var nw = noiseTile(256, 3, 3, rnd);
+    TEX.warm = pixels(256, function (i) { return [176, 96, 34, clamp((nw[i] - 0.45) * 2.6, 0, 1) * 255]; });
+    var ns = noiseTile(128, 16, 2, rnd);
+    TEX.speckle = pixels(128, function (i) { return [0, 0, 0, smooth(0.56, 0.72, ns[i]) * 255]; });
     // the grain of the paper
     TEX.grain = pixels(128, function () { var v = rnd(); return [40, 20, 16, v < 0.5 ? v * 70 : 0]; });
     // rods seen end on: a fine honeycomb of pale discs
@@ -259,7 +269,7 @@
     g.clearRect(0, 0, w, h);
     return c;
   }
-  function wash(out, path, colour, edge, qpx, box, soft) {
+  function wash(out, path, colour, edge, qpx, box, soft, dry) {
     var w = out.width, h = out.height, o = out.getContext('2d'), r = Math.max(0.8, soft * qpx);
     var A = blank(0, w, h), B = blank(1, w, h), E = blank(2, w, h), a = A.getContext('2d'), b = B.getContext('2d'), e = E.getContext('2d');
     // the shape in its colour, the pigment settling unevenly
@@ -268,6 +278,12 @@
     a.setTransform(1, 0, 0, 1, 0, 0);
     a.globalCompositeOperation = 'source-atop'; a.globalAlpha = 0.55;
     a.fillStyle = pattern(a, TEX.mottle, 1.4); a.fillRect(0, 0, w, h);
+    a.globalAlpha = 0.22;
+    a.fillStyle = pattern(a, TEX.warm, 2.2, 37, 91); a.fillRect(0, 0, w, h);
+    if (dry) {
+      a.globalCompositeOperation = 'destination-out'; a.globalAlpha = dry;
+      a.fillStyle = pattern(a, TEX.speckle, 1 + qpx / 1500, 13, 7); a.fillRect(0, 0, w, h);
+    }
     a.globalCompositeOperation = 'source-over'; a.globalAlpha = 1;
     // a soft copy: it bleeds past the edges, and tells us where the edges are
     b.filter = 'blur(' + r.toFixed(1) + 'px)'; b.drawImage(A, 0, 0); b.filter = 'none';
@@ -488,6 +504,36 @@
     return Object.keys(tiles).map(function (k) { return tiles[k]; });
   }
   function layer(h, size, near) { return { h: h, size: size, near: near || 0, items: [] }; }
+
+  // An organic honeycomb: a hex lattice whose corners are nudged (each corner once, so neighbours still meet),
+  // its cells drawn as soft pillows set a little apart, so you see down between them, each with its nucleus.
+  function honeycomb(rnd, R, s, jit) {
+    var tiles = {}, n = Math.ceil(R / s) + 2, ts = R / 6, cr = s / Math.sqrt(3), i, j, c;
+    function nudge(x, y) {   // the same corner always moves the same way, whichever cell asks
+      var h = Math.sin(Math.round(x * 1e4) * 12.9898 + Math.round(y * 1e4) * 78.233) * 43758.5453, f = h - Math.floor(h);
+      var a = f * TAU, m = (0.5 + 0.5 * Math.sin(f * 91.7)) * jit * s;
+      return [x + Math.cos(a) * m, y + Math.sin(a) * m];
+    }
+    for (j = -n; j <= n; j++) {
+      for (i = -n; i <= n; i++) {
+        var cx = (i + (j & 1 ? 0.5 : 0)) * s, cy = j * s * 0.866;
+        if (rnd() < smooth(R * 0.45, R, Math.hypot(cx, cy))) continue;
+        var key = Math.floor(cx / ts) + ':' + Math.floor(cy / ts);
+        var t = tiles[key] || (tiles[key] = { cells: [new Ink(), new Ink(), new Ink()], nuc: new Ink() }), pts = [];
+        for (c = 0; c < 6; c++) {
+          var a = Math.PI / 6 + c / 6 * TAU, q = nudge(cx + Math.cos(a) * cr, cy + Math.sin(a) * cr), inset = 0.84 + rnd() * 0.06;
+          pts.push([lerp(cx, q[0], inset), lerp(cy, q[1], inset)]);
+        }
+        var ink = t.cells[Math.floor(rnd() * 3)], P = ink.path;
+        P.moveTo((pts[5][0] + pts[0][0]) / 2, (pts[5][1] + pts[0][1]) / 2);
+        for (c = 0; c < 6; c++) { var nx = pts[(c + 1) % 6]; P.quadraticCurveTo(pts[c][0], pts[c][1], (pts[c][0] + nx[0]) / 2, (pts[c][1] + nx[1]) / 2); }
+        P.closePath();
+        ink.fit(cx, cy, cr * 1.2);
+        if (rnd() < 0.8) t.nuc.dot(cx + (rnd() - 0.5) * s * 0.25, cy + (rnd() - 0.5) * s * 0.25, s * (0.11 + rnd() * 0.06));
+      }
+    }
+    return Object.keys(tiles).map(function (k) { return tiles[k]; });
+  }
   function disc(R, colour) {
     var g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
     g.addColorStop(0, colour); g.addColorStop(0.55, colour); g.addColorStop(1, alpha(colour, 0));
@@ -542,18 +588,18 @@
     }).forEach(function (t) { L.items.push({ path: t.path, fill: 'rgba(58,24,30,.6)', box: t.box }); });
     list.push(L);
 
-    // the roof: a honeycomb of ganglion cells, dark walls, translucent bodies, each with its nucleus
+    // the roof: an organic honeycomb of ganglion cells, see-through, in three shades, each with its nucleus
     L = layer(ROOF_H, 0.009);
-    var walls = [], bodies = [], nuclei = [];
-    scatter(rnd, 0.5, 0.02, 0.18, function (ink, x, y) { ink.hex(x, y, 0.0092 + rnd() * 0.0008, Math.PI / 6 + (rnd() - 0.5) * 0.2); })
-      .forEach(function (t) { walls.push({ path: t.path, fill: 'rgba(92,36,52,.3)', stroke: 'rgba(52,18,30,.85)', lw: 0.0016, box: t.box }); });
-    scatter(rnd, 0.5, 0.02, 0.4, function (ink, x, y) { ink.dot(x, y, 0.0028 + rnd() * 0.001); })
-      .forEach(function (t) { nuclei.push({ path: t.path, fill: 'rgba(52,18,30,.55)', box: t.box }); });
-    L.items = walls.concat(bodies, nuclei);
+    var cells = [], nuclei = [], shades = ['rgba(110,40,58,.24)', 'rgba(88,30,48,.34)', 'rgba(132,54,72,.17)'];
+    honeycomb(rnd, 0.5, 0.02, 0.22).forEach(function (t) {
+      t.cells.forEach(function (ink, c) { if (isFinite(ink.box[0])) cells.push({ path: ink.path, fill: shades[c], stroke: 'rgba(62,20,34,.5)', lw: 0.0009, box: ink.box }); });
+      if (isFinite(t.nuc.box[0])) nuclei.push({ path: t.nuc.path, fill: 'rgba(58,18,32,.5)', box: t.nuc.box });
+    });
+    L.items = cells.concat(nuclei);
     list.push(L);
 
     // on top: the nerve fibres, streaming to the blind spot, and the vessels, red rivers coming out of it
-    L = layer(0.3, 0, 0.02);
+    L = layer(0.3, 0, 0.07);
     var nfl = new Ink(), fo = { step: 0.02, wiggle: 0.05, taper: 0.7, spread: 0.3, lenK: 0.8, wK: 0.8, depth: 0 };
     for (i = 0; i < 160; i++) {
       var a0 = rnd() * TAU, r0 = 0.15 + rnd() * 1.4, sx = Math.cos(a0) * r0, sy = Math.sin(a0) * r0;
@@ -565,7 +611,7 @@
     g.addColorStop(0, '#FFF8E6'); g.addColorStop(0.25, '#FCEBB8'); g.addColorStop(0.6, '#F6D27E'); g.addColorStop(0.8, '#E9A548'); g.addColorStop(1, 'rgba(225,140,60,0)');
     L.items.push({ path: circle(BLIND.x, BLIND.y, 0.16), fill: g, box: [BLIND.x - 0.16, BLIND.y - 0.16, BLIND.x + 0.16, BLIND.y + 0.16] });
     var veins = new Ink(), arteries = new Ink();
-    var o = { step: 0.02, wiggle: 0.14, taper: 0.82, spread: 0.55, lenK: 0.7, wK: 0.74, depth: 6, side: 0.07, sideK: 0.45,
+    var o = { step: 0.008, wiggle: 0.06, taper: 0.82, spread: 0.55, lenK: 0.7, wK: 0.74, depth: 6, side: 0.03, sideK: 0.45,
       inside: function (x, y) { var r2 = x * x + y * y; return r2 > 0.02 && r2 < 3; } };   // they keep out of the very middle
     [[-0.42, 0.022, 0.015, veins], [-0.56, 0.024, 0.011, arteries], [0.42, -0.022, 0.015, veins], [0.56, -0.024, 0.011, arteries],
       [Math.PI + 0.5, 0, 0.012, veins], [Math.PI - 0.5, 0, 0.011, arteries], [Math.PI + 0.1, 0, 0.009, arteries], [Math.PI - 0.15, 0, 0.009, veins]].forEach(function (v) {
@@ -659,12 +705,13 @@
     g.seg.taper(cone ? [[x, fl, w * 0.25], [x, osTop, w * 0.85]] : [[x, fl, w * 0.95], [x, osTop, w * 0.95]]);
     if (g.discs) for (var yy = fl - 0.012 * k; yy > osTop; yy -= 0.012 * k) { g.discs.moveTo(x - w, yy); g.discs.lineTo(x + w, yy); }
     // the inner segment: cones swell like a bottle palm
-    g.pr.taper(cone ? [[x, osTop, w * 0.9], [x, osTop - is * 0.4, w * 1.9], [x, isTop, w * 1.05]] : [[x, osTop, w], [x, isTop, w * 0.9]]);
+    var ink = cone || !g.rod ? g.pr : g.rod;   // rods in a lighter ink, so the cones stand out
+    ink.taper(cone ? [[x, osTop, w * 0.9], [x, osTop - is * 0.4, w * 1.9], [x, isTop, w * 1.05]] : [[x, osTop, w], [x, isTop, w * 0.9]]);
     // the fibre up through the outer nuclear layer, with the nucleus somewhere along it, then the foot
     var ny = (cone ? OLM - 0.04 : lerp(0.33, OLM - 0.03, rnd())) * k, ft = (0.27 + (rnd() - 0.5) * 0.02) * k, fw = w * (cone ? 0.55 : 0.32);
-    g.pr.taper([[x, isTop, fw * 1.4], [x + sw * 0.3, ny, fw], [x + sw, ft, fw * 0.9]]);
-    g.pr.dot(x + sw * 0.3, ny, w * (cone ? 1.1 : 0.9));
-    if (cone) g.pr.tri(x + sw, ft + w * 0.2, w); else g.pr.dot(x + sw, ft, w * 0.55);
+    ink.taper([[x, isTop, fw * 1.4], [x + sw * 0.3, ny, fw], [x + sw, ft, fw * 0.9]]);
+    ink.dot(x + sw * 0.3, ny, w * (cone ? 1.1 : 0.9));
+    if (cone) ink.tri(x + sw, ft + w * 0.2, w); else ink.dot(x + sw, ft, w * 0.55);
     return { x: x + sw, y: ft };
   }
 
@@ -704,12 +751,31 @@
 
   // A ganglion cell: a big body in the roof, dendrites down into the canopy, an axon up and away along the top.
   function ganglionCell(g, rnd, x, k, lod) {
-    var y = (-0.8 + (rnd() - 0.5) * 0.04) * k, dir = rnd() < 0.5 ? -1 : 1, j;
-    var o = { step: 0.02 * k, wiggle: 0.3, taper: 0.45, spread: 0.75, lenK: 0.6, wK: 0.65, depth: 1 + lod, pull: Math.PI / 2, pullK: 0.04 };
-    for (j = 0; j < 2 + lod; j++) grow(g.ink, o, rnd, x, y, Math.PI / 2 + (j / (1 + lod) - 0.5) * 1.6, (0.14 + rnd() * 0.12) * k, 0.006 * k, 0);
+    var y = (-0.78 + (rnd() - 0.5) * 0.05) * k, dir = rnd() < 0.5 ? -1 : 1, j;
+    var o = { step: 0.02 * k, wiggle: 0.32, taper: 0.45, spread: 0.75, lenK: 0.6, wK: 0.65, depth: lod, pull: Math.PI / 2, pullK: 0.04 };
+    for (j = 0; j < 1 + lod; j++) grow(g.ink, o, rnd, x, y, Math.PI / 2 + (rnd() - 0.5) * 1.4, (0.1 + rnd() * 0.12) * k, 0.0055 * k, 0);
     var ay = (ILM - 0.04 - rnd() * 0.12) * k;
-    g.ink.taper([[x, y, 0.0055 * k], [x + dir * 0.02 * k, ay + 0.02 * k, 0.0045 * k], [x + dir * 0.12 * k, ay, 0.004 * k], [x + dir * 0.6 * k, ay - 0.01 * k, 0.0035 * k]]);
-    g.gang.blob(x, y, 0.03 * k, -Math.PI / 2, 0.7);
+    g.ink.taper([[x, y, 0.005 * k], [x + dir * 0.02 * k, ay + 0.02 * k, 0.004 * k], [x + dir * 0.12 * k, ay, 0.0035 * k], [x + dir * 0.6 * k, ay - 0.01 * k, 0.003 * k]]);
+    g.gang.blob(x, y, (0.022 + rnd() * 0.012) * k, -Math.PI / 2, 0.7);
+  }
+
+  // The roof seen from inside: the ganglion cells' bodies packed along it like clumps of leaves, three rows deep,
+  // darker and lower towards us, with gaps where the light comes through.
+  function roof(g, rnd, X, k) {
+    [[g.roofC, -0.9, 0.034, 0.1], [g.roofB, -0.85, 0.027, 0.15], [g.roofA, -0.8, 0.021, 0.24]].forEach(function (row) {
+      var x = -X - rnd() * 0.05 * k;
+      while (x < X) {
+        if (rnd() < row[3]) { x += (0.06 + rnd() * 0.14) * k; continue; }
+        var r = row[2] * (0.6 + rnd() * 0.8) * k, y = (row[1] + (rnd() - 0.5) * 0.06 + 0.03 * Math.sin(x / k * 2.1 + row[1] * 9)) * k;
+        row[0].blob(x, y, r, -Math.PI / 2 + (rnd() - 0.5) * 0.8, 0.2 + rnd() * 0.5);
+        // now and then a cluster hangs lower, a few smaller cells strung below
+        if (rnd() < 0.16) for (var j = 1, hx = x, hy = y; j <= 1 + Math.floor(rnd() * 3); j++) {
+          hx += (rnd() - 0.5) * r; hy += r * (1.2 + rnd() * 0.5);
+          row[0].blob(hx, hy, r * (0.75 - j * 0.12), -Math.PI / 2, 0.3);
+        }
+        x += r * (1.1 + rnd() * 0.9);
+      }
+    });
   }
 
   // A Müller cell: the mangrove. End feet splayed against the roof, a feathery trunk hanging down through the
@@ -745,25 +811,28 @@
 
   function slice(D, rnd, view) {
     var k = 1 / D, hz = haze(D), X = (view + 0.42) * (D - CAM_Z0) / D, lod = D < 3 ? 2 : D < 8 ? 1 : 0, x, i;
-    var g = { pr: new Ink(), seg: new Ink(), glia: new Ink(), ink: new Ink(), lamp: new Ink(), gang: new Ink(), discs: lod > 1 ? new Path2D() : null };
+    var g = { pr: new Ink(), rod: new Ink(), seg: new Ink(), glia: new Ink(), ink: new Ink(), lamp: new Ink(), gang: new Ink(), roofA: new Ink(), roofB: new Ink(), roofC: new Ink(), discs: lod > 1 ? new Path2D() : null };
     // keep an avenue open along the river, wide for the big cells, narrow for the rods and cones on its banks
     var rx = riverX(D) * k;
     function open(x, wide) { return Math.abs(x - rx) < (wide ? 0.34 : 0.1) * k * (0.8 + rnd() * 0.4); }
     var qpx = H * clamp(D / Math.max(0.5, D - CAM_Z1), 1, 1.3) * Math.min(dpr, 1.25);
     minInk = 0.7 / qpx;
+    wob = rng(Math.round(D * 1000)); wobble = 0.35;
+    var thin = lod > 1 ? 1.5 : 1;   // the foreground holds a few bold things, not a thicket
 
     // rods and cones along the floor
-    var feet = [], step = Math.max(0.014, 0.045 * k);
+    var feet = [], step = Math.max(0.016, (lod > 1 ? 0.075 : 0.055) * k);
     for (x = -X; x < X; x += step * (0.7 + rnd() * 0.6)) if (!open(x, false)) feet.push(rodOrCone(g, rnd, x, k, rnd() < 0.2));
     // the lower branches, the upper trunks reaching down to the feet nearest them, the canopy, the roof
-    for (x = -X + rnd() * 0.4 * k; x < X; x += Math.max(0.14, 0.6 * k) * (0.7 + rnd() * 0.6)) if (!open(x, true)) horizontalCell(g, rnd, x, k, lod);
-    for (x = -X + rnd() * 0.1 * k; x < X; x += Math.max(0.06, 0.17 * k) * (0.7 + rnd() * 0.6)) {
+    for (x = -X + rnd() * 0.4 * k; x < X; x += Math.max(0.14, 0.6 * k * thin) * (0.7 + rnd() * 0.6)) if (!open(x, true)) horizontalCell(g, rnd, x, k, lod);
+    for (x = -X + rnd() * 0.1 * k; x < X; x += Math.max(0.06, 0.17 * k * thin) * (0.7 + rnd() * 0.6)) {
       if (open(x, true)) continue;
       var near = feet.filter(function (f) { return Math.abs(f.x - x) < 0.06 * k; }).slice(0, 4);
       bipolarCell(g, rnd, x, k, near);
     }
-    for (x = -X + rnd() * 0.3 * k; x < X; x += Math.max(0.1, 0.4 * k) * (0.7 + rnd() * 0.6)) if (!open(x, true)) amacrineCell(g, rnd, x, k, lod);
-    for (x = -X + rnd() * 0.3 * k; x < X; x += Math.max(0.09, 0.38 * k) * (0.7 + rnd() * 0.6)) if (!open(x, true)) ganglionCell(g, rnd, x, k, lod);
+    for (x = -X + rnd() * 0.3 * k; x < X; x += Math.max(0.1, 0.4 * k * thin) * (0.7 + rnd() * 0.6)) if (!open(x, true)) amacrineCell(g, rnd, x, k, lod);
+    for (x = -X + rnd() * 0.3 * k; x < X; x += Math.max(0.12, 0.5 * k * thin) * (0.7 + rnd() * 0.6)) if (!open(x, true)) ganglionCell(g, rnd, x, k, lod);
+    roof(g, rnd, X, k);
     // nerve fibres along the very top
     for (i = 0; i < 1 + lod; i++) {
       var Y = ILM - 0.03 - rnd() * 0.15, ph = rnd() * TAU, pts = [];
@@ -771,8 +840,8 @@
       g.ink.taper(pts);
     }
     // the glia, our mangroves
-    for (x = -X + rnd() * 0.5 * k; x < X; x += Math.max(0.22, 1.0 * k) * (0.7 + rnd() * 0.6)) if (!open(x, true)) mullerCell(g, rnd, x, k, lod);
-    minInk = 0;
+    for (x = -X + rnd() * 0.5 * k; x < X; x += Math.max(0.22, 1.2 * k * thin) * (0.7 + rnd() * 0.6)) if (!open(x, true)) mullerCell(g, rnd, x, k, lod);
+    minInk = 0; wobble = 0;
 
     // paint it
     var box = [-X, (ILM - 0.24) * k, X, (FLOOR + 0.01) * k];
@@ -780,8 +849,9 @@
     cv.width = Math.min(4096, Math.ceil((box[2] - box[0]) * qpx)); cv.height = Math.min(4096, Math.ceil((box[3] - box[1]) * qpx));
     qpx = Math.min(cv.width / (box[2] - box[0]), cv.height / (box[3] - box[1]));
     var soft = 0.012 * k, col = function (c) { return mix(c, HAZE, hz); }, edge = function (c) { return mix(mix(c, '#14080B', 0.45), HAZE, hz * 0.8); };
-    [[g.seg, '#C48A3A'], [g.pr, '#6B3A24'], [g.glia, '#7E86A8'], [g.ink, '#3E1C24'], [g.gang, '#7A2E4A'], [g.lamp, '#C9587C']].forEach(function (w) {
-      if (isFinite(w[0].box[0])) wash(cv, w[0].path, col(w[1]), edge(w[1]), qpx, box, soft);
+    [[g.roofC, '#A56A7C', 0.2], [g.seg, '#C48A3A', 0.3], [g.rod, '#A0703E', 0.35], [g.pr, '#6B3A24', 0.3], [g.glia, '#7E86A8', 0.35], [g.ink, '#3E1C24', 0.45],
+      [g.roofB, '#83405A', 0.2], [g.gang, '#7A2E4A', 0.25], [g.roofA, '#64263E', 0.2], [g.lamp, '#C9587C', 0.2]].forEach(function (w) {
+      if (isFinite(w[0].box[0])) wash(cv, w[0].path, col(w[1]), edge(w[1]), qpx, box, soft, w[2]);
       if (w[0] === g.seg && g.discs) {
         var o = cv.getContext('2d');
         o.setTransform(qpx, 0, 0, qpx, -box[0] * qpx, -box[1] * qpx);
@@ -806,8 +876,36 @@
     return item;
   }
 
-  // A rod or cone of the grove we end up in, close enough to be as wide as a tree. Drawn live, so it stays crisp.
+  // A rod or cone of the grove we end up in, close enough at the end to be as wide as a tree: painted once as a
+  // tall, narrow cel, at about the size it will be when we get there.
+  function paintTrunk(t) {
+    var g = { pr: new Ink(), seg: new Ink(), discs: new Path2D() }, rnd = rng(Math.round(t.D * 9973 + t.x * 1013 + 7));
+    var qpx = Math.min(F / Math.max(0.12, t.D - CAM_Z1) * Math.min(dpr, 1.5), 2400 / 0.7);
+    wob = rnd; wobble = 0.25; minInk = 0.7 / qpx;
+    rodOrCone(g, rnd, 0, 1, t.cone);
+    wobble = 0; minInk = 0;
+    var box = [-0.032, 0.235, 0.032, FLOOR + 0.004], cv = document.createElement('canvas');
+    cv.width = Math.ceil((box[2] - box[0]) * qpx); cv.height = Math.ceil((box[3] - box[1]) * qpx);
+    wash(cv, g.seg.path, '#C48A3A', mix('#C48A3A', '#14080B', 0.45), qpx, box, 0.0016, 0.25);
+    var o = cv.getContext('2d');
+    o.setTransform(qpx, 0, 0, qpx, -box[0] * qpx, -box[1] * qpx);
+    o.strokeStyle = alpha('#5C3214', 0.42); o.lineWidth = 0.0016; o.stroke(g.discs);
+    o.setTransform(1, 0, 0, 1, 0, 0);
+    wash(cv, g.pr.path, '#6B3A24', mix('#6B3A24', '#14080B', 0.45), qpx, box, 0.0016, 0.25);
+    paper(cv, 0.6);
+    t.cel = settle({ img: cv, box: box });
+  }
+
+  // Until its cel is painted, a trunk is drawn live.
   function drawTrunk(t, cam, now) {
+    if (t.cel) {
+      var at = proj(t.x, 0, t.D, cam), T = PT;
+      if (at.den < 0.05) return;
+      T.s = at.s; T.tx = at.x; T.ty = at.y;
+      setT(T.s, T.tx, T.ty);
+      drawItems([t.cel], T, 1);
+      return;
+    }
     var pr = proj(t.x, FLOOR, t.D, cam), s = pr.s;
     if (pr.den < 0.05) return;
     var w = (t.cone ? 0.011 : 0.0065) * s, x = pr.x, fl = pr.y, os = (t.cone ? 0.1 : 0.17) * s, is = (t.cone ? 0.18 : 0.1) * s;
@@ -948,7 +1046,7 @@
   // The boat: a red blood cell, round and dished, riding the river, and in it our eye, small, looking around.
   function drawBoat(cam, now) {
     var b = forest.boat, at = riverAt(forest.river, b.t), pr = proj(at[0], FLOOR - 0.004, at[1], cam);
-    var R = 0.045 * pr.s, x = pr.x, y = pr.y + Math.sin(now * 0.0016) * R * 0.05, tilt = Math.sin(now * 0.0012) * 0.06;
+    var R = 0.062 * pr.s, x = pr.x, y = pr.y + Math.sin(now * 0.0016) * R * 0.05, tilt = Math.sin(now * 0.0012) * 0.06;
     if (x + R * 2 < 0 || x - R * 2 > W || pr.den < 0.06) return;
     var c = Math.cos(tilt) * R * dpr, s = Math.sin(tilt) * R * dpr;
     ctx.setTransform(c, s, -s, c, x * dpr, y * dpr);   // boat units: half its width is 1
@@ -1005,10 +1103,10 @@
     var grove = [[-0.12, 1.14, 0], [0.16, 1.17, 1], [-0.24, 1.26, 1], [0.27, 1.3, 0], [-0.17, 1.47, 0], [0.36, 1.48, 1], [-0.36, 1.55, 0], [0.12, 1.62, 1], [-0.18, 1.66, 0], [0.24, 1.2, 0]]
       .map(function (g) { return { x: g[0] * Math.max(1, view / 0.75), D: g[1], cone: !!g[2], nuc: lerp(0.34, OLM - 0.04, rnd()) }; });
     var rays = [];
-    [[13, 2], [7.5, 2], [4.4, 2], [2.7, 1], [1.9, 1]].forEach(function (r) {
-      for (i = 0; i < r[1]; i++) rays.push({ D: r[0] * (0.82 + rnd() * 0.12), x: lerp(-view, view, rnd()) * r[0] * 0.9, w: 0.1 + rnd() * 0.14, slant: 0.32, a: 0.8 + rnd() * 0.2 });
+    [[13, 1], [7.5, 2], [4.4, 1], [2.7, 1], [1.9, 1]].forEach(function (r) {
+      for (i = 0; i < r[1]; i++) rays.push({ D: r[0] * (0.82 + rnd() * 0.12), x: lerp(-view, view, rnd()) * r[0] * 0.9, w: (0.22 + rnd() * 0.3) * Math.sqrt(r[0] / 3), slant: 0.32, a: 0.5 + rnd() * 0.25 });
     });
-    forest = { planes: [], todo: SLICES.slice(), rnd: rnd, view: view, river: river, cells: cells, tube: { pts: tpts, R: 0.02, cells: tcells }, grove: grove, rays: rays, boat: { t: 0.5 } };
+    forest = { planes: [], todo: SLICES.slice(), trunks: grove.slice(), rnd: rnd, view: view, river: river, cells: cells, tube: { pts: tpts, R: 0.02, cells: tcells }, grove: grove, rays: rays, boat: { t: 0.5 } };
     // split the river and the tube where they pass a slice, so the slices can cover them and they the slices
     forest.riverRuns = split(river.map(function (r) { return r[1]; }));
     forest.tubeRuns = split(tpts.map(function (r) { return r[2]; }));
@@ -1054,9 +1152,10 @@
 
   // paint the slices one at a time, so the page stays smooth while they grow
   function paintNext() {
-    if (!forest || (!forest.todo.length && forest.veil)) return false;
+    if (!forest || (!forest.todo.length && forest.veil && !forest.trunks.length)) return false;
     var t0 = performance.now();
     if (!forest.veil) { paintVeil(forest.rnd); buildMs += performance.now() - t0; return true; }
+    if (!forest.todo.length) { paintTrunk(forest.trunks.shift()); buildMs += performance.now() - t0; return true; }
     var D = forest.todo.shift();
     forest.planes.push(slice(D, forest.rnd, forest.view));
     forest.planes.sort(function (a, b) { return b.D - a.D; });
@@ -1068,7 +1167,7 @@
   // where things are in the forest: the slices, and everything that lives between them
   var queue = [];
   function drawForest(cam, now) {
-    while (paintNext()) { /* we got here before the slices were painted: finish them now */ }
+    while (!forest.veil || forest.todo.length) paintNext();   // we got here before the slices were painted: finish them now
     rollC = 1; rollS = 0;
     if (SKIP.indexOf('planes') < 0) drawBackdrop(cam);
     var T = PT, i;
@@ -1336,7 +1435,13 @@
       p = keep;
       return Math.round(ms * 100) / 100;
     },
-    build: function () { return Math.round(buildMs); }
+    build: function () { return Math.round(buildMs); },
+    // hold the camera at a point of the scroll (and, optionally, the pointer), as ?p= and ?px=&py= do
+    seek: function (pp, px, py) {
+      fixedP = clamp(pp, 0, 1); p = fixedP;
+      if (px != null) { fixedPtr = { x: px, y: py || 0 }; ptr.x = ptr.tx = px; ptr.y = ptr.ty = py || 0; }
+    },
+    ready: function () { return !!forest && !forest.todo.length && !!forest.veil && !forest.trunks.length; }
   };
 
   makeTextures();
