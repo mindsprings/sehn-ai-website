@@ -35,6 +35,7 @@
       0% { transform: translate(0, 0); } 20% { transform: translate(-4%, 3%); } 40% { transform: translate(3%, -2%); }
       60% { transform: translate(-2%, -4%); } 80% { transform: translate(4%, 2%); } 100% { transform: translate(0, 0); }
     }
+    .paper { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: multiply; background-size: 256px 256px; opacity: 0; visibility: hidden; }
     .vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 95% at 50% 45%, transparent 58%, rgba(6, 8, 14, .55) 100%); }
 
     .hero-copy { position: absolute; left: 0; right: 0; bottom: 7vh; padding: 0 16px; text-align: center; }
@@ -65,6 +66,7 @@
   <main class="track">
     <div class="stage">
       <canvas id="stage" aria-hidden="true"></canvas>
+      <div class="paper" aria-hidden="true"></div>
       <div class="grain" aria-hidden="true"></div>
       <div class="vignette" aria-hidden="true"></div>
 
