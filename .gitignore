@@ -12,3 +12,6 @@ node_modules/
 .DS_Store
 Thumbs.db
 *~
+
+# Renders of lab experiments (preview videos, contact sheets)
+lab/*/renders/

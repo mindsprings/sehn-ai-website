@@ -1248,7 +1248,7 @@
     var hy = C.y - cam.y * F / 200, g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, '#F7E2B0'); g.addColorStop(clamp(hy / H - 0.12, 0, 1), '#E2B678'); g.addColorStop(clamp(hy / H, 0, 1), '#E9BC74'); g.addColorStop(1, '#D9993E');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    plane(cam, ILM, '#EFD3A0', '#DDB57C', TEX.roof, 0.09, 0.28);
+    plane(cam, ILM, '#EFD3A0', '#DDB57C', TEX.roof, 0.12, 0.14);   // only a hint of cells: the leafy roof in the slices carries it
     plane(cam, FLOOR, '#F2BF45', '#DDB57C', TEX.floor, 0.035, 0.42);
   }
   function plane(cam, Y, nearCol, far, tex, cell, texA) {
@@ -1448,10 +1448,12 @@
   // ---------- go ----------
   var hud = q.has('debug') ? document.body.appendChild(document.createElement('pre')) : null, hudAt = 0, renderMs = 0, frameMs = 16, last = 0;
   if (hud) hud.className = 'hud';
+  var paused = false;
   function frame(now) {
     var dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016;
     frameMs = lerp(frameMs, last ? now - last : 16, 0.1);
     last = now;
+    if (paused) { requestAnimationFrame(frame); return; }
     update(dt, now);
     var t0 = performance.now();
     render(now);
@@ -1485,7 +1487,15 @@
       fixedP = clamp(pp, 0, 1); p = fixedP;
       if (px != null) { fixedPtr = { x: px, y: py || 0 }; ptr.x = ptr.tx = px; ptr.y = ptr.ty = py || 0; }
     },
-    ready: function () { return !!forest && !forest.todo.length && !!forest.veil && !forest.trunks.length; }
+    ready: function () { return !!forest && !forest.todo.length && !!forest.veil && !forest.trunks.length; },
+    // for recording: stop the clock, then draw frames at chosen moments (scroll point, pointer, time in ms, flattening)
+    pause: function () { paused = true; },
+    frameAt: function (pp, px, py, t, flat) {
+      fixedP = clamp(pp, 0, 1); p = fixedP; fixedPtr = { x: px || 0, y: py || 0 };
+      if (flat != null) { flatTarget = flat; flatT = flat; }
+      update(1 / 30, t);
+      render(t);
+    }
   };
 
   makeTextures();
