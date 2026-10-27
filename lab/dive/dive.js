@@ -1049,46 +1049,62 @@
     path = new Path2D(); taper(path, hi); ctx.fillStyle = 'rgba(255,214,200,.55)'; ctx.fill(path);
   }
 
-  // The boat: a red blood cell, round and dished, riding the river, and in it our eye, small, looking around.
+  // The boat: a red blood cell, round and dished, riding the river, and sitting in it our eye, small, looking around.
+  // Crisp, like a cel-animated character over the painted ground.
   function drawBoat(cam, now) {
     var b = forest.boat, at = riverAt(forest.river, b.t), pr = proj(at[0], FLOOR - 0.004, at[1], cam);
     var R = 0.062 * pr.s, x = pr.x, y = pr.y + Math.sin(now * 0.0016) * R * 0.05, tilt = Math.sin(now * 0.0012) * 0.06;
     if (x + R * 2 < 0 || x - R * 2 > W || pr.den < 0.06) return;
     var c = Math.cos(tilt) * R * dpr, s = Math.sin(tilt) * R * dpr;
+    // its shadow on the plasma, and ripples
+    ctx.setTransform(R * dpr, 0, 0, R * dpr, x * dpr, (pr.y + R * 0.1) * dpr);
+    ctx.fillStyle = 'rgba(90,10,20,.35)'; ctx.beginPath(); ctx.ellipse(0, 0.12, 1.3, 0.24, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,214,200,.5)'; ctx.lineWidth = 0.035;
+    var rp = (now * 0.0006) % 1;
+    ctx.globalAlpha = 1 - rp; ctx.beginPath(); ctx.ellipse(0, 0.06, 1.15 + rp * 0.5, 0.2 + rp * 0.09, 0, 0, TAU); ctx.stroke();
+    ctx.globalAlpha = 1;
     ctx.setTransform(c, s, -s, c, x * dpr, y * dpr);   // boat units: half its width is 1
-    // ripples
-    ctx.strokeStyle = 'rgba(255,214,200,.55)'; ctx.lineWidth = 0.04;
-    ctx.beginPath(); ctx.ellipse(0, 0.08, 1.25, 0.2, 0, 0, TAU); ctx.stroke();
-    // the hull: the cell's dark rim, and its dished middle
-    ctx.fillStyle = '#6E0C18';
-    ctx.beginPath(); ctx.ellipse(0, 0, 1, 0.42, 0, 0, Math.PI); ctx.fill();
-    ctx.fillStyle = '#B83A48';
-    ctx.beginPath(); ctx.ellipse(0, 0, 1, 0.2, 0, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#5A0A14';
-    ctx.beginPath(); ctx.ellipse(0, 0.01, 0.72, 0.12, 0, 0, TAU); ctx.fill();
-    // the eye: an eyeball with the rose iris, looking where the pointer is
-    var lx = clamp(ptr.x, -1, 1) * 0.12, ly = clamp(ptr.y, -1, 1) * 0.07;
-    var eb = ctx.createRadialGradient(-0.15, -0.75, 0.05, 0, -0.55, 0.5);
-    eb.addColorStop(0, '#FFFBF2'); eb.addColorStop(1, '#E9D8C8');
-    ctx.fillStyle = eb; ctx.beginPath(); ctx.arc(0, -0.55, 0.46, 0, TAU); ctx.fill();
-    var ig = ctx.createRadialGradient(lx - 0.05, -0.6 + ly, 0, lx, -0.55 + ly, 0.24);
+    // the hull, and the dished middle of the cell, behind the eye
+    ctx.fillStyle = '#6E0C18'; ctx.beginPath(); ctx.ellipse(0, 0, 1, 0.42, 0, 0, Math.PI); ctx.fill();
+    ctx.fillStyle = '#B83A48'; ctx.beginPath(); ctx.ellipse(0, 0, 1, 0.2, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5A0A14'; ctx.beginPath(); ctx.ellipse(0, 0.01, 0.74, 0.12, 0, 0, TAU); ctx.fill();
+    // the eye: an eyeball with the rose iris, looking where the pointer is, blinking now and then
+    var ey = -0.36, er = 0.44, lx = clamp(ptr.x, -1, 1) * 0.11, ly = clamp(ptr.y, -1, 1) * 0.06;
+    var eb = ctx.createRadialGradient(-0.14, ey - 0.2, 0.05, 0, ey, er);
+    eb.addColorStop(0, '#FFFBF2'); eb.addColorStop(1, '#E6D2C2');
+    ctx.fillStyle = eb; ctx.beginPath(); ctx.arc(0, ey, er, 0, TAU); ctx.fill();
+    var ig = ctx.createRadialGradient(lx - 0.05, ey - 0.05 + ly, 0, lx, ey + ly, 0.23);
     ig.addColorStop(0, '#F7D3DE'); ig.addColorStop(0.65, '#E7A1B6'); ig.addColorStop(1, '#8E2F55');
-    ctx.fillStyle = ig; ctx.beginPath(); ctx.arc(lx, -0.55 + ly, 0.24, 0, TAU); ctx.fill();
-    ctx.fillStyle = DARK; ctx.beginPath(); ctx.arc(lx, -0.55 + ly, 0.1, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#FFF8EC'; ctx.beginPath(); ctx.arc(lx - 0.07, -0.63 + ly, 0.035, 0, TAU); ctx.fill();
+    ctx.fillStyle = ig; ctx.beginPath(); ctx.arc(lx, ey + ly, 0.23, 0, TAU); ctx.fill();
+    ctx.fillStyle = DARK; ctx.beginPath(); ctx.arc(lx, ey + ly, 0.095, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#FFF8EC'; ctx.beginPath(); ctx.arc(lx - 0.07, ey - 0.08 + ly, 0.034, 0, TAU); ctx.fill();
+    var bk = (now / 1000 + b.t * 7) % 5.2, shut = bk < 0.18 ? Math.sin(bk / 0.18 * Math.PI) : 0;
+    if (shut > 0) {
+      ctx.save(); ctx.beginPath(); ctx.arc(0, ey, er, 0, TAU); ctx.clip();
+      ctx.fillStyle = '#EAD6C6'; ctx.fillRect(-er, ey - er, er * 2, er * 2 * shut);
+      ctx.restore();
+    }
     // the logo's lid and lashes, for a brow
-    ctx.strokeStyle = '#3A1820'; ctx.lineCap = 'round'; ctx.lineWidth = 0.07;
-    ctx.beginPath(); ctx.moveTo(-0.5, -0.66); ctx.quadraticCurveTo(0, -1.15, 0.5, -0.66); ctx.stroke();
+    ctx.strokeStyle = '#3A1820'; ctx.lineCap = 'round'; ctx.lineWidth = 0.065;
+    var lid = ey - er + er * 2 * shut * 0.9;
+    ctx.beginPath(); ctx.moveTo(-0.46, ey - 0.12 + shut * 0.5); ctx.quadraticCurveTo(0, lid - 0.12 * (1 - shut), 0.46, ey - 0.12 + shut * 0.5); ctx.stroke();
     ctx.lineWidth = 0.05;
-    [[0.2, -0.86, 0.3, -1.06], [0.33, -0.78, 0.48, -0.93], [0.43, -0.7, 0.6, -0.78]].forEach(function (l) { ctx.beginPath(); ctx.moveTo(l[0], l[1]); ctx.lineTo(l[2], l[3]); ctx.stroke(); });
-    // little arms with an oar
+    // three lashes, from points along the right of the brow (relative to the eye's middle)
+    [[0.14, -0.32, 0.2, -0.5], [0.28, -0.26, 0.4, -0.42], [0.39, -0.185, 0.55, -0.28]].forEach(function (l) {
+      var dy = ey + shut * 0.45;
+      ctx.beginPath(); ctx.moveTo(l[0], l[1] + dy); ctx.lineTo(l[2], l[3] + dy); ctx.stroke();
+    });
+    // the near rim of the cell, in front of the eye: it sits in the boat, not on it
+    ctx.fillStyle = '#B83A48'; ctx.beginPath(); ctx.ellipse(0, 0, 1, 0.2, 0, 0, Math.PI); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,200,190,.5)'; ctx.lineWidth = 0.03; ctx.beginPath(); ctx.ellipse(0, 0, 0.98, 0.18, 0, 0.15, Math.PI - 0.15); ctx.stroke();
+    // little arms over the rim, with an oar
     var row = Math.sin(now * 0.0024) * 0.25;
     ctx.strokeStyle = '#3A1820'; ctx.lineWidth = 0.05;
-    ctx.beginPath(); ctx.moveTo(-0.4, -0.45); ctx.quadraticCurveTo(-0.55, -0.25, -0.3 + row * 0.3, -0.12); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0.4, -0.45); ctx.quadraticCurveTo(0.5, -0.25, 0.25 + row * 0.3, -0.18); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-0.36, -0.22); ctx.quadraticCurveTo(-0.52, -0.08, -0.3 + row * 0.3, 0.02); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0.36, -0.22); ctx.quadraticCurveTo(0.5, -0.08, 0.26 + row * 0.3, -0.02); ctx.stroke();
     ctx.strokeStyle = '#E7A1B6'; ctx.lineWidth = 0.06;
-    ctx.beginPath(); ctx.moveTo(-0.5 + row, -0.3); ctx.lineTo(0.7 + row * 0.6, 0.2); ctx.stroke();
-    ctx.fillStyle = '#E7A1B6'; ctx.beginPath(); ctx.ellipse(0.78 + row * 0.6, 0.24, 0.16, 0.07, 0.4, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-0.5 + row, -0.12); ctx.lineTo(0.72 + row * 0.6, 0.3); ctx.stroke();
+    ctx.fillStyle = '#E7A1B6'; ctx.beginPath(); ctx.ellipse(0.8 + row * 0.6, 0.34, 0.16, 0.07, 0.4, 0, TAU); ctx.fill();
   }
 
   function buildForest() {
