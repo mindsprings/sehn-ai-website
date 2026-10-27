@@ -342,7 +342,8 @@
   }
 
   function pattern(g, tex, scale, ox, oy) {
-    var pt = g === ctx ? tex.pat || (tex.pat = ctx.createPattern(tex, 'repeat')) : g.createPattern(tex, 'repeat');
+    var key = g === backCtx ? 'patB' : g === ctx ? 'pat' : null;
+    var pt = key ? tex[key] || (tex[key] = g.createPattern(tex, 'repeat')) : g.createPattern(tex, 'repeat');
     pt.setTransform(new DOMMatrix([scale, 0, 0, scale, ox || 0, oy || 0]));
     return pt;
   }
@@ -360,12 +361,18 @@
     return c;
   }
   // ibox: the shape's bounds in the same units as box; the wash only works on that part of the canvas.
-  function wash(out, path, colour, edge, qpx, box, soft, dry, ibox) {
+  // strip: [x0, x1] in the same units: lay down only that strip of it (a big wash is laid down strip by strip,
+  // each with a margin, so the bleed across a strip's edge is right, and only its own strip kept).
+  function wash(out, path, colour, edge, qpx, box, soft, dry, ibox, strip) {
     var W0 = out.width, H0 = out.height, o = out.getContext('2d'), r = Math.max(0.8, soft * qpx), pad = Math.ceil(r * 2.5 + 2);
-    var x0 = 0, y0 = 0, x1 = W0, y1 = H0;
+    var x0 = 0, y0 = 0, x1 = W0, y1 = H0, kx0 = 0, kx1 = W0;
     if (ibox) {
       x0 = clamp(Math.floor((ibox[0] - box[0]) * qpx) - pad, 0, W0); y0 = clamp(Math.floor((ibox[1] - box[1]) * qpx) - pad, 0, H0);
       x1 = clamp(Math.ceil((ibox[2] - box[0]) * qpx) + pad, 0, W0); y1 = clamp(Math.ceil((ibox[3] - box[1]) * qpx) + pad, 0, H0);
+    }
+    if (strip) {
+      kx0 = clamp(Math.round((strip[0] - box[0]) * qpx), 0, W0); kx1 = clamp(Math.round((strip[1] - box[0]) * qpx), 0, W0);
+      x0 = Math.max(x0, kx0 - pad); x1 = Math.min(x1, kx1 + pad);
     }
     var w = x1 - x0, h = y1 - y0, hw = Math.max(1, Math.ceil(w / 2)), hh = Math.max(1, Math.ceil(h / 2));
     if (w < 1 || h < 1) return;
@@ -389,10 +396,23 @@
     e.drawImage(A, 0, 0);
     e.globalCompositeOperation = 'destination-out'; e.drawImage(B, 0, 0, w, h);
     e.globalCompositeOperation = 'source-in'; e.fillStyle = edge; e.fillRect(0, 0, w, h);
+    if (strip) { o.save(); o.beginPath(); o.rect(kx0, 0, kx1 - kx0, H0); o.clip(); }
     o.globalAlpha = 0.42; o.drawImage(B, x0, y0, w, h);
     o.globalAlpha = 0.88; o.drawImage(A, x0, y0);
     o.globalAlpha = 0.6; o.drawImage(E, x0, y0);
     o.globalAlpha = 1;
+    if (strip) o.restore();
+  }
+
+  // Cut a wash into strips of at most about half a million pixels, so each is a short step of painting.
+  // Returns the strips, in drawing units ([null] when it is small enough as it is).
+  function strips(ibox, qpx) {
+    var w = (ibox[2] - ibox[0]) * qpx, h = (ibox[3] - ibox[1]) * qpx, n = Math.ceil(w * h / 5e5);
+    if (n <= 1) return [null];
+    var out = [];
+    for (var i = 0; i < n; i++) out.push([lerp(ibox[0], ibox[2], i / n), lerp(ibox[0], ibox[2], (i + 1) / n)]);
+    out[0][0] = -1e9; out[n - 1][1] = 1e9;
+    return out;
   }
   function paper(out, strength) {
     var o = out.getContext('2d');
@@ -403,6 +423,25 @@
 
   // ---------- state ----------
   var W, H, dpr, A, F, C, halfDiag, eyePx, EYE_S, dMin, cam0;
+  // Resolution. The eye is drawn at the screen's full sharpness (dprEye). Inside it everything is soft paint, so it
+  // is drawn within a budget of pixels (dprBase), and lower still if the device cannot keep up (dprIn, adapted in
+  // frame()); the browser scales the canvas up, and the page's text, being HTML, stays sharp. The forest is painted
+  // at paintScale (fixed when it is painted).
+  var PIXEL_BUDGET = 1.6e6, dprEye = 1, dprBase = 1, dprIn = 0, paintScale = 1, forceScale = parseFloat(q.get('scale')) || 0;
+  var cost = { n: 0, slow: 0, fast: 0, last: 0 };
+  function useScale(sc) {
+    var w = Math.round(W * sc), h = Math.round(H * sc);
+    if (canvas.width === w && canvas.height === h && dpr === sc) return;
+    dpr = sc; canvas.width = w; canvas.height = h;
+  }
+  // wait for the drawing to finish, by copying a pixel of it into a tiny canvas and reading that (reading the
+  // stage itself back would make the browser take it off the GPU for good)
+  var one = null;
+  function flush() {
+    one = one || document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+    one.drawImage(canvas, 0, 0, 1, 1, 0, 0, 1, 1);
+    one.getImageData(0, 0, 1, 1);
+  }
   var fall, forest, sparks, nightGrad, glowGrad, irisGrad, irisArt;
   var p = fixedP != null ? fixedP : 0, flatT = q.has('flat') ? 1 : 0, flatTarget = flatT;
   var rollC = 1, rollS = 0, buildMs = 0;
@@ -946,7 +985,8 @@
           roofA: new Ink(), roofB: new Ink(), roofC: new Ink(), ground: new Ink(), lumps: new Ink(), discs: lod > 1 ? new Path2D() : null };
         // keep an avenue open along the river, wide for the trees, narrow for the rods and cones on its banks
         S.rx = riverX(D) * k;
-        S.qpx = H * clamp(D / Math.max(0.5, D - CAM_Z1), 1, 1.3) * Math.min(dpr, 1.25);
+        // fine where we come close, coarser where it gets blurred anyway: far off, and right in front of us
+        S.qpx = H * clamp(D / Math.max(0.5, D - CAM_Z1), 1, 1.3) * paintScale * (frame ? 0.55 : D > 6 ? 0.7 : 1);
         S.wob = rng(Math.round(D * 1000));
         ink(true);
         // the ground: rolling, lumpy with cells, low where the river runs
@@ -1009,17 +1049,21 @@
         var t0 = performance.now(), soft = 0.012 * k;
         function edge(c) { return mix(mix(c, '#14080B', 0.45), HAZE, hz * 0.8); }
         do {
-          var w = S.washes.shift(), base = w[4] || w[1];
+          var w = S.washes[0], base = w[4] || w[1];
+          if (!isFinite(w[0].box[0])) { S.washes.shift(); continue; }
+          w.strips = w.strips || strips(w[0].box, S.qpx);
           // the roofs fade into the light more than the rest of their slice
           var c = typeof w[1] !== 'string' ? w[1] : w[3] ? mix(w[1], HAZE, Math.min(1, hz * 1.25)) : mix(w[1], HAZE, hz);
-          if (isFinite(w[0].box[0])) wash(S.cv, w[0].path, c, w[3] ? mix(edge(base), HAZE, hz * 0.4) : edge(base), S.qpx, S.box, soft, w[2], w[0].box);
+          wash(S.cv, w[0].path, c, w[3] ? mix(edge(base), HAZE, hz * 0.4) : edge(base), S.qpx, S.box, soft, w[2], w[0].box, w.strips.shift());
+          if (w.strips.length) continue;
+          S.washes.shift();
           if (w[0] === g.seg && g.discs) {
             var o = S.cv.getContext('2d');
             o.setTransform(S.qpx, 0, 0, S.qpx, -S.box[0] * S.qpx, -S.box[1] * S.qpx);
             o.strokeStyle = alpha('#5C3214', 0.4); o.lineWidth = 0.0016 * k; o.stroke(g.discs);
             o.setTransform(1, 0, 0, 1, 0, 0);
           }
-        } while (S.washes.length && performance.now() - t0 < 8);
+        } while (S.washes.length && performance.now() - t0 < 6);
         return !S.washes.length;
       },
       function finish() {
@@ -1028,7 +1072,7 @@
         // far off, the air softens everything; right in front of us, the lens does, focused further in
         if (D > 6 || frame) {
           var bl = blank(1, cv.width, cv.height), b = bl.getContext('2d');
-          b.filter = 'blur(' + (frame ? 2.2 : 0.6 + D * 0.06).toFixed(1) + 'px)'; b.drawImage(cv, 0, 0); b.filter = 'none';
+          b.filter = 'blur(' + (frame ? 1.3 : 0.4 + D * 0.045).toFixed(1) + 'px)'; b.drawImage(cv, 0, 0); b.filter = 'none';
           var o2 = cv.getContext('2d'); o2.clearRect(0, 0, cv.width, cv.height); o2.drawImage(bl, 0, 0);
         }
         forest.planes.push({ D: D, items: [settle({ img: cv, box: S.box })] });
@@ -1049,7 +1093,7 @@
   // tall, narrow cel, at about the size it will be when we get there.
   function paintTrunk(t) {
     var g = { pr: new Ink(), seg: new Ink(), discs: new Path2D() }, rnd = rng(Math.round(t.D * 9973 + t.x * 1013 + 7));
-    var qpx = Math.min(F / Math.max(0.12, t.D - CAM_Z1) * Math.min(dpr, 1.5), 2400 / 0.7);
+    var qpx = Math.min(F / Math.max(0.12, t.D - CAM_Z1) * paintScale, 2400 / 0.7);
     wob = rnd; wobble = 0.25; minInk = 0.7 / qpx;
     rodOrCone(g, rnd, 0, 1, t.cone);
     wobble = 0; minInk = 0;
@@ -1361,9 +1405,9 @@
     });
     forest = { planes: [], steps: [], rnd: rnd, view: view, river: river, cells: cells, tube: { pts: tpts, R: 0.02, cells: tcells }, grove: grove, rays: rays, boat: { t: 0.5 } };
     // what there is to paint, in order: the veil we meet first, the slices far to near, then the grove's trunks
-    forest.steps.push(function () { paintVeil(rnd); });
+    forest.steps.push.apply(forest.steps, veilSteps(rnd));
     SLICES.forEach(function (D) { forest.steps.push.apply(forest.steps, sliceSteps(D, view)); });
-    grove.forEach(function (t) { forest.steps.push(function () { paintTrunk(t); }); });
+    grove.forEach(function (t) { forest.steps.push(function trunk() { paintTrunk(t); }); });
     // split the river and the tube where they pass a slice, so the slices can cover them and they the slices
     forest.riverRuns = split(river.map(function (r) { return r[1]; }));
     forest.tubeRuns = split(tpts.map(function (r) { return r[2]; }));
@@ -1386,54 +1430,72 @@
   // The veil: the roof all around us just after the cut, seen from right inside it: the same leafy mass of cell
   // bodies as the forest's roof, dense above, thinning into hanging clusters below, with dendrites dangling from
   // them. It slides up and away as we drop out of it. Painted in world units at a fixed depth.
-  function paintVeil(rnd) {
-    var dark = new Ink(), mid = new Ink(), lite = new Ink(), ink = new Ink(), glia = new Ink(), x, y, i, j;
-    wob = rnd; wobble = 0.3; minInk = 0.0012;
-    // the mass: rows of cells, packed tight up top, more gaps further down
-    for (y = -1.46; y < -0.9; y += 0.028) {
-      var gap = smooth(-1.2, -0.9, y) * 0.45;
-      for (x = -0.72 - rnd() * 0.04; x < 0.72;) {
-        var r = (0.022 + rnd() * 0.026) * (1 - 0.3 * smooth(-1.3, -0.9, y));
-        if (rnd() > gap) (y < -1.25 ? dark : rnd() < 0.55 ? mid : lite).blob(x, y + (rnd() - 0.5) * 0.03, r, -Math.PI / 2 + (rnd() - 0.5), 0.15 + rnd() * 0.4);
-        x += r * (1.2 + rnd() * 0.8);
+  function veilSteps(rnd) {
+    var dark, mid, lite, ink, glia, cv, box, qpx, washes;
+    return [
+      function veil() {
+        dark = new Ink(); mid = new Ink(); lite = new Ink(); ink = new Ink(); glia = new Ink();
+        var x, y, j;
+        wob = rnd; wobble = 0.3; minInk = 0.0012;
+        // the mass: rows of cells, packed tight up top, more gaps further down
+        for (y = -1.46; y < -0.9; y += 0.028) {
+          var gap = smooth(-1.2, -0.9, y) * 0.45;
+          for (x = -0.72 - rnd() * 0.04; x < 0.72;) {
+            var r = (0.022 + rnd() * 0.026) * (1 - 0.3 * smooth(-1.3, -0.9, y));
+            if (rnd() > gap) (y < -1.25 ? dark : rnd() < 0.55 ? mid : lite).blob(x, y + (rnd() - 0.5) * 0.03, r, -Math.PI / 2 + (rnd() - 0.5), 0.15 + rnd() * 0.4);
+            x += r * (1.2 + rnd() * 0.8);
+          }
+        }
+        // clusters hanging below it, each a few cells on a stalk, with dendrites dangling
+        var DEN = { step: 0.008, wiggle: 0.35, taper: 0.4, spread: 0.7, lenK: 0.6, wK: 0.65, depth: 2, pull: Math.PI / 2, pullK: 0.05 };
+        for (x = -0.68; x < 0.68; x += 0.05 + rnd() * 0.09) {
+          var hy = -0.92 + (rnd() - 0.5) * 0.04, n = 1 + Math.floor(rnd() * 3), hx = x;
+          for (j = 0; j < n; j++) {
+            hx += (rnd() - 0.5) * 0.02; hy += 0.03 + rnd() * 0.02;
+            (rnd() < 0.5 ? mid : lite).blob(hx, hy, 0.018 + rnd() * 0.012, -Math.PI / 2 + (rnd() - 0.5) * 0.6, 0.3 + rnd() * 0.4);
+          }
+          if (rnd() < 0.7) grow(ink, DEN, rnd, hx, hy + 0.01, Math.PI / 2 + (rnd() - 0.5) * 0.8, 0.06 + rnd() * 0.08, 0.0035, 0);
+        }
+        // a few Müller cells' end feet, pale stems coming down out of it
+        for (x = -0.6; x < 0.6; x += 0.22 + rnd() * 0.16) glia.taper([[x, -1.2, 0.0035], [x + (rnd() - 0.5) * 0.03, -0.8, 0.0028], [x + (rnd() - 0.5) * 0.04, -0.6, 0]]);
+        wobble = 0; minInk = 0;
+        box = [-0.72, -1.5, 0.72, -0.5]; qpx = Math.min(1600, H * 1.6 * paintScale) / (box[3] - box[1]); cv = document.createElement('canvas');
+        cv.width = Math.ceil((box[2] - box[0]) * qpx); cv.height = Math.ceil((box[3] - box[1]) * qpx);
+        washes = [[glia, '#5E6488', 0.3], [lite, '#7E3C56', 0.2], [mid, '#5C2440', 0.2], [ink, '#2A1218', 0.35], [dark, '#3A1424', 0.15]];
+      },
+      function veilWash() {
+        var w = washes[0];
+        w.strips = w.strips || strips(w[0].box, qpx);
+        wash(cv, w[0].path, w[1], mix(w[1], '#0A0406', 0.5), qpx, box, 0.006, w[2], w[0].box, w.strips.shift());
+        if (!w.strips.length) washes.shift();
+        return !washes.length;
+      },
+      function veilFinish() {
+        paper(cv, 0.6);
+        forest.veil = settle({ z: -0.22, img: cv, box: box });
       }
-    }
-    // clusters hanging below it, each a few cells on a stalk, with dendrites dangling
-    var DEN = { step: 0.008, wiggle: 0.35, taper: 0.4, spread: 0.7, lenK: 0.6, wK: 0.65, depth: 2, pull: Math.PI / 2, pullK: 0.05 };
-    for (x = -0.68; x < 0.68; x += 0.05 + rnd() * 0.09) {
-      var hy = -0.92 + (rnd() - 0.5) * 0.04, n = 1 + Math.floor(rnd() * 3), hx = x;
-      for (j = 0; j < n; j++) {
-        hx += (rnd() - 0.5) * 0.02; hy += 0.03 + rnd() * 0.02;
-        (rnd() < 0.5 ? mid : lite).blob(hx, hy, 0.018 + rnd() * 0.012, -Math.PI / 2 + (rnd() - 0.5) * 0.6, 0.3 + rnd() * 0.4);
-      }
-      if (rnd() < 0.7) grow(ink, DEN, rnd, hx, hy + 0.01, Math.PI / 2 + (rnd() - 0.5) * 0.8, 0.06 + rnd() * 0.08, 0.0035, 0);
-    }
-    // a few Müller cells' end feet, pale stems coming down out of it
-    for (x = -0.6; x < 0.6; x += 0.22 + rnd() * 0.16) glia.taper([[x, -1.2, 0.0035], [x + (rnd() - 0.5) * 0.03, -0.8, 0.0028], [x + (rnd() - 0.5) * 0.04, -0.6, 0]]);
-    wobble = 0; minInk = 0;
-    var box = [-0.72, -1.5, 0.72, -0.5], qpx = Math.min(1600, H * 1.6) / (box[3] - box[1]), cv = document.createElement('canvas');
-    cv.width = Math.ceil((box[2] - box[0]) * qpx); cv.height = Math.ceil((box[3] - box[1]) * qpx);
-    [[glia, '#5E6488', 0.3], [lite, '#7E3C56', 0.2], [mid, '#5C2440', 0.2], [ink, '#2A1218', 0.35], [dark, '#3A1424', 0.15]].forEach(function (w) {
-      wash(cv, w[0].path, w[1], mix(w[1], '#0A0406', 0.5), qpx, box, 0.006, w[2]);
-    });
-    paper(cv, 0.6);
-    forest.veil = settle({ z: -0.22, img: cv, box: box });
+    ];
   }
 
   // paint the slices one at a time, so the page stays smooth while they grow
-  var stepStats = { n: 0, max: 0, over30: 0 };
+  var stepStats = { n: 0, max: 0, over30: 0, by: {} }, lastStep = null;
   // one small step of painting; a step that is not done yet says so, and is called again
   function paintNext() {
     if (!forest || !forest.steps.length) return false;
     var t0 = performance.now();
-    if (forest.steps[0]() !== false) forest.steps.shift();
+    lastStep = forest.steps[0];
+    if (lastStep() !== false) forest.steps.shift();
     var dt = performance.now() - t0;
     buildMs += dt; stepStats.n++; stepStats.max = Math.max(stepStats.max, dt); if (dt > 30) stepStats.over30++;
+    var key = lastStep.name || 'anon';
+    stepStats.by[key] = Math.max(stepStats.by[key] || 0, Math.round(dt));
     return true;
   }
-  // paint in the gaps between frames
+  // paint in the gaps between frames (one painter at a time, however often the forest is built again)
   var idle = window.requestIdleCallback ? function (f) { requestIdleCallback(f, { timeout: 200 }); } : function (f) { setTimeout(f, 16); };
-  function paintLater() { if (paintNext()) idle(paintLater); }
+  var painting = false;
+  function paintLater() { if (paintNext()) idle(paintLater); else painting = false; }
+  function paintSoon() { if (!painting) { painting = true; setTimeout(paintLater, 60); } }
 
   // where things are in the forest: the slices, and everything that lives between them
   var queue = [];
@@ -1481,7 +1543,20 @@
   }
 
   // the light from above, and the roof and the floor as two planes running off into the distance (in strips)
+  // The light, the roof and the floor are soft and fill the whole screen, so they are drawn at half resolution
+  // into their own canvas, then scaled up onto the stage.
+  var back = null, backCtx = null;
   function drawBackdrop(cam) {
+    var sc = dpr * 0.5, bw = Math.max(1, Math.round(W * sc)), bh = Math.max(1, Math.round(H * sc));
+    if (!back) { back = document.createElement('canvas'); backCtx = back.getContext('2d'); }
+    if (back.width !== bw || back.height !== bh) { back.width = bw; back.height = bh; }
+    var stage = ctx, full = dpr;
+    ctx = backCtx; dpr = sc;
+    try { paintBackdrop(cam); } finally { ctx = stage; dpr = full; }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(back, 0, 0, canvas.width, canvas.height);
+  }
+  function paintBackdrop(cam) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     var hy = C.y - cam.by * F / 200 - cam.py * sway(200), g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, '#F7E2B0'); g.addColorStop(clamp(hy / H - 0.12, 0, 1), '#E2B678'); g.addColorStop(clamp(hy / H, 0, 1), '#E9BC74'); g.addColorStop(1, '#D9993E');
@@ -1490,7 +1565,7 @@
     plane(cam, FLOOR, '#F2BF45', '#DDB57C', TEX.floor, 0.035, 0.42);
   }
   function plane(cam, Y, nearCol, far, tex, cell, texA) {
-    var dy = Y - cam.y, n = 30, i, prev = null, near = Math.max(0.05, Math.abs(dy) * F / (H * 0.62));
+    var dy = Y - cam.y, n = 18, i, prev = null, near = Math.max(0.05, Math.abs(dy) * F / (H * 0.62));
     for (i = 0; i <= n; i++) {
       var D = cam.z + Math.exp(lerp(Math.log(80), Math.log(near), i / n));
       if (Math.abs(D) < 1e-3) D = 1e-3;
@@ -1502,14 +1577,19 @@
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.fillStyle = mix(nearCol, far, Math.min(1, haze(Dm) * 1.1));
         ctx.fillRect(0, y0, W, y1 - y0 + 1);
-        ctx.globalAlpha = texA * (1 - haze(Dm));
-        ctx.fillStyle = pattern(ctx, tex, sx, pm.x, pm.y);
+        var ta = texA * (1 - haze(Dm)), ma = 0.3 * (1 - haze(Dm) * 0.7);   // far off, the haze all but hides them
         ctx.setTransform(dpr, 0, 0, dpr * sq, 0, pm.y * dpr * (1 - sq));
-        ctx.fillRect(0, pm.y + (y0 - pm.y) / sq, W, (y1 - y0 + 1) / sq);
+        if (ta > 0.03) {
+          ctx.globalAlpha = ta;
+          ctx.fillStyle = pattern(ctx, tex, sx, pm.x, pm.y);
+          ctx.fillRect(0, pm.y + (y0 - pm.y) / sq, W, (y1 - y0 + 1) / sq);
+        }
         // an uneven wash over it, fixed to the ground so it does not swim as we move
-        ctx.globalAlpha = 0.3 * (1 - haze(Dm) * 0.7);
-        ctx.fillStyle = pattern(ctx, TEX.mottle, sx * 9, pm.x, pm.y);
-        ctx.fillRect(0, pm.y + (y0 - pm.y) / sq, W, (y1 - y0 + 1) / sq);
+        if (ma > 0.12) {
+          ctx.globalAlpha = ma;
+          ctx.fillStyle = pattern(ctx, TEX.mottle, sx * 9, pm.x, pm.y);
+          ctx.fillRect(0, pm.y + (y0 - pm.y) / sq, W, (y1 - y0 + 1) / sq);
+        }
         ctx.globalAlpha = 1;
       }
       prev = { y: y, D: D };
@@ -1541,6 +1621,7 @@
 
   // ---------- render ----------
   function render(now) {
+    useScale(p < P_PUPIL ? dprEye : dprIn);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     rollC = 1; rollS = 0;
@@ -1629,21 +1710,21 @@
   }
 
   // ---------- setup ----------
-  function layout() {
-    var t0 = performance.now();
+  // Sizes, scales, and everything cheap that depends on them.
+  function measure() {
     W = window.innerWidth; H = window.innerHeight;
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    var dev = window.devicePixelRatio || 1;
+    dprEye = Math.min(dev, 2);
+    dprBase = forceScale || Math.min(dev, 1.5, Math.sqrt(PIXEL_BUDGET / (W * H)));
+    dprIn = forceScale || (dprIn ? Math.min(dprIn, dprBase) : dprBase);
+    paintScale = Math.min(dprBase, 1);
+    dpr = 0; useScale(p < P_PUPIL ? dprEye : dprIn);
     A = W / H; F = H; C = { x: W / 2, y: H / 2 }; halfDiag = Math.hypot(W, H) / 2;
     var portrait = W < H;
     eyePx = Math.min(W * (portrait ? 0.6 : 0.5), H * 0.72);   // narrow screens: keep the logo's sparkles on screen
     EYE_S = eyePx / (192 * H);   // world units per logo unit, at the eye's distance (1) with F = H
     cam0 = { x: 0, y: portrait ? 0.13 : 0.1 };   // the eye sits above the middle, the headline below it
     dMin = 13 * EYE_S * F / (1.3 * halfDiag);   // this close, the pupil fills the screen
-    fall = buildFall(rng(SEED));
-    // the forest takes a while to paint; the eye and the fall do not need it, so paint it slice by slice meanwhile
-    buildForest();
-    setTimeout(paintLater, 60);
     sparks = buildSparks();
     if (!irisArt) irisArt = buildIris(rng(SEED + 5));
     irisGrad = ctx.createRadialGradient(194.6, 129.8, 0, 194.6, 129.8, 34);
@@ -1652,7 +1733,25 @@
     glowGrad.addColorStop(0, 'rgba(231,161,182,.16)'); glowGrad.addColorStop(0.6, 'rgba(231,161,182,.07)'); glowGrad.addColorStop(1, 'rgba(231,161,182,0)');
     nightGrad = ctx.createLinearGradient(0, 0, 0, H);
     nightGrad.addColorStop(0, '#18263F'); nightGrad.addColorStop(1, '#0A111D');
+  }
+
+  // The fall's layers, and the forest: the forest takes a while to paint, and the eye and the fall do not need it,
+  // so it is painted bit by bit meanwhile.
+  var built = null;
+  function build() {
+    var t0 = performance.now();
+    fall = buildFall(rng(SEED));
+    buildForest();
+    paintSoon();
+    built = { w: W, h: H };
     buildMs = performance.now() - t0;
+  }
+  function layout() {
+    measure();
+    // On a phone, the address bar showing or hiding changes the height a little: keep what is built (it is drawn
+    // in units of the screen's height, so it just scales). Anything bigger, and it is built again for the new shape.
+    if (built && W === built.w && Math.abs(H - built.h) < built.h * 0.3) return;
+    build();
   }
 
   function makeGrain() {
@@ -1683,6 +1782,7 @@
   });
   flatBtn.setAttribute('aria-pressed', flatTarget ? 'true' : 'false');
   flatBtn.addEventListener('click', function () {
+    poke();
     flatTarget = flatTarget ? 0 : 1;
     flatBtn.setAttribute('aria-pressed', flatTarget ? 'true' : 'false');
   });
@@ -1692,20 +1792,38 @@
   // ---------- go ----------
   var hud = q.has('debug') ? document.body.appendChild(document.createElement('pre')) : null, hudAt = 0, renderMs = 0, frameMs = 16, last = 0;
   if (hud) hud.className = 'hud';
-  var paused = false;
+  var paused = false, tick = 0, lastInput = 0;
+  function poke() { lastInput = performance.now(); }
+  window.addEventListener('scroll', poke, { passive: true });
   function frame(now) {
+    if (paused) { requestAnimationFrame(frame); return; }
+    // When nobody is doing anything the scene still lives (cells drift, the eye looks around), but every other
+    // frame is enough for that, and it spares the battery.
+    var calm = fixedP == null && now - Math.max(lastInput, ptr.last) > 1500 && Math.abs(scrollP() - p) < 1e-4;
+    if (calm && (tick++ & 1)) { requestAnimationFrame(frame); return; }
     var dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016;
     frameMs = lerp(frameMs, last ? now - last : 16, 0.1);
     last = now;
-    if (paused) { requestAnimationFrame(frame); return; }
     update(dt, now);
     var t0 = performance.now();
     render(now);
     renderMs = lerp(renderMs, performance.now() - t0, 0.1);
+    // Twice a second, inside the eye, measure what a frame really costs, waiting for the drawing to finish (the
+    // time between frames would not do: browsers slow down pages that are not in front). Three slow ones in a row:
+    // draw with fewer pixels; a run of quick ones: with more again, up to the budget.
+    if (p >= P_PUPIL && fixedP == null && !forceScale && ++cost.n % 30 === 0) {
+      flush();
+      var c = cost.last = performance.now() - t0;
+      cost.slow = c > 15 ? cost.slow + (c > 30 ? 1.5 : 1) : 0;   // very slow ones count for more
+      cost.fast = c < 6 ? cost.fast + 1 : 0;
+      if (cost.slow >= 3 && dprIn > 0.45) { dprIn = Math.max(0.45, dprIn * (c > 30 ? 0.75 : 0.84)); cost.slow = 0; }
+      if (cost.fast >= 6 && dprIn < dprBase) { dprIn = Math.min(dprBase, dprIn * 1.1); cost.fast = 0; }
+    }
     if (hud && now - hudAt > 250) {
       hudAt = now;
       hud.textContent = 'fps ' + (1000 / frameMs).toFixed(0) + '  draw ' + renderMs.toFixed(1) + 'ms  build ' + buildMs.toFixed(0) + 'ms  slices ' + (forest ? forest.planes.length : 0) + '/' + SLICES.length + '\n' +
-        'p ' + p.toFixed(3) + '  fall ' + FC.c.toFixed(4) + '  forest ' + SC.y.toFixed(2) + ',' + SC.z.toFixed(2) + '  flat ' + flatT.toFixed(2);
+        'p ' + p.toFixed(3) + '  fall ' + FC.c.toFixed(4) + '  forest ' + SC.y.toFixed(2) + ',' + SC.z.toFixed(2) + '  flat ' + flatT.toFixed(2) + '\n' +
+        'scale ' + dpr.toFixed(2) + ' (inside ' + dprIn.toFixed(2) + ' of ' + dprBase.toFixed(2) + ')  measured ' + cost.last.toFixed(1) + 'ms';
     }
     requestAnimationFrame(frame);
   }
@@ -1716,17 +1834,21 @@
       var keep = p, t0, i;
       n = n || 20; p = pp; t0 = performance.now();
       for (i = 0; i < n; i++) render(t0 + i * 16);
-      // wait for the drawing to finish by copying a pixel into a tiny canvas and reading that: reading the stage
-      // itself back would make the browser take it off the GPU, and every frame after would be slow
-      var one = this.one || (this.one = document.createElement('canvas').getContext('2d', { willReadFrequently: true }));
-      one.drawImage(canvas, 0, 0, 1, 1, 0, 0, 1, 1);
-      one.getImageData(0, 0, 1, 1);
+      flush();
       var ms = (performance.now() - t0) / n;
       p = keep;
       return Math.round(ms * 100) / 100;
     },
     build: function () { return Math.round(buildMs); },
-    steps: function () { return { n: stepStats.n, max: Math.round(stepStats.max), over30: stepStats.over30 }; },
+    scale: function () { return { now: dpr, inside: dprIn, base: dprBase, paint: paintScale, eye: dprEye }; },
+    steps: function () { return { n: stepStats.n, max: Math.round(stepStats.max), over30: stepStats.over30, by: stepStats.by }; },
+    // megapixels held in painted bitmaps (each pixel is 4 bytes, on the GPU or in memory)
+    memory: function () {
+      var px = 0;
+      function add(it) { if (it && it.img) px += it.img.width * it.img.height; }
+      if (forest) { forest.planes.forEach(function (pl) { pl.items.forEach(add); }); add(forest.veil); forest.grove.forEach(function (t) { add(t.cel); }); }
+      return { forestMP: Math.round(px / 1e5) / 10, stageMP: Math.round(canvas.width * canvas.height / 1e5) / 10, scratchMP: Math.round(scratch.reduce(function (a, c) { return a + c.width * c.height; }, 0) / 1e5) / 10 };
+    },
     // hold the camera at a point of the scroll (and, optionally, the pointer), as ?p= and ?px=&py= do
     seek: function (pp, px, py) {
       fixedP = clamp(pp, 0, 1); p = fixedP;
