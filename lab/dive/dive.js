@@ -1037,8 +1037,10 @@
         ink(false);
         // the canvas, and the washes to lay on it, back to front
         var box = S.box = [-X, (ILM - 0.24) * k, X, S.bottom], cv = S.cv = document.createElement('canvas');
-        cv.width = Math.min(4096, Math.ceil((box[2] - box[0]) * S.qpx)); cv.height = Math.min(4096, Math.ceil((box[3] - box[1]) * S.qpx));
-        S.qpx = Math.min(cv.width / (box[2] - box[0]), cv.height / (box[3] - box[1]));
+        // at most 4096 pixels either way: on a wide screen the slice is painted a little coarser, the same both ways,
+        // so the painting still fills its canvas exactly (or it would be stretched and the ground lifted)
+        S.qpx = Math.min(S.qpx, 4096 / (box[2] - box[0]), 4096 / (box[3] - box[1]));
+        cv.width = Math.ceil((box[2] - box[0]) * S.qpx); cv.height = Math.ceil((box[3] - box[1]) * S.qpx);
         var earth = ctx.createLinearGradient(0, (FLOOR - 0.15) * k, 0, S.bottom);
         earth.addColorStop(0, mix('#E9B54A', HAZE, hz)); earth.addColorStop(0.35, mix('#D99A36', HAZE, hz)); earth.addColorStop(1, mix('#B8742A', HAZE, hz));
         S.washes = [[g.roofC, '#A56A7C', 0.2, 1], [g.ground, earth, 0.15, 0, '#C98A2E'], [g.lumps, '#D7A03E', 0.2], [g.seg, '#C48A3A', 0.3], [g.rod, '#A0703E', 0.35], [g.pr, '#6B3A24', 0.3],
@@ -1259,6 +1261,9 @@
       var squash = clamp((FLOOR - cam.y) / q2.den, 0.15, 1), ph = c.ph + now * 0.0007 * c.spin;
       drawCell(q2.x, q2.y, 0.024 * q2.s * c.size, Math.abs(Math.sin(ph)), c.rot + 0.4 * Math.sin(ph * 0.5), 1 - 0.45 * c.d, 0.55 + 0.45 * squash);
     }
+    // the boat rides on the run it is on, over the cells in it (sorted on its own, the run could cover it)
+    var bf = forest.boat.t * (R.length - 1);
+    if (bf >= r.a0 && bf < r.b && SKIP.indexOf('boat') < 0) drawBoat(cam, now);
   }
 
   // the capillary of the deep plexus, a tube winding among the lower branches, painted the same way, its cells
@@ -1512,10 +1517,9 @@
     forest.tubeRuns.forEach(function (r) { queue.push({ D: r.D, k: 2, r: r }); });
     forest.rays.forEach(function (r) { queue.push({ D: r.D, k: 3, r: r }); });
     forest.grove.forEach(function (t) { queue.push({ D: t.D, k: 4, t: t }); });
-    queue.push({ D: riverAt(forest.river, forest.boat.t)[1] - 0.001, k: 5 });
-    queue.push({ D: -10, k: 6 });
+    queue.push({ D: -10, k: 5 });
     queue.sort(function (a, b) { return b.D - a.D; });
-    var names = ['slices', 'river', 'river', 'rays', 'trunks', 'boat', 'veil'];
+    var names = ['slices', 'river', 'river', 'rays', 'trunks', 'veil'];   // the boat is drawn with the river
     for (i = 0; i < queue.length; i++) {
       var it = queue[i];
       if (SKIP.indexOf(names[it.k]) >= 0) continue;
@@ -1529,7 +1533,6 @@
       else if (it.k === 2) drawTube(it.r, cam, now);
       else if (it.k === 3) drawRay(it.r, cam, now);
       else if (it.k === 4) drawTrunk(it.t, cam, now);
-      else if (it.k === 5) drawBoat(cam, now);
       else {
         var v = forest.veil, vd = v.z - cam.z;
         if (vd > 0.05) {
