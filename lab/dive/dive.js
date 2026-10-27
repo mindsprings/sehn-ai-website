@@ -1497,7 +1497,7 @@
     pause: function () { paused = true; },
     frameAt: function (pp, px, py, t, flat) {
       fixedP = clamp(pp, 0, 1); p = fixedP; fixedPtr = { x: px || 0, y: py || 0 };
-      if (flat != null) { flatTarget = flat; flatT = flat; }
+      if (flat != null) { flatTarget = flat; flatT = flat; flatBtn.setAttribute('aria-pressed', flat > 0.5 ? 'true' : 'false'); }
       update(1 / 30, t);
       render(t);
     }
