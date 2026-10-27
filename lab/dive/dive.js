@@ -237,6 +237,14 @@
     TEX.dots = texCanvas(64, 64, function (g) {
       for (var i = 0; i < 40; i++) { g.fillStyle = 'rgba(80,36,30,' + (0.3 + rnd() * 0.4).toFixed(2) + ')'; g.beginPath(); g.arc(rnd() * 64, rnd() * 64, 1.2 + rnd() * 1.6, 0, TAU); g.fill(); }
     });
+    // pale streaks in the plasma, lying along the flow
+    TEX.streak = texCanvas(256, 64, function (g) {
+      for (var i = 0; i < 26; i++) {
+        var y = rnd() * 64, x = rnd() * 256, l = 30 + rnd() * 90, w = 1 + rnd() * 2.5;
+        g.strokeStyle = 'rgba(255,214,200,' + (0.18 + rnd() * 0.3).toFixed(2) + ')'; g.lineWidth = w; g.lineCap = 'round';
+        [-256, 0, 256].forEach(function (ox) { g.beginPath(); g.moveTo(x + ox, y); g.quadraticCurveTo(x + ox + l / 2, y + (rnd() - 0.5) * 6, x + ox + l, y); g.stroke(); });
+      }
+    });
     // the floor seen in perspective: the pigment epithelium's cells, hexagons washed in yellow
     TEX.floor = texCanvas(60, 104, function (g) {
       g.fillStyle = 'rgba(140,72,20,.55)'; g.fillRect(0, 0, 60, 104);
@@ -267,6 +275,72 @@
       g.putImageData(img, 0, 0);
     });
   }
+  // Red blood cells, painted once: a biconcave disc, lit from the upper left, in tilts from face-on to edge-on.
+  // Drawn in turn as a cell tumbles, they make it look round.
+  var CELL_R = 50, CELL_S = 128;
+  function paintCells() {
+    var N = 12, R = CELL_R, S = CELL_S, T = 0.3 * R, frames = [];
+    // half the cell's height at x (u = x / R): its rim seen at the tilt, plus its own thickness, thin in the middle
+    function half(u, c, sn) {
+      var r = Math.sqrt(Math.max(0, 1 - u * u));
+      return R * c * r + T * 1.75 * r * (0.25 + 1.1 * u * u) * sn;
+    }
+    for (var f = 0; f < N; f++) {
+      var th = f / (N - 1) * Math.PI / 2 * 0.97, c = Math.cos(th), sn = Math.sin(th);
+      var dry = texCanvas(S, S, function (g) {
+        g.translate(S / 2, S / 2);
+        var body = new Path2D(), n = 48, i, x;
+        for (i = 0; i <= n; i++) { x = -R + 2 * R * i / n; if (i) body.lineTo(x, -half(x / R, c, sn)); else body.moveTo(x, -half(x / R, c, sn)); }
+        for (i = n; i >= 0; i--) { x = -R + 2 * R * i / n; body.lineTo(x, half(x / R, c, sn)); }
+        body.closePath();
+        var gr = g.createRadialGradient(-0.35 * R, -0.45 * R, 0.08 * R, 0, 0, 1.15 * R);
+        gr.addColorStop(0, '#B42E3C'); gr.addColorStop(0.5, '#86132A'); gr.addColorStop(1, '#520812');
+        g.fillStyle = gr; g.fill(body);
+        // the dimple: a hollow, so lit on its far side; lighter than the rim, still darker than the plasma
+        if (c > 0.12) {
+          var dr = 0.55 * R, dg = g.createLinearGradient(-dr, -dr * c, dr, dr * c);
+          dg.addColorStop(0, 'rgba(66,6,16,.85)'); dg.addColorStop(1, 'rgba(176,56,66,.8)');
+          g.globalAlpha = smooth(0.12, 0.5, c);
+          g.fillStyle = dg; g.beginPath(); g.ellipse(0, 0, dr, dr * c, 0, 0, TAU); g.fill();
+          g.globalAlpha = 1;
+        }
+        // light catching the near rim, upper left
+        g.strokeStyle = 'rgba(244,150,150,.55)'; g.lineWidth = 0.07 * R; g.lineCap = 'round';
+        g.beginPath(); g.ellipse(0, -T * 0.4 * sn, 0.84 * R, 0.84 * R * c + 0.2 * T * sn + 0.5, 0, Math.PI * 1.05, Math.PI * 1.55); g.stroke();
+        // uneven pigment, pooled darker along the outline
+        g.save(); g.clip(body);
+        g.globalAlpha = 0.32; g.fillStyle = pattern(g, TEX.mottle, 0.5, 37 * f, 11 * f); g.fillRect(-S / 2, -S / 2, S, S);
+        g.restore();
+        g.strokeStyle = 'rgba(46,4,12,.55)'; g.lineWidth = 0.045 * R; g.stroke(body);
+      });
+      // a soft bleed under it, as wet paint spreads
+      frames.push(texCanvas(S, S, function (g) {
+        g.filter = 'blur(2.5px)'; g.globalAlpha = 0.4; g.drawImage(dry, 0, 0);
+        g.filter = 'none'; g.globalAlpha = 1; g.drawImage(dry, 0, 0);
+      }));
+    }
+    TEX.cells = frames;
+    TEX.cellShadow = texCanvas(64, 32, function (g) {
+      var gr = g.createRadialGradient(32, 16, 0, 32, 16, 32);
+      gr.addColorStop(0, 'rgba(84,8,18,.6)'); gr.addColorStop(1, 'rgba(84,8,18,0)');
+      g.setTransform(1, 0, 0, 0.5, 0, 8); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    });
+  }
+
+  // A blood cell at (x, y), rr across, tumbling (tilt 0 face-on .. 1 edge-on), turned by rot, fading by a,
+  // flattened a little (sq) to sit in the plane of the river.
+  function drawCell(x, y, rr, tilt, rot, a, sq) {
+    var img = TEX.cells[Math.round(clamp(tilt, 0, 1) * (TEX.cells.length - 1))], k = rr / CELL_R;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.globalAlpha = 0.4 * a;
+    ctx.drawImage(TEX.cellShadow, x - rr * 1.05, y + rr * (0.2 + 0.25 * sq), rr * 2.3, rr * 0.9 * sq);
+    var cs = Math.cos(rot) * k * dpr, sn = Math.sin(rot) * k * dpr;
+    ctx.setTransform(cs, sn * sq, -sn, cs * sq, x * dpr, y * dpr);
+    ctx.globalAlpha = a;
+    ctx.drawImage(img, -CELL_S / 2, -CELL_S / 2);
+    ctx.globalAlpha = 1;
+  }
+
   function pattern(g, tex, scale, ox, oy) {
     var pt = g === ctx ? tex.pat || (tex.pat = ctx.createPattern(tex, 'repeat')) : g.createPattern(tex, 'repeat');
     pt.setTransform(new DOMMatrix([scale, 0, 0, scale, ox || 0, oy || 0]));
@@ -1068,36 +1142,109 @@
     return [lerp(river[i][0], river[i + 1][0], u), lerp(river[i][1], river[i + 1][1], u)];
   }
 
+  // The river, painted in layers like a wash: a soft bleed into the banks, darker plasma along the edges and
+  // lighter in the middle, uneven pigment that stays put on the river, pigment pooled along the banks, pale streaks
+  // flowing downstream, and the cells, tumbling in it.
   function drawRiverRun(r, cam, now) {
-    var R = forest.river, wid = 0.075, i, a, sc = [], left = [], right = [];
-    for (i = r.a; i <= r.b; i++) {
-      a = proj(R[i][0], FLOOR - 0.002, R[i][1], cam);
-      sc.push([a.x, a.y, a.s]);
+    var R = forest.river, wid = 0.075, i, a, sc = [], n;
+    // The river is a ribbon lying on the floor: at each point, its width runs across its course, in the floor's
+    // plane, and is seen in perspective. sc: the middle on screen, and the vector to its right bank.
+    // Only what is in front of us: the river's near end runs past the camera at the end of the scroll.
+    for (i = r.a0; i <= r.b; i++) {   // runs meet exactly at a shared point, so nothing doubles up where they join
+      if (R[i][1] - cam.z < 0.08) continue;
+      var i0 = Math.max(0, i - 1), i1 = Math.min(R.length - 1, i + 1), dx = R[i1][0] - R[i0][0], dD = R[i1][1] - R[i0][1], dl = Math.hypot(dx, dD) || 1;
+      var nx = dD / dl * wid, nD = -dx / dl * wid, mid = proj(R[i][0], FLOOR - 0.002, R[i][1], cam), mx = mid.x, my = mid.y, ms = mid.s;
+      var rb = proj(R[i][0] + nx, FLOOR - 0.002, Math.max(cam.z + 0.04, R[i][1] + nD), cam);
+      sc.push([mx, my, ms * wid, rb.x - mx, rb.y - my]);
     }
-    for (i = 0; i < sc.length; i++) { left.push(sc[i][0] - wid * sc[i][2], sc[i][1]); right.push(sc[i][0] + wid * sc[i][2], sc[i][1]); }
-    var path = new Path2D(), bank = new Path2D();
-    path.moveTo(left[0], left[1]);
-    for (i = 2; i < left.length; i += 2) path.lineTo(left[i], left[i + 1]);
-    for (i = right.length - 2; i >= 0; i -= 2) path.lineTo(right[i], right[i + 1]);
-    path.closePath();
+    n = sc.length;
+    if (n < 2) return;
+    var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (i = 0; i < n; i++) {
+      var ex = Math.abs(sc[i][3]) * 1.3, ey = Math.abs(sc[i][4]) * 1.3;
+      x0 = Math.min(x0, sc[i][0] - ex); x1 = Math.max(x1, sc[i][0] + ex); y0 = Math.min(y0, sc[i][1] - ey); y1 = Math.max(y1, sc[i][1] + ey);
+    }
+    if (x1 < 0 || x0 > W || y1 < 0 || y0 > H) return;
+    // a band k half-widths wide, shifted by dx half-widths towards the right bank
+    function band(k, dx) {
+      var p = new Path2D(), c, f;
+      dx = dx || 0;
+      for (i = 0; i < n; i++) { c = sc[i]; f = dx - k; if (i) p.lineTo(c[0] + c[3] * f, c[1] + c[4] * f); else p.moveTo(c[0] + c[3] * f, c[1] + c[4] * f); }
+      for (i = n - 1; i >= 0; i--) { c = sc[i]; f = dx + k; p.lineTo(c[0] + c[3] * f, c[1] + c[4] * f); }
+      p.closePath();
+      return p;
+    }
+    // the paint's texture is pinned to the river as a whole (forest.rf, once a frame), so the runs match up
+    var rf = forest.rf, s0 = rf.s, body = band(1);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = 'rgba(214,92,84,.92)'; ctx.fill(path);
-    ctx.globalAlpha = 0.3; ctx.fillStyle = pattern(ctx, TEX.mottle, 0.8); ctx.fill(path); ctx.globalAlpha = 1;
-    // darker along the banks, a sheen of light down the middle
-    for (i = 0; i < left.length; i += 2) { if (i) bank.lineTo(left[i], left[i + 1]); else bank.moveTo(left[i], left[i + 1]); }
-    bank.moveTo(right[0], right[1]);
-    for (i = 2; i < right.length; i += 2) bank.lineTo(right[i], right[i + 1]);
-    ctx.strokeStyle = 'rgba(110,20,28,.6)'; ctx.lineWidth = 1.5; ctx.stroke(bank);
-    // blood cells drifting with the flow
+    ctx.fillStyle = 'rgba(120,26,30,.1)'; ctx.fill(band(1.2));                                // bleed
+    ctx.fillStyle = '#A8323A'; ctx.fill(body);                                                // plasma, darker at the edges
+    ctx.fillStyle = '#D15A55'; ctx.fill(band(0.8, -0.06));
+    ctx.fillStyle = '#E07B6C'; ctx.fill(band(0.46, -0.12));                                  // lighter in the middle, towards the light
+    ctx.save(); ctx.clip(body);
+    var ox = rf.x, oy = rf.y;
+    ctx.globalAlpha = 0.34; ctx.fillStyle = pattern(ctx, TEX.mottle, s0 * 0.0022, ox, oy); ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.globalAlpha = 0.1; ctx.fillStyle = pattern(ctx, TEX.speckle, s0 * 0.004, ox + 13, oy + 7); ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    // pale streaks, carried downstream along the river's course
+    ctx.globalAlpha = 0.55; ctx.lineCap = 'round'; ctx.strokeStyle = 'rgba(255,212,196,.5)';
+    var flow = now * 0.00006;
+    for (var lane = -0.55; lane <= 0.56; lane += 0.55) {
+      ctx.setLineDash([s0 * 0.05, s0 * 0.11]); ctx.lineDashOffset = -(flow * s0 * 3 + lane * s0 * 0.4) + r.a0 * 7.3;
+      ctx.lineWidth = Math.max(0.6, s0 * 0.004);
+      ctx.beginPath();
+      for (i = 0; i < n; i++) { var lx = sc[i][0] + lane * 0.8 * sc[i][3], ly = sc[i][1] + lane * 0.8 * sc[i][4]; if (i) ctx.lineTo(lx, ly); else ctx.moveTo(lx, ly); }
+      ctx.stroke();
+    }
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    ctx.restore();
+    // pigment pooled along the banks (just the banks: the ends of a run are where the next one joins)
+    var banks = new Path2D();
+    [-1, 1].forEach(function (side) {
+      for (i = 0; i < n; i++) { var c = sc[i]; if (i) banks.lineTo(c[0] + c[3] * side, c[1] + c[4] * side); else banks.moveTo(c[0] + c[3] * side, c[1] + c[4] * side); }
+    });
+    ctx.strokeStyle = 'rgba(94,14,28,.5)'; ctx.lineWidth = Math.max(1, s0 * 0.003); ctx.stroke(banks);
+    // blood cells drifting with the flow, far ones first; some deeper in the plasma than others
+    var list = [];
     for (var j = 0; j < forest.cells.length; j++) {
       var bc = forest.cells[j], t = (bc.t + now * 0.000012 * bc.v) % 1, fi = t * (R.length - 1);
-      if (fi < r.a0 || fi >= r.b) continue;
-      var at = riverAt(R, t), q2 = proj(at[0] + bc.off * wid, FLOOR - 0.003, at[1], cam), rr = 0.022 * q2.s, squash = clamp((FLOOR - cam.y) / q2.den, 0.15, 1);
-      ctx.fillStyle = '#7A0E1A';
-      ctx.beginPath(); ctx.ellipse(q2.x, q2.y, rr, rr * squash, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = 'rgba(160,36,46,.8)';
-      ctx.beginPath(); ctx.ellipse(q2.x, q2.y, rr * 0.45, rr * 0.45 * squash, 0, 0, TAU); ctx.fill();
+      if (fi >= r.a0 && fi < r.b && riverAt(R, t)[1] - cam.z > 0.1) list.push([fi, bc, t]);
     }
+    list.sort(function (p1, p2) { return p2[0] - p1[0] || p2[1].d - p1[1].d; });
+    for (j = 0; j < list.length; j++) {
+      var c = list[j][1], at = riverAt(R, list[j][2]), q2 = proj(at[0] + c.off * wid, FLOOR - 0.003, at[1], cam);
+      var squash = clamp((FLOOR - cam.y) / q2.den, 0.15, 1), ph = c.ph + now * 0.0007 * c.spin;
+      drawCell(q2.x, q2.y, 0.024 * q2.s * c.size, Math.abs(Math.sin(ph)), c.rot + 0.4 * Math.sin(ph * 0.5), 1 - 0.45 * c.d, 0.55 + 0.45 * squash);
+    }
+  }
+
+  // the capillary of the deep plexus, a tube winding among the lower branches, painted the same way, its cells
+  // seen through its wall
+  function drawTube(r, cam, now) {
+    var tb = forest.tube, pts = tb.pts, i, sc = [], n = pts.length;
+    for (i = r.a; i <= r.b; i++) { var a = proj(pts[i][0], pts[i][1], pts[i][2], cam); sc.push([a.x, a.y, tb.R * a.s * pts[i][3]]); }
+    function off(k, side) {
+      return sc.map(function (c, m) {
+        var i0 = Math.max(0, m - 1), i1 = Math.min(sc.length - 1, m + 1), tx = sc[i1][0] - sc[i0][0], ty = sc[i1][1] - sc[i0][1], tl = Math.hypot(tx, ty) || 1;
+        return [c[0] + ty / tl * c[2] * side, c[1] - tx / tl * c[2] * side, c[2] * k];
+      });
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var path = new Path2D(); taper(path, sc.map(function (c) { return [c[0], c[1], c[2] * 1.25]; })); ctx.fillStyle = 'rgba(120,26,30,.14)'; ctx.fill(path);
+    path = new Path2D(); taper(path, sc.map(function (c) { return [c[0], c[1], c[2] + Math.max(0.6, c[2] * 0.12)]; })); ctx.fillStyle = '#7A1622'; ctx.fill(path);
+    path = new Path2D(); taper(path, sc); ctx.fillStyle = '#C24A4C'; ctx.fill(path);
+    path = new Path2D(); taper(path, off(0.55, 0.2)); ctx.fillStyle = 'rgba(226,116,104,.85)'; ctx.fill(path);
+    var list = [];
+    for (var j = 0; j < tb.cells.length; j++) {
+      var fi = ((tb.cells[j].t + now * 0.00005) % 1) * (n - 1);
+      if (fi >= r.a0 && fi < r.b) list.push([fi, tb.cells[j]]);
+    }
+    list.sort(function (p1, p2) { return p2[0] - p1[0]; });
+    for (j = 0; j < list.length; j++) {
+      var k = clamp(Math.floor(list[j][0]) - r.a, 0, sc.length - 1), c = sc[k], tc = list[j][1], ph = tc.ph + now * 0.0008;
+      drawCell(c[0], c[1], c[2] * 0.75, Math.abs(Math.sin(ph)), tc.rot, 0.9, 1);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    path = new Path2D(); taper(path, off(0.14, 0.5)); ctx.fillStyle = 'rgba(255,214,200,.5)'; ctx.fill(path);   // the light on the wall, over the cells
   }
 
   // a slanting shaft of light, from the roof down to a pool on the floor
@@ -1130,27 +1277,6 @@
     ctx.globalCompositeOperation = 'source-over';
   }
 
-  // the capillary of the deep plexus, a tube winding among the lower branches: plasma, and dark cells in it
-  function drawTube(r, cam, now) {
-    var tb = forest.tube, pts = tb.pts, i, sc = [], n = pts.length;
-    for (i = r.a; i <= r.b; i++) { var a = proj(pts[i][0], pts[i][1], pts[i][2], cam); sc.push([a.x, a.y, tb.R * a.s * pts[i][3]]); }
-    var outl = sc.map(function (c) { return [c[0], c[1], c[2] + Math.max(0.6, c[2] * 0.14)]; }), hi = [];
-    for (i = 0; i < sc.length; i++) {
-      var i0 = Math.max(0, i - 1), i1 = Math.min(sc.length - 1, i + 1), tx = sc[i1][0] - sc[i0][0], ty = sc[i1][1] - sc[i0][1], tl = Math.hypot(tx, ty) || 1;
-      hi.push([sc[i][0] + ty / tl * sc[i][2] * 0.45, sc[i][1] - tx / tl * sc[i][2] * 0.45, sc[i][2] * 0.15]);
-    }
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    var path = new Path2D(); taper(path, outl); ctx.fillStyle = '#7A1622'; ctx.fill(path);
-    path = new Path2D(); taper(path, sc); ctx.fillStyle = '#D9675C'; ctx.fill(path);
-    for (var j = 0; j < tb.cells.length; j++) {
-      var fi = ((tb.cells[j] + now * 0.00005) % 1) * (n - 1);
-      if (fi < r.a0 || fi >= r.b) continue;
-      var k = Math.floor(fi) - r.a, c = sc[clamp(k, 0, sc.length - 1)];
-      ctx.fillStyle = '#7A0E1A';
-      ctx.beginPath(); ctx.ellipse(c[0], c[1], c[2] * 0.75, c[2] * 0.55, 0, 0, TAU); ctx.fill();
-    }
-    path = new Path2D(); taper(path, hi); ctx.fillStyle = 'rgba(255,214,200,.55)'; ctx.fill(path);
-  }
 
   // The boat: a red blood cell, round and dished, riding the river, and sitting in it our eye, small, looking around.
   // Crisp, like a cel-animated character over the painted ground.
@@ -1214,7 +1340,9 @@
     var view = A / 2, rnd = rng(SEED + 1), i;
     var river = makeRiver([[0.55, 1.02], [0.05, 1.28], [-0.1, 1.7], [0.25, 2.4], [0.45, 3.4], [-0.1, 5], [-0.55, 7.5], [0.15, 11], [0.6, 16], [0.1, 26]]);
     var cells = [];
-    for (i = 0; i < 70; i++) cells.push({ t: rnd(), v: 0.6 + rnd() * 0.8, off: (rnd() - 0.5) * 1.4 });
+    var crnd = rng(SEED + 21);
+    for (i = 0; i < 70; i++) cells.push({ t: rnd(), v: 0.6 + rnd() * 0.8, off: (rnd() - 0.5) * 1.1,
+      d: crnd(), ph: crnd() * TAU, spin: 0.5 + crnd(), rot: (crnd() - 0.5) * 1.2, size: 0.85 + crnd() * 0.3 });
     var tubeCtrl = [[3.2, 0.2, 1.5], [1.0, 0.17, 2.3], [0.2, 0.15, 3.6], [-0.7, 0.16, 5.4], [-1.2, 0.18, 8], [-0.6, 0.17, 12], [0.2, 0.16, 18]], tpts = [];
     for (i = 0; i < tubeCtrl.length - 1; i++) {
       var a = tubeCtrl[Math.max(0, i - 1)], b = tubeCtrl[i], c = tubeCtrl[i + 1], d = tubeCtrl[Math.min(tubeCtrl.length - 1, i + 2)];
@@ -1223,7 +1351,7 @@
     tpts.push(tubeCtrl[tubeCtrl.length - 1].slice());
     tpts.forEach(function (pt, j) { pt[3] = 1 - 0.85 * smooth(0.8, 1, j / (tpts.length - 1)); });
     var tcells = [];
-    for (i = 0; i < 9; i++) tcells.push((i + rnd() * 0.6) / 9);
+    for (i = 0; i < 9; i++) tcells.push({ t: (i + rnd() * 0.6) / 9, ph: crnd() * TAU, rot: (crnd() - 0.5) * 1.4 });
     // the grove at the end: rods and cones close enough to be trees, either side of the river
     var grove = [[-0.12, 1.14, 0], [0.16, 1.17, 1], [-0.24, 1.26, 1], [0.27, 1.3, 0], [-0.17, 1.47, 0], [0.36, 1.48, 1], [-0.36, 1.55, 0], [0.12, 1.62, 1], [-0.18, 1.66, 0], [0.24, 1.2, 0]]
       .map(function (g) { return { x: g[0] * Math.max(1, view / 0.75), D: g[1], cone: !!g[2], nuc: lerp(0.34, OLM - 0.04, rnd()) }; });
@@ -1313,6 +1441,8 @@
     while (!forest.veil || forest.planes.length < SLICES.length) paintNext();   // we got here before the slices were painted: finish them now
     rollC = 1; rollS = 0;
     if (SKIP.indexOf('planes') < 0) drawBackdrop(cam);
+    var ref = proj(0, FLOOR, cam.z + 2, cam);
+    forest.rf = { x: ref.x, y: ref.y, s: ref.s * 0.6 };
     var T = PT, i;
     queue.length = 0;
     forest.planes.forEach(function (pl) { queue.push({ D: pl.D, k: 0, pl: pl }); });
@@ -1614,6 +1744,7 @@
   };
 
   makeTextures();
+  paintCells();
   makeGrain();
   layout();
   requestAnimationFrame(frame);
