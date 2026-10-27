@@ -1148,26 +1148,39 @@
     }
     return runs;
   }
-  // The veil: the roof all around us just after the cut, dense and dark; it slides up and away as we drop out of it.
-  // Painted in world units at a fixed depth, just behind where the forest camera starts.
+  // The veil: the roof all around us just after the cut, seen from right inside it: the same leafy mass of cell
+  // bodies as the forest's roof, dense above, thinning into hanging clusters below, with dendrites dangling from
+  // them. It slides up and away as we drop out of it. Painted in world units at a fixed depth.
   function paintVeil(rnd) {
-    var g = { ink: new Ink(), gang: new Ink(), glia: new Ink() }, x, i, k = 1;
-    minInk = 0.0015;
-    for (i = 0; i < 70; i++) {
-      var Y = -0.92 - Math.pow(rnd(), 1.3) * 0.55, ph = rnd() * TAU, pts = [];
-      for (var s2 = 0; s2 <= 30; s2++) { var xx = lerp(-0.7, 0.7, s2 / 30); pts.push([xx, Y + 0.012 * Math.sin(xx * 9 + ph), 0.004 + rnd() * 0.006]); }
-      g.ink.taper(pts);
+    var dark = new Ink(), mid = new Ink(), lite = new Ink(), ink = new Ink(), glia = new Ink(), x, y, i, j;
+    wob = rnd; wobble = 0.3; minInk = 0.0012;
+    // the mass: rows of cells, packed tight up top, more gaps further down
+    for (y = -1.46; y < -0.9; y += 0.028) {
+      var gap = smooth(-1.2, -0.9, y) * 0.45;
+      for (x = -0.72 - rnd() * 0.04; x < 0.72;) {
+        var r = (0.022 + rnd() * 0.026) * (1 - 0.3 * smooth(-1.3, -0.9, y));
+        if (rnd() > gap) (y < -1.25 ? dark : rnd() < 0.55 ? mid : lite).blob(x, y + (rnd() - 0.5) * 0.03, r, -Math.PI / 2 + (rnd() - 0.5), 0.15 + rnd() * 0.4);
+        x += r * (1.2 + rnd() * 0.8);
+      }
     }
-    for (x = -0.68; x < 0.68; x += 0.03 + rnd() * 0.03) {
-      var gy = -0.86 + (rnd() - 0.5) * 0.12;
-      g.gang.blob(x, gy, 0.018 + rnd() * 0.02, -Math.PI / 2, 0.6);
-      grow(g.ink, { step: 0.01, wiggle: 0.35, taper: 0.45, spread: 0.8, lenK: 0.6, wK: 0.65, depth: 3, pull: Math.PI / 2, pullK: 0.04 }, rnd, x, gy, Math.PI / 2 + (rnd() - 0.5), 0.08 + rnd() * 0.06, 0.004, 0);
+    // clusters hanging below it, each a few cells on a stalk, with dendrites dangling
+    var DEN = { step: 0.008, wiggle: 0.35, taper: 0.4, spread: 0.7, lenK: 0.6, wK: 0.65, depth: 2, pull: Math.PI / 2, pullK: 0.05 };
+    for (x = -0.68; x < 0.68; x += 0.05 + rnd() * 0.09) {
+      var hy = -0.92 + (rnd() - 0.5) * 0.04, n = 1 + Math.floor(rnd() * 3), hx = x;
+      for (j = 0; j < n; j++) {
+        hx += (rnd() - 0.5) * 0.02; hy += 0.03 + rnd() * 0.02;
+        (rnd() < 0.5 ? mid : lite).blob(hx, hy, 0.018 + rnd() * 0.012, -Math.PI / 2 + (rnd() - 0.5) * 0.6, 0.3 + rnd() * 0.4);
+      }
+      if (rnd() < 0.7) grow(ink, DEN, rnd, hx, hy + 0.01, Math.PI / 2 + (rnd() - 0.5) * 0.8, 0.06 + rnd() * 0.08, 0.0035, 0);
     }
-    for (x = -0.6; x < 0.6; x += 0.2 + rnd() * 0.15) g.glia.taper([[x, -1.4, 0.0035], [x + (rnd() - 0.5) * 0.03, -0.75, 0.0028], [x + (rnd() - 0.5) * 0.04, -0.58, 0]]);
-    minInk = 0;
+    // a few Müller cells' end feet, pale stems coming down out of it
+    for (x = -0.6; x < 0.6; x += 0.22 + rnd() * 0.16) glia.taper([[x, -1.2, 0.0035], [x + (rnd() - 0.5) * 0.03, -0.8, 0.0028], [x + (rnd() - 0.5) * 0.04, -0.6, 0]]);
+    wobble = 0; minInk = 0;
     var box = [-0.72, -1.5, 0.72, -0.5], qpx = Math.min(1600, H * 1.6) / (box[3] - box[1]), cv = document.createElement('canvas');
     cv.width = Math.ceil((box[2] - box[0]) * qpx); cv.height = Math.ceil((box[3] - box[1]) * qpx);
-    [[g.glia, '#5E6488'], [g.ink, '#2A1218'], [g.gang, '#5A2238']].forEach(function (w) { wash(cv, w[0].path, w[1], mix(w[1], '#0A0406', 0.5), qpx, box, 0.006); });
+    [[glia, '#5E6488', 0.3], [lite, '#7E3C56', 0.2], [mid, '#5C2440', 0.2], [ink, '#2A1218', 0.35], [dark, '#3A1424', 0.15]].forEach(function (w) {
+      wash(cv, w[0].path, w[1], mix(w[1], '#0A0406', 0.5), qpx, box, 0.006, w[2]);
+    });
     paper(cv, 0.6);
     forest.veil = settle({ z: -0.22, img: cv, box: box });
   }
