@@ -1427,7 +1427,8 @@
   }
 
   // ---------- update: scroll, pointer, the eye's own life ----------
-  var heroCopy = document.getElementById('hero-copy'), worldCopy = document.getElementById('world-copy'), paperEl = document.querySelector('.paper');
+  var heroCopy = document.getElementById('hero-copy'), flatBox = document.getElementById('dive-flat'), paperEl = document.querySelector('.paper');
+  var track = document.querySelector('.track');
   var flatBtn = document.getElementById('flat');
   function fade(el, v) {
     v = Math.round(v * 100) / 100;
@@ -1436,9 +1437,13 @@
     el.style.opacity = v;
     el.style.visibility = v > 0 ? 'visible' : 'hidden';
   }
+  // Scrolling through the track flies the camera from the eye to the forest at rest, arriving as the track's end
+  // reaches the bottom of the screen; then, while the page's sections scroll over it, it goes on, slowly, deeper in.
   function scrollP() {
-    var max = document.documentElement.scrollHeight - window.innerHeight;
-    return max > 0 ? clamp(window.scrollY / max, 0, 1) : 0;
+    var y = window.scrollY, vh = window.innerHeight, end = Math.max(1, track.offsetTop + track.offsetHeight - vh);
+    if (y <= end) return P_REST * y / end;
+    var max = document.documentElement.scrollHeight - vh;
+    return P_REST + (1 - P_REST) * clamp((y - end) / Math.max(1, max - end), 0, 1);
   }
 
   var shown = null, swapAt = 0;
@@ -1490,7 +1495,7 @@
 
     fade(heroCopy, 1 - smooth(0.008, 0.045, p));
     fade(paperEl, smooth(P_PUPIL, P_GLOW + 0.03, p));
-    fade(worldCopy, smooth(0.94, 0.99, p));
+    fade(flatBox, smooth(P_CUT + 0.04, P_CUT + 0.1, p) * (1 - smooth(P_REST + 0.008, P_REST + 0.02, p)));   // only while the forest is in full view
   }
 
   // ---------- setup ----------

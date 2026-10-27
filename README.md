@@ -14,7 +14,7 @@ Static site, no build step. Everything that gets deployed is in `public/`.
 - `public/favicon.svg`, `favicon-32.png`, `apple-touch-icon.png`, `og-image.png`
 - `assets-source/`: the full asset library from the deck. **Not deployed**, because it contains images with unclear licenses (see its README)
 - `tools/og.html`: source of the Open Graph image (screenshot at 1200×630)
-- `lab/`: experiments, not deployed. `lab/dive/` is the multiplane prototype: the eye, a fall through the retina's layers, a cut in the canopy, and a watercolour forest of retinal cells. Open `lab/dive/index.html` and scroll.
+- `lab/`: experiments, not deployed. `lab/dive/` is the multiplane prototype: the eye, a fall through the retina's layers, a cut in the canopy, and a watercolour forest of retinal cells, with the site's sections (copied from `public/index.html`, using its `styles.css` and `main.js`) scrolling over the forest as paper panels. Open `lab/dive/index.html` and scroll. Its API key form never sends anything.
   - `?p=0.66` holds the camera at a point of the scroll, `?px=&py=` holds the pointer (-1..1), `?flat` flattens the layers, `?debug` shows timings, `?skip=slices,planes,veil,rays,river,trunks,boat` leaves parts out
   - in the console: `__dive.bench(p)` times a frame at a point, `__dive.seek(p, px, py)` moves the camera, `__dive.pause()` and `__dive.frameAt(p, px, py, ms, flat)` draw frames on a fixed clock, for recording
 - `tools/make_keyframe_template.py`: writes the blank keyframe sheet `lab/dive/keyframes/keyframe-sheet.ora` (layered, opens in Krita) and a PNG preview
