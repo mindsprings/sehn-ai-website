@@ -1465,7 +1465,11 @@
       var keep = p, t0, i;
       n = n || 20; p = pp; t0 = performance.now();
       for (i = 0; i < n; i++) render(t0 + i * 16);
-      ctx.getImageData(0, 0, 1, 1);
+      // wait for the drawing to finish by copying a pixel into a tiny canvas and reading that: reading the stage
+      // itself back would make the browser take it off the GPU, and every frame after would be slow
+      var one = this.one || (this.one = document.createElement('canvas').getContext('2d', { willReadFrequently: true }));
+      one.drawImage(canvas, 0, 0, 1, 1, 0, 0, 1, 1);
+      one.getImageData(0, 0, 1, 1);
       var ms = (performance.now() - t0) / n;
       p = keep;
       return Math.round(ms * 100) / 100;
