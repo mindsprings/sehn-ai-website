@@ -148,6 +148,9 @@
   // The thinnest a stroke may get, in drawing units, set per layer so that every twig stays visible:
   // Cajal inked every last branch, and that is what makes his cells dense.
   var minInk = 0;
+  // Where the cells are, for the plate's labels: while a slice paints, each cell marks its body (in the slice's units).
+  var marks = null;
+  function mark(k, x, y) { if (marks) marks.push({ k: k, x: x, y: y }); }
 
   // Grow a dendrite: a wandering stroke that thins out, sprouts spines and side branches, then forks.
   function grow(ink, o, rnd, x, y, ang, len, w, depth) {
@@ -850,6 +853,7 @@
     ink.taper([[x, isTop, fw * 1.4], [x + sw * 0.3, ny, fw], [x + sw, ft, fw * 0.9]]);
     ink.dot(x + sw * 0.3, ny, w * (cone ? 1.1 : 0.9));
     if (cone) ink.tri(x + sw, ft + w * 0.15, w * 0.7); else ink.dot(x + sw, ft, w * 0.4);
+    mark(cone ? 'C' : 'R', x, cone ? osTop - is * 0.4 : (osTop + fl) / 2);   // a cone's swelling, a rod's stack of discs
     return { x: x + sw, y: ft };
   }
 
@@ -865,6 +869,7 @@
     g.ink.taper([[x, sy, 0.0045 * k * sc], [x + wob * 0.5, (sy + top) / 2, 0.0038 * k * sc], [x + wob, top, 0.003 * k * sc]]);
     grow(g.ink, { step: 0.012 * k, wiggle: 0.6, taper: 0.3, spread: 0.9, lenK: 0.55, wK: 0.6, depth: 2 }, rnd, x + wob, top, -Math.PI / 2, 0.04 * k * sc, 0.0022 * k * sc, 0);
     g.lamp.blob(x, sy, 0.018 * k * sc, -Math.PI / 2, 0.6);
+    mark('Bc', x, sy);
   }
 
   // A horizontal cell: lower branches spreading wide from the foot of a tree, drooping, with tufts down to the
@@ -878,6 +883,7 @@
     var drop = { step: 0.012 * k, wiggle: 0.4, taper: 0.3, spread: 0.7, lenK: 0.5, wK: 0.6, depth: 1, pull: Math.PI / 2, pullK: 0.1 };
     for (j = 0; j < 2 + lod; j++) grow(g.ink, drop, rnd, x + (rnd() - 0.5) * 0.3 * k * sc, y + 0.01 * k, Math.PI / 2, 0.07 * k, 0.0025 * k, 0);
     g.gang.blob(x, y - 0.012 * k, 0.015 * k * sc, 0, 0.3);
+    mark('Hc', x, y - 0.012 * k);
   }
 
   // An amacrine cell: branches rising into the canopy and spreading flat, a lacy crown with tufts of foliage.
@@ -892,6 +898,7 @@
       grow(g.ink, o, rnd, x, y, -Math.PI / 2 + side * (0.3 + rnd() * 0.7), (0.12 + rnd() * 0.14) * k * sc, 0.004 * k * sc, 0);
     }
     g.gang.blob(x, y, 0.016 * k * sc, -Math.PI / 2, 0.5);
+    mark('Ac', x, y);
   }
 
   // One tree of the strange forest, built the way the retina is: a cone for its trunk, horizontal cells for its
@@ -917,6 +924,7 @@
     var ay = (ILM - 0.02 - rnd() * 0.06) * k;
     g.ink.taper([[x, y, 0.005 * k], [x + dir * 0.015 * k, ay + 0.03 * k, 0.004 * k], [x + dir * 0.06 * k, ay, 0.003 * k], [x + dir * 0.14 * k, ay - 0.015 * k, 0]]);
     g.gang.blob(x, y, (0.022 + rnd() * 0.012) * k, -Math.PI / 2, 0.7);
+    mark('Gc', x, y);
   }
 
   // The roof seen from inside: the ganglion cells' bodies packed along it like clumps of leaves, three rows deep,
@@ -967,6 +975,7 @@
       g.glia.taper(cp);
       g.glia.dot(ex, OLM * k, 0.006 * k);
     }
+    mark('Mg', bx, lerp(split, OLM * k, 0.4));   // among its lifted roots
   }
 
   // A slice is painted in small steps, queued on forest.steps, so the page stays smooth while it grows:
@@ -978,11 +987,12 @@
       if (frame && Math.abs(x) < view * (wide ? 0.62 : 0.45)) return true;
       return Math.abs(x - S.rx) < (wide ? 0.3 : 0.09) * k * (0.8 + rnd() * 0.4);
     }
-    function ink(on) { minInk = on ? 0.7 / S.qpx : 0; wobble = on ? 0.35 : 0; if (on) wob = S.wob; }
+    function ink(on) { minInk = on ? 0.7 / S.qpx : 0; wobble = on ? 0.35 : 0; if (on) wob = S.wob; marks = on ? S.marks : null; }
     return [
       function layout() {
         g = S.g = { pr: new Ink(), rod: new Ink(), seg: new Ink(), glia: new Ink(), ink: new Ink(), lamp: new Ink(), gang: new Ink(), leaf: new Ink(), leafLow: new Ink(),
           roofA: new Ink(), roofB: new Ink(), roofC: new Ink(), ground: new Ink(), lumps: new Ink(), discs: lod > 1 ? new Path2D() : null };
+        S.marks = [];
         // keep an avenue open along the river, wide for the trees, narrow for the rods and cones on its banks
         S.rx = riverX(D) * k;
         // fine where we come close, coarser where it gets blurred anyway: far off, and right in front of us
@@ -1079,6 +1089,8 @@
         }
         forest.planes.push({ D: D, items: [settle({ img: cv, box: S.box })] });
         forest.planes.sort(function (a, b) { return b.D - a.D; });
+        // the cells the plate may name: not in the blurred frame right in front of us, nor so far off they are specks
+        if (!frame && D < 5) S.marks.forEach(function (m) { addMark(m.k, { x: m.x * D, Y: m.y * D, D: D }); });
         S = null; g = null;
       }
     ];
@@ -1408,7 +1420,13 @@
     [[13, 1], [7.5, 2], [4.4, 1], [2.7, 1], [1.9, 1]].forEach(function (r) {
       for (i = 0; i < r[1]; i++) rays.push({ D: r[0] * (0.82 + rnd() * 0.12), x: lerp(-view, view, rnd()) * r[0] * 0.9, w: (0.22 + rnd() * 0.3) * Math.sqrt(r[0] / 3), slant: 0.32, a: 0.5 + rnd() * 0.25 });
     });
-    forest = { planes: [], steps: [], rnd: rnd, view: view, river: river, cells: cells, tube: { pts: tpts, R: 0.02, cells: tcells }, grove: grove, rays: rays, boat: { t: 0.5 } };
+    forest = { planes: [], steps: [], rnd: rnd, view: view, river: river, cells: cells, tube: { pts: tpts, R: 0.02, cells: tcells }, grove: grove, rays: rays, boat: { t: 0.5 }, markBy: {} };
+    // for the plate: what is not painted into the slices (the slices add their cells as they are painted)
+    grove.forEach(function (t) { addMark(t.cone ? 'C' : 'R', { x: t.x, Y: t.cone ? 0.73 : 0.8, D: t.D }); });
+    for (i = 0; i < tpts.length; i += 6) addMark('Cap', { x: tpts[i][0], Y: tpts[i][1], D: tpts[i][2] });
+    for (i = 0; i < river.length; i += 4) addMark('Cap', { x: river[i][0], Y: FLOOR, D: river[i][1] });
+    cells.forEach(function (c) { addMark('Rbc', { cell: c }); });
+    addMark('S', { boat: true });
     // what there is to paint, in order: the veil we meet first, the slices far to near, then the grove's trunks
     forest.steps.push.apply(forest.steps, veilSteps(rnd));
     SLICES.forEach(function (D) { forest.steps.push.apply(forest.steps, sliceSteps(D, view)); });
@@ -1545,6 +1563,178 @@
     }
   }
 
+  // ---------- the plate ----------
+  // Cajal labelled his plates: the layers numbered down a margin, the cells named by abbreviations in the margins,
+  // each with a dotted leader to one or two of the cells it names. Here, over the forest: the layers down the left,
+  // and down the right a few cells, picked among those in view and followed as we move, so the labels stay put on
+  // the glass while the leaders reach into the depth. Drawn in SVG over the canvas, so the type stays sharp.
+  var SVGNS = 'http://www.w3.org/2000/svg', plateEl = document.getElementById('plate'), plate = null;
+  var KINDS = [['Gc', 'ganglion cell'], ['Ac', 'amacrine cell'], ['Bc', 'bipolar cell'], ['Hc', 'horizontal cell'], ['Mg', 'Müller glia'],
+    ['C', 'cones', 2], ['R', 'rods', 2], ['Cap', 'capillary'], ['Rbc', 'red blood cell'], ['S', 'sehn']];
+  var LAYERS = [['I', 'ganglion cells', ILM, -0.7], ['II', 'inner plexiform', -0.7, -0.38], ['III', 'inner nuclear', -0.38, 0.1],
+    ['IV', 'outer plexiform', 0.1, 0.27], ['V', 'outer nuclear', 0.27, OLM], ['VI', 'rods and cones', OLM, FLOOR]];
+  var PLATE_TOP = 84;   // below the site's header
+  function addMark(k, m) { (forest.markBy[k] = forest.markBy[k] || []).push(m); }
+  function svgEl(name, cls, parent) {
+    var e = document.createElementNS(SVGNS, name);
+    if (cls) e.setAttribute('class', cls);
+    parent.appendChild(e);
+    return e;
+  }
+  function attr(e, k, v) { if (e['_' + k] !== v) { e['_' + k] = v; e.setAttribute(k, v); } }
+  function buildPlate() {
+    var narrow = W < 600;   // on a phone, the names alone: there is no room for a legend
+    plateEl.textContent = '';
+    plate = { kinds: [], layers: [], at: 0, shown: -1, narrow: narrow };
+    LAYERS.forEach(function (L) {
+      var o = { brk: svgEl('path', 'brk', plateEl), rn: svgEl('text', 'rn', plateEl), nm: narrow ? null : svgEl('text', 'nm', plateEl) };
+      o.rn.textContent = L[0] + '.';
+      if (o.nm) o.nm.textContent = L[1];
+      plate.layers.push(o);
+    });
+    KINDS.forEach(function (K) {
+      var g = svgEl('g', '', plateEl), o = { k: K[0], n: K[2] || 1, g: g, leads: [], picks: [], qs: [], a: 0, y: -1, w: 0, retry: 0 };
+      for (var i = 0; i < o.n; i++) o.leads.push([svgEl('path', 'halo', g), svgEl('path', 'lead', g)]);
+      o.text = svgEl('text', 'lab', g);
+      if (!narrow) svgEl('tspan', 'ab', o.text).textContent = K[0] + ' ';
+      svgEl('tspan', 'nm', o.text).textContent = K[1];
+      attr(o.text, 'text-anchor', 'end');
+      g.style.opacity = 0;
+      plate.kinds.push(o);
+    });
+  }
+  // where a mark is on screen now (cells and the boat move along the river)
+  var MP = { x: 0, y: 0, den: 0 };
+  function markAt(m, cam, now) {
+    var q, at;
+    if (m.cell) { at = riverAt(forest.river, (m.cell.t + now * 0.000012 * m.cell.v) % 1); q = proj(at[0] + m.cell.off * 0.075, FLOOR - 0.005, at[1], cam); }
+    else if (m.boat) { at = riverAt(forest.river, forest.boat.t); q = proj(at[0], FLOOR - 0.03, at[1], cam); }
+    else q = proj(m.x, m.Y, m.D, cam);
+    MP.x = q.x; MP.y = q.y; MP.den = q.den;
+    return MP;
+  }
+  function inView(q, cam) {
+    if (!(q.den > 0.32 && q.x > W * 0.06 && q.x < plate.xMax && q.y > PLATE_TOP + 8 && q.y < plate.floor - 12)) return false;
+    // not behind what is nearer: the blurred frame's trees (only at its sides), or a trunk of the grove
+    var x = q.x, y = q.y, den = q.den, df = SLICES[SLICES.length - 1] - cam.z, i, t, dt;
+    if (df > 0.3 && den > df && Math.abs(x - C.x) > 0.62 * forest.view * H * SLICES[SLICES.length - 1] / df) return false;
+    for (i = 0; i < forest.grove.length; i++) {
+      t = forest.grove[i]; dt = t.D - cam.z;
+      if (dt < 0.12 || dt > den) continue;
+      // a thin fibre from its top, the inner segment (a cone's swelling), then the slim outer segment
+      var tp = proj(t.x, 0.235, t.D, cam), top = tp.y, tx = tp.x, is0 = proj(t.x, 0.63, t.D, cam).y, is1 = proj(t.x, 0.8, t.D, cam).y;
+      if (y > top && Math.abs(x - tx) < (y > is0 && y < is1 && t.cone ? 0.024 : 0.009) * F / dt) return false;
+    }
+    return true;
+  }
+  var FIRST = { S: 0.35, Rbc: 0.6, Cap: 0.8 };   // the boat, its cells and its river are named first
+  // the best of a kind in view: near but not too near, in the front slice where nothing else covers it, and
+  // towards the right, so the leader stays short; for two, two well apart
+  function pick(o, cam, now) {
+    var list = forest.markBy[o.k] || [], best = [], i, q;
+    for (i = 0; i < list.length; i++) {
+      q = markAt(list[i], cam, now);
+      if (!inView(q, cam)) continue;
+      best.push([-Math.abs(Math.log(q.den / 1.3)) + 0.6 * q.x / W + (list[i].D < 2 ? 0.4 : 0), list[i], q.x]);
+    }
+    best.sort(function (a, b) { return b[0] - a[0]; });
+    o.picks = [];
+    for (i = 0; i < best.length && o.picks.length < o.n; i++) {
+      if (o.picks.length && Math.abs(best[i][2] - o.px) < W * 0.06) continue;
+      o.picks.push(best[i][1]); o.px = best[i][2];
+    }
+    o.la = 0;
+  }
+  function drawPlate(cam, now) {
+    if (!plate) buildPlate();
+    var dt = plate.at ? clamp((now - plate.at) / 1000, 0, 0.1) : 0.016, show = SKIP.indexOf('plate') < 0 ? smooth(P_CUT + 0.07, P_CUT + 0.13, p) : 0;
+    plate.at = now;
+    show = Math.round(show * 100) / 100;
+    if (show !== plate.shown) { plate.shown = show; plateEl.style.opacity = show; plateEl.style.visibility = show > 0 ? 'visible' : 'hidden'; }
+    if (show <= 0) return;
+    var xr = W - 16, maxW = 0, act = [], i, j, o, q, ease = fixedP != null ? 1 : 1 - Math.exp(-dt * 10);
+    plate.kinds.forEach(function (o) { if (!o.w) o.w = o.text.getComputedTextLength(); maxW = Math.max(maxW, o.w); });
+    plate.xMax = xr - maxW - 36;
+    // at the very end the legend's paper comes up from below: the labels stay above it
+    plate.floor = legendEl ? Math.min(H, legendEl.getBoundingClientRect().top + H * 0.1) : H;
+
+    // the layers, read at a fixed distance in front of us: they slide up as we go down
+    var Dl = cam.z + 2;
+    plate.layers.forEach(function (o, i) {
+      var a = proj(0, LAYERS[i][2], Dl, cam).y + 3, b = proj(0, LAYERS[i][3], Dl, cam).y - 3;
+      a = Math.max(a, PLATE_TOP); b = Math.min(b, H - 10);
+      var on = b - a > 22, mid = Math.round((a + b) / 2);
+      attr(o.brk, 'd', on ? 'M52,' + a.toFixed(1) + 'H44V' + b.toFixed(1) + 'H52' : '');
+      attr(o.rn, 'x', 14); attr(o.rn, 'y', mid + 6); attr(o.rn, 'opacity', on ? 1 : 0);
+      if (o.nm) { attr(o.nm, 'x', 60); attr(o.nm, 'y', mid + 5); attr(o.nm, 'opacity', on ? 1 : 0); }
+    });
+
+    // the cells: keep what is picked while it stays in view, pick again when it leaves (not too often)
+    var ready = [];
+    plate.kinds.forEach(function (o) {
+      var ok = o.picks.length > 0;
+      for (j = 0; ok && j < o.picks.length; j++) if (!inView(markAt(o.picks[j], cam, now), cam)) ok = false;
+      if (!ok && now >= o.retry) { pick(o, cam, now); o.retry = now + 400; ok = o.picks.length > 0; }
+      o.on = false;
+      if (!ok) return;
+      o.qs.length = 0;
+      var ty = 0, x0 = W;
+      for (j = 0; j < o.picks.length; j++) { q = markAt(o.picks[j], cam, now); o.qs.push([q.x, q.y]); ty += q.y; x0 = Math.min(x0, q.x); }
+      o.ty = ty / o.picks.length + 5;
+      o.len = (xr - x0) * (o.a > 0.5 ? 0.7 : 1) * (FIRST[o.k] || 1);   // the ones showing hold on a little, so they do not flicker
+      ready.push(o);
+    });
+    // a few at a time, those with the shortest leaders: a plate, not a tangle
+    // (and the one named from the legend, whatever its leader)
+    ready.sort(function (a, b) { return (b.k === focusK) - (a.k === focusK) || a.len - b.len; });
+    act = ready.slice(0, plate.narrow ? 4 : 6);
+    act.forEach(function (o) { o.on = true; });
+    plate.kinds.forEach(function (o) { var f = o.k === focusK; if (o.f !== f) { o.f = f; o.g.classList.toggle('is-focus', f); } });
+    // down the margin in the order of their cells, never closer than a line apart
+    act.sort(function (a, b) { return a.ty - b.ty; });
+    var gap = 30, lo = PLATE_TOP + 14, hi = Math.min(H - 64, plate.floor - 14);   // above the flatten switch, and the legend
+    for (i = 0; i < act.length; i++) act[i].ty = Math.max(act[i].ty, i ? act[i - 1].ty + gap : lo);
+    for (i = act.length - 1; i >= 0; i--) act[i].ty = Math.min(act[i].ty, i < act.length - 1 ? act[i + 1].ty - gap : hi);
+    plate.kinds.forEach(function (o) {
+      o.a += ((o.on ? 1 : 0) - o.a) * ease;
+      o.la = o.on ? o.la + (1 - o.la) * ease : o.la;
+      var a = Math.round(o.a * o.la * 100) / 100;
+      if (o.g._a !== a) { o.g._a = a; o.g.style.opacity = a; o.g.style.visibility = a > 0 ? 'visible' : 'hidden'; }   // not display: its width is measured
+      if (!o.on) return;
+      o.y = o.y < 0 ? o.ty : o.y + (o.ty - o.y) * ease;
+      attr(o.text, 'x', xr); attr(o.text, 'y', o.y.toFixed(1));
+      var sx = (xr - o.w - 8).toFixed(1), sy = (o.y - 5).toFixed(1);
+      for (j = 0; j < o.n; j++) {
+        var d = j < o.qs.length ? 'M' + sx + ',' + sy + 'L' + o.qs[j][0].toFixed(1) + ',' + o.qs[j][1].toFixed(1) : '';
+        attr(o.leads[j][0], 'd', d); attr(o.leads[j][1], 'd', d);
+      }
+    });
+  }
+  function hidePlate() {
+    if (plate && plate.shown !== 0) { plate.shown = 0; plateEl.style.opacity = 0; plateEl.style.visibility = 'hidden'; }
+  }
+  // The legend, at the very bottom of the page: point at a line (tap it, on a phone) and its cell is named in the
+  // forest, in plum, even if it was not among the few on show.
+  var legendEl = document.querySelector('.plate-legend'), focusK = null;
+  if (legendEl) legendEl.querySelectorAll('[data-k]').forEach(function (el) {
+    var k = el.getAttribute('data-k');
+    function set(on) {
+      focusK = on ? k : focusK === k ? null : focusK;
+      legendEl.querySelectorAll('[data-k]').forEach(function (e) { e.classList.toggle('is-on', e.getAttribute('data-k') === focusK); });
+      if (plate && on) plate.kinds.forEach(function (o) { if (o.k === k) o.retry = 0; });
+      poke();
+    }
+    el.addEventListener('pointerenter', function (e) { if (e.pointerType === 'mouse') set(true); });
+    el.addEventListener('pointerleave', function (e) { if (e.pointerType === 'mouse') set(false); });
+    var by = '';   // what pressed it (a click does not say, in every browser)
+    el.addEventListener('pointerdown', function (e) { by = e.pointerType; });
+    el.addEventListener('click', function () { if (by !== 'mouse') set(focusK !== k); });
+    el.addEventListener('focus', function () { set(true); });
+    el.addEventListener('blur', function () { set(false); });
+  });
+  // the labels are measured in their own type, once it has arrived
+  if (document.fonts) document.fonts.ready.then(function () { if (plate) plate.kinds.forEach(function (o) { o.w = 0; }); });
+
   // the light from above, and the roof and the floor as two planes running off into the distance (in strips)
   // The light, the roof and the floor are soft and fill the whole screen, so they are drawn at half resolution
   // into their own canvas, then scaled up onto the stage.
@@ -1628,9 +1818,11 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     rollC = 1; rollS = 0;
-    if (p < P_PUPIL) { drawEye(eyeCam(p), now); return; }
-    if (p < P_CUT) { drawFall(fallCam(p)); return; }
-    drawForest(forestCam(p), now);
+    if (p < P_PUPIL) { hidePlate(); drawEye(eyeCam(p), now); return; }
+    if (p < P_CUT) { hidePlate(); drawFall(fallCam(p)); return; }
+    var fc = forestCam(p);
+    drawForest(fc, now);
+    drawPlate(fc, now);
     // the far side of the cut: still dark in the roof, until we drop out of it
     var dark = 1 - smooth(P_CUT, P_CUT + 0.035, p);
     if (dark > 0) {
@@ -1656,7 +1848,9 @@
   function scrollP() {
     var y = window.scrollY, vh = window.innerHeight, end = Math.max(1, track.offsetTop + track.offsetHeight - vh);
     if (y <= end) return P_REST * y / end;
-    var max = document.documentElement.scrollHeight - vh;
+    // the end is where the plate's folded legend comes in; opened, it scrolls on without moving the camera
+    var max = document.documentElement.scrollHeight - vh, sum = legendEl && legendEl.querySelector('summary');
+    if (sum) max = Math.min(max, legendEl.offsetTop + sum.offsetTop + sum.offsetHeight + 28 - vh);
     return P_REST + (1 - P_REST) * clamp((y - end) / Math.max(1, max - end), 0, 1);
   }
 
@@ -1745,6 +1939,7 @@
     var t0 = performance.now();
     fall = buildFall(rng(SEED));
     buildForest();
+    plate = null;   // laid out again for the new shape
     paintSoon();
     built = { w: W, h: H };
     buildMs = performance.now() - t0;

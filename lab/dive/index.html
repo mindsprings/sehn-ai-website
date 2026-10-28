@@ -7,9 +7,10 @@
   <meta name="robots" content="noindex">
   <meta name="theme-color" content="#0A111D">
   <link rel="icon" href="../../public/favicon.svg" type="image/svg+xml">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- the fonts are served from here: see public/assets/fonts -->
+  <link rel="preload" href="../../public/assets/fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../../public/assets/fonts/plex-sans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../../public/assets/fonts/old-standard.woff2" as="font" type="font/woff2" crossorigin>
   <!-- the site's own styles and scripts: this page is the site, with the dive in place of the hero -->
   <link rel="stylesheet" href="../../public/styles.css">
   <style>
@@ -26,6 +27,16 @@
       60% { transform: translate(-2%, -4%); } 80% { transform: translate(4%, 2%); } 100% { transform: translate(0, 0); }
     }
     .paper { position: absolute; inset: 0; mix-blend-mode: multiply; background-size: 256px 256px; opacity: 0; visibility: hidden; }
+    /* the plate: Cajal's labels over the forest, in Old Standard TT, a revival of the Modern roman of his plates;
+       each letter and dot ringed in paper, so they read over the painting, under the sheet of paper */
+    .plate { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; opacity: 0; visibility: hidden; }
+    .plate text { font-family: "Old Standard TT", "Times New Roman", serif; fill: #1E1612; paint-order: stroke; stroke: rgba(246, 236, 214, .6); stroke-width: 2.5px; stroke-linejoin: round; }
+    .plate .ab { font-size: 18px; }
+    .plate .nm { font-size: 15px; font-style: italic; }
+    .plate .rn { font-size: 19px; }
+    .plate .halo { fill: none; stroke: rgba(246, 236, 214, .5); stroke-width: 4.6; stroke-dasharray: .1 6.5; stroke-linecap: round; }
+    .plate .lead { fill: none; stroke: #1E1612; stroke-width: 2.6; stroke-dasharray: .1 6.5; stroke-linecap: round; }
+    .plate .brk { fill: none; stroke: #1E1612; stroke-width: 1.4; }
     .vignette { position: absolute; inset: 0; background: radial-gradient(120% 95% at 50% 45%, transparent 58%, rgba(6, 8, 14, .55) 100%); }
     @media (prefers-reduced-motion: reduce) { .grain { animation: none; } }
 
@@ -59,11 +70,36 @@
     .over .section--dark-left > .wrap { background: rgba(10, 17, 29, .9); }
     .over .section--plum > .wrap { background: rgba(110, 42, 71, .93); }
     .over .evidence, .over .contact { padding-top: 0; }
-    .site-footer-wrap { position: relative; z-index: 2; padding-bottom: 46vh; }   /* room at the end for the river, and whoever is on it */
+    .site-footer-wrap { position: relative; z-index: 2; padding-bottom: 34vh; }   /* room at the end for the river, and whoever is on it */
     .site-footer-wrap .footer { background: none; padding: 0; }
     .site-footer-wrap .footer > .wrap { padding-top: 56px; padding-bottom: 56px; border-radius: 24px; background: rgba(10, 17, 29, .9); }
-    .footer .credits { max-width: 40em; margin: 24px auto 0; font-family: var(--sans); text-transform: none; letter-spacing: 0; font-size: 15px; line-height: 1.5; color: var(--on-dark-2); }
+    .footer .credits { max-width: 40em; margin: 24px auto 0; font-family: var(--label); font-style: italic; text-transform: none; letter-spacing: 0; font-size: 17px; line-height: 1.5; color: var(--on-dark-2); }
     .footer .credits a { color: var(--on-dark); }
+    /* past the footer, the plate's lower margin: the forest fades into paper, and a folded explanation of the plate */
+    .plate-legend { position: relative; z-index: 2; padding: 9vh 16px 28px; color: #1E1612;
+      background: linear-gradient(to bottom, rgba(244, 236, 217, 0), rgba(244, 236, 217, .88) 8vh, rgba(244, 236, 217, .96)); }
+    .plate-legend > * { max-width: 1120px; margin-left: auto; margin-right: auto; }
+    .plate-legend summary { list-style: none; cursor: pointer; text-align: center; padding: 6px 0; }
+    .plate-legend summary::-webkit-details-marker { display: none; }
+    .plate-legend summary b { font: 400 21px/1.3 "Old Standard TT", serif; letter-spacing: .14em; }
+    .plate-legend summary b::after { content: " ›"; display: inline-block; letter-spacing: 0; transition: transform .2s ease; }
+    .plate-legend[open] summary b::after { transform: rotate(90deg); }
+    .plate-legend summary span { display: block; font: italic 400 15px/1.4 "Old Standard TT", serif; color: #4A3A30; margin-top: 2px; }
+    .plate-legend summary:focus-visible { outline: 2px solid var(--plum); outline-offset: 4px; border-radius: 6px; }
+    .plate-legend .why { font: italic 400 17px/1.45 "Old Standard TT", serif; text-align: center; color: #4A3A30; max-width: 46em; margin: 18px auto 14px; }
+    .plate-legend .layers { text-align: center; font-size: 15px; line-height: 1.7; color: #3E342D; max-width: 60em; margin: 0 auto 22px; }
+    .plate-legend .layers b { font: 400 17px "Old Standard TT", serif; color: #1E1612; }
+    .plate-legend .layers span { white-space: nowrap; }
+    .plate-legend .layers span + span::before { content: "·"; margin: 0 .55em 0 .2em; color: #9A8A78; }
+    .plate-legend dl { margin: 0 auto; display: grid; gap: 2px 28px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+    .plate-legend dl > div { display: grid; grid-template-columns: 2.6em 1fr; gap: 0 8px; padding: 5px 8px; border-radius: 8px; cursor: default; }
+    .plate-legend dl > div:hover, .plate-legend dl > div:focus, .plate-legend dl > div.is-on { background: rgba(231, 161, 182, .22); outline: none; }
+    .plate-legend dt { font: 400 18px/1.4 "Old Standard TT", serif; }
+    .plate-legend dd { margin: 0; font-size: 14px; line-height: 1.4; color: #3E342D; }
+    .plate-legend dd i { font: italic 400 17px/1.35 "Old Standard TT", serif; color: #1E1612; display: block; }
+    /* a cell named from the legend: its label in the forest, in plum */
+    .plate g.is-focus text { fill: #8E2F55; }
+    .plate g.is-focus .lead { stroke: #8E2F55; stroke-width: 3.2; }
     @media (max-width: 720px) {
       .over .section > .wrap, .site-footer-wrap .footer > .wrap { margin: 0 8px; padding-left: 20px; padding-right: 20px; padding-top: 44px; padding-bottom: 44px; }
       .over .section { padding-bottom: 12vh; }
@@ -77,7 +113,7 @@
     .dive-flat .switch__track::after { border-color: var(--on-dark-2); background: var(--on-dark); }
     .dive-flat .switch[aria-pressed="true"] .switch__track { background: var(--rose); }
 
-    .hud { position: fixed; top: 76px; left: 8px; z-index: 60; margin: 0; padding: 6px 8px; font: 12px/1.35 var(--mono); color: #CFE; background: rgba(0, 0, 0, .55); border-radius: 6px; pointer-events: none; }
+    .hud { position: fixed; top: 76px; left: 8px; z-index: 60; margin: 0; padding: 6px 8px; font: 12px/1.35 ui-monospace, monospace; color: #CFE; background: rgba(0, 0, 0, .55); border-radius: 6px; pointer-events: none; }
   </style>
   <script>document.documentElement.classList.add('js');</script>
   <script src="../../public/main.js" defer></script>
@@ -89,7 +125,7 @@
   <!-- shared drawings: the hand-drawn arrow for notes, and the line puzzle -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <defs>
-      <g id="arrow"><path d="M4,6 Q22,2 34,18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M26,18 L35,20 L36,11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g id="arrow"><path d="M4,6 L37,19" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="0 6"/></g>
       <g id="puz">
         <path d="M6,4 Q240,0 474,5 Q479,150 476,296 Q240,300 5,295 Q1,150 6,4 Z" fill="#F3E3C6"/>
         <g fill="none" stroke="#3B2A1E" stroke-width="3.5" stroke-linecap="round">
@@ -125,6 +161,7 @@
 
   <div class="stage" aria-hidden="true">
     <canvas id="stage"></canvas>
+    <svg class="plate" id="plate"></svg>
     <div class="paper"></div>
     <div class="grain"></div>
     <div class="vignette"></div>
@@ -161,7 +198,7 @@
       <div class="wrap">
         <div class="split-head reveal">
           <div>
-            <p class="eyebrow">The problem</p>
+            <p class="eyebrow" data-n="I">The problem</p>
             <h2 id="problem-title">An LLM doesn’t see an image. It reads a list of patches.</h2>
           </div>
           <p class="lead">Today’s models talk brilliantly about pictures. Yet they stumble on spatial tasks a small child solves at a glance. Try one yourself.</p>
@@ -217,7 +254,7 @@
       <div class="wrap">
         <div class="split-head reveal">
           <div>
-            <p class="eyebrow">How it works</p>
+            <p class="eyebrow" data-n="II">How it works</p>
             <h2 id="how-title">One sentence, and your agent can see.</h2>
           </div>
           <p class="lead">sehn.ai is an MCP service. Tell your agent to use the tools at sehn.ai, and it gains a sense of space it did not have before.</p>
@@ -226,7 +263,7 @@
         <div class="how">
           <ol class="steps-v reveal">
             <li>
-              <span class="num">01</span>
+              <span class="num">I.</span>
               <div>
                 <h3>Any agent</h3>
                 <p>Bring the agent you already use.</p>
@@ -234,7 +271,7 @@
               </div>
             </li>
             <li>
-              <span class="num">02</span>
+              <span class="num">II.</span>
               <div>
                 <h3>The sehn.ai MCP server</h3>
                 <p class="quote">“use the tools at sehn.ai”</p>
@@ -242,7 +279,7 @@
               </div>
             </li>
             <li>
-              <span class="num">03</span>
+              <span class="num">III.</span>
               <div>
                 <h3>New answers</h3>
                 <p>About shape, position and connection, that it could not give before.</p>
@@ -280,7 +317,7 @@
       <div class="wrap">
         <div class="split-head reveal">
           <div>
-            <p class="eyebrow">Grounded in neuroscience</p>
+            <p class="eyebrow" data-n="III">Grounded in neuroscience</p>
             <h2 id="model-title">Built on how the brain sees space</h2>
           </div>
           <p class="lead">Our tools draw on decades of vision neuroscience, and give an LLM the sense of space it can’t get from a list of patches.</p>
@@ -298,7 +335,7 @@
       <div class="wrap">
         <div class="split-head reveal">
           <div>
-            <p class="eyebrow">First evidence</p>
+            <p class="eyebrow" data-n="IV">First evidence</p>
             <h2 id="evidence-title">With sehn.ai, agents trace paths they couldn’t before.</h2>
           </div>
           <p class="lead">200 new mazes: which entrance reaches the exit? None of them were used to build or tune the tools, and the analysis was written down before the run.</p>
@@ -334,7 +371,7 @@
       <div class="wrap">
         <div class="split-head reveal">
           <div>
-            <p class="eyebrow">Where it matters</p>
+            <p class="eyebrow" data-n="V">Where it matters</p>
             <h2 id="markets-title">One way of seeing, many markets</h2>
           </div>
           <p class="lead">The same sense of space helps wherever a machine has to understand a room, a drawing, a face or a screen.</p>
@@ -442,7 +479,7 @@
       <div class="wrap">
         <div class="name-grid reveal">
           <div class="name-text">
-            <p class="eyebrow">The name</p>
+            <p class="eyebrow" data-n="VI">The name</p>
             <h2 id="name-title">Why we call it sehn</h2>
           </div>
           <div class="name-text">
@@ -481,7 +518,7 @@
       <div class="wrap">
         <div class="split-head reveal">
           <div>
-            <p class="eyebrow">Team</p>
+            <p class="eyebrow" data-n="VII">Team</p>
             <h2 id="team-title">The two people behind sehn</h2>
           </div>
           <p class="lead">A clinical psychologist with a computer-science background, and an engineer who builds brain-inspired vision systems.</p>
@@ -517,10 +554,10 @@
         <div class="story">
           <h3 class="reveal">How we got here</h3>
           <ol class="timeline">
-            <li class="reveal"><span class="num">01</span>People reason in pictures: we follow, fit and compare shapes without a word.</li>
-            <li class="reveal d1"><span class="num">02</span>LLMs describe images brilliantly, then get the space in them wrong.</li>
-            <li class="reveal d2"><span class="num">03</span>Anton had met the same blind spot throughout his years in computer vision.</li>
-            <li class="reveal d3"><span class="num">04</span>sehn.ai: give AI the non-verbal reasoning it is missing.</li>
+            <li class="reveal"><span class="num">I.</span>People reason in pictures: we follow, fit and compare shapes without a word.</li>
+            <li class="reveal d1"><span class="num">II.</span>LLMs describe images brilliantly, then get the space in them wrong.</li>
+            <li class="reveal d2"><span class="num">III.</span>Anton had met the same blind spot throughout his years in computer vision.</li>
+            <li class="reveal d3"><span class="num">IV.</span>sehn.ai: give AI the non-verbal reasoning it is missing.</li>
           </ol>
         </div>
       </div>
@@ -531,7 +568,7 @@
       <div class="edge edge--top" aria-hidden="true"></div>
       <div class="wrap contact__grid">
         <div class="reveal">
-          <p class="eyebrow">Early access</p>
+          <p class="eyebrow" data-n="VIII">Early access</p>
           <h2 id="contact-title">Every AI that sees should see like we do.</h2>
           <p class="lead">sehn.ai is in early access. Tell us what your agent should see, and we’ll send you an API key to try it.</p>
           <p class="contact__direct"><a href="mailto:anton@mindsprings.ai">anton@mindsprings.ai</a> <a href="mailto:diana@mindsprings.ai">diana@mindsprings.ai</a></p>
@@ -585,6 +622,25 @@
       </div>
     </footer>
   </div>
+
+  <!-- the plate's legend, folded, past the end of the page: open it, point at a line, and its cell is named in the forest -->
+  <details class="plate-legend">
+    <summary><b>Explanation of Plate I</b><span>sehn.ai dib., after the plates of S. Ramón y Cajal</span></summary>
+    <p class="why">The retina, from the inside. Light comes down from above and passes through every layer before it reaches the rods and cones; on its way back, the picture is taken apart and analysed, layer by layer, before the brain ever sees it.</p>
+    <p class="layers"><span><b>I.</b> ganglion cells, the roof</span> <span><b>II.</b> inner plexiform, the canopy</span> <span><b>III.</b> inner nuclear, the upper trunks</span> <span><b>IV.</b> outer plexiform, the lower branches</span> <span><b>V.</b> outer nuclear, the nuclei of rods and cones</span> <span><b>VI.</b> rods and cones, the trunks</span></p>
+    <dl>
+      <div data-k="Gc" tabindex="0"><dt>Gc</dt><dd><i>ganglion cell</i>the retina’s output: their fibres make the optic nerve, carrying a picture already analysed</dd></div>
+      <div data-k="Ac" tabindex="0"><dt>Ac</dt><dd><i>amacrine cell</i>compares neighbours across space and time; some detect the direction of motion</dd></div>
+      <div data-k="Bc" tabindex="0"><dt>Bc</dt><dd><i>bipolar cell</i>carries the signal inward, split into “lighter than around” and “darker than around”</dd></div>
+      <div data-k="Hc" tabindex="0"><dt>Hc</dt><dd><i>horizontal cell</i>holds back each cell’s neighbours, so that edges stand out</dd></div>
+      <div data-k="Mg" tabindex="0"><dt>Mg</dt><dd><i>Müller glia</i>span the whole retina, and guide light down through it like optical fibres</dd></div>
+      <div data-k="R" tabindex="0"><dt>R</dt><dd><i>rods</i>see in dim light</dd></div>
+      <div data-k="C" tabindex="0"><dt>C</dt><dd><i>cones</i>see colour and fine detail</dd></div>
+      <div data-k="Cap" tabindex="0"><dt>Cap</dt><dd><i>capillary</i>feeds the inner layers</dd></div>
+      <div data-k="Rbc" tabindex="0"><dt>Rbc</dt><dd><i>red blood cell</i>darker than the plasma it floats in</dd></div>
+      <div data-k="S" tabindex="0"><dt>S</dt><dd><i>sehn</i>learning to see the same way</dd></div>
+    </dl>
+  </details>
 
   <script>
     // This is a lab copy of the page: the API key form must never reach HubSpot from here.
