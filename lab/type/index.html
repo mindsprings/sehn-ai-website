@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en" data-set="b">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Type specimen · sehn.ai lab</title>
+  <meta name="robots" content="noindex">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- the site's fonts (Fraunces with its SOFT and WONK axes, Plex with its italic), and Old Standard TT for the labels -->
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Courier+Prime:wght@400;700&family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&family=Old+Standard+TT:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../public/styles.css">
+  <style>
+    :root { --label: "Old Standard TT", "Times New Roman", serif; --plate-ink: #1E1612; --plate-paper: #F4ECD9; }
+
+    /* ---------- the sets ----------
+       A  now: the site as it is
+       B  bridge: Fraunces sharpened (no softness, no wonky letters, the high-contrast optical size), and
+          Old Standard TT, a revival of the Modern roman of late-19th-century science books, for every label
+       C  plate: Old Standard TT for the headings too */
+    html[data-set="b"], html[data-set="c"] { --mono: var(--label); }
+    html[data-set="b"] body { font-variation-settings: "SOFT" 0, "WONK" 0; }   /* inherited; Plex ignores the axes */
+    html[data-set="b"] h1, html[data-set="b"] h2 { font-variation-settings: "SOFT" 0, "WONK" 0, "opsz" 72; font-weight: 380; }
+    html[data-set="c"] h1, html[data-set="c"] h2, html[data-set="c"] h3, html[data-set="c"] .brand span { font-family: var(--label); letter-spacing: -0.01em; }
+    html[data-set="c"] .hero h1 { letter-spacing: -0.025em; }
+
+    /* labels: plate numbers instead of the sparkle, mixed case and letterspaced like "Lámina II" */
+    html[data-set="b"] .eyebrow, html[data-set="c"] .eyebrow { text-transform: none; letter-spacing: .12em; font-size: 17px; }
+    html[data-set="b"] .eyebrow::before, html[data-set="c"] .eyebrow::before { content: attr(data-n) ". —"; font-size: inherit; letter-spacing: .04em; }
+    html[data-set="b"] .btn, html[data-set="c"] .btn { letter-spacing: .14em; font-size: 15px; }
+    html[data-set="b"] .num, html[data-set="c"] .num { font-size: 0; }
+    html[data-set="b"] .num::after, html[data-set="c"] .num::after { content: attr(data-r); font-size: 26px; letter-spacing: .04em; }
+    /* the handwriting becomes annotation: a small italic with a dotted leader */
+    html[data-set="b"] .note, html[data-set="c"] .note { font-family: var(--label); font-style: italic; font-weight: 400; font-size: 19px; transform: none; gap: 10px; }
+    html[data-set="b"] .note svg, html[data-set="c"] .note svg { display: none; }
+    html[data-set="b"] .note::after, html[data-set="c"] .note::after { content: ""; width: 64px; border-top: 2px dotted currentColor; opacity: .8; }
+    html[data-set="b"] .footer p, html[data-set="c"] .footer p { letter-spacing: .16em; font-size: 14px; }
+    html[data-set="b"] .hero__art .note::after, html[data-set="c"] .hero__art .note::after { display: none; }
+    html[data-set="b"] .hero__art .note::before, html[data-set="c"] .hero__art .note::before { content: ""; width: 64px; border-top: 2px dotted currentColor; opacity: .8; }
+    html[data-set="b"] .footer .credits, html[data-set="c"] .footer .credits { font-family: var(--label); font-style: italic; text-transform: none; letter-spacing: 0; font-size: 17px; }
+
+    /* ---------- the specimen's own pages ---------- */
+    body { background: var(--plate-paper); }
+    .bar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding: 12px 16px;
+      background: rgba(244, 236, 217, .94); border-bottom: 1px solid var(--paper-line); backdrop-filter: blur(6px); }
+    .bar b { font-family: var(--label); font-weight: 400; font-size: 20px; letter-spacing: .08em; }
+    .seg { display: inline-flex; border: 1.5px solid var(--ink); border-radius: 10px; overflow: hidden; }
+    .seg button { font: 600 15px/1 var(--sans); padding: 10px 14px; background: transparent; border: 0; cursor: pointer; color: var(--ink); }
+    .seg button + button { border-left: 1.5px solid var(--ink); }
+    .seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper-1); }
+    .bar small { color: var(--ink-3); font-size: 14px; }
+
+    .part { max-width: 1240px; margin: 0 auto; padding: 56px 16px 24px; }
+    .part > h2.t { font-family: var(--label); font-size: 30px; font-weight: 400; letter-spacing: .1em; text-align: center; margin: 0 0 6px; font-variation-settings: normal; }
+    .part > p.sub { text-align: center; color: var(--ink-2); max-width: 46em; margin: 0 auto 36px; font-size: 17px; }
+
+    /* the faces, side by side, role by role */
+    .faces { display: grid; grid-template-columns: 150px repeat(3, 1fr); border-top: 1.5px solid var(--plate-ink); }
+    .faces > * { padding: 18px 16px; border-bottom: 1px solid var(--paper-line); min-width: 0; }
+    .faces .h { font: 400 15px/1.3 var(--label); letter-spacing: .14em; padding-top: 14px; padding-bottom: 14px; }
+    .faces .h b { display: block; font-size: 22px; letter-spacing: .04em; font-weight: 700; }
+    .faces .role { font: italic 400 16px/1.3 var(--label); color: var(--ink-2); }
+    .faces .on { background: rgba(231, 161, 182, .14); }
+    .A .hl, .A .sh { font-family: var(--serif); }
+    .B .hl, .B .sh { font-family: var(--serif); font-variation-settings: "SOFT" 0, "WONK" 0, "opsz" 72; font-weight: 380; }
+    .C .hl, .C .sh { font-family: var(--label); }
+    .hl { font-size: 44px; line-height: 1.08; letter-spacing: -0.02em; }
+    .hl em { color: var(--plum); }
+    .sh { font-size: 28px; line-height: 1.15; }
+    .bd { font: 400 17px/1.5 var(--sans); }
+    .A .lb { font: 400 14px/1.4 "Courier Prime", monospace; text-transform: uppercase; letter-spacing: 4px; color: var(--plum); }
+    .B .lb, .C .lb { font: 400 17px/1.4 var(--label); letter-spacing: .12em; color: var(--plum); }
+    .A .nm { font: 700 22px/1.4 "Courier Prime", monospace; letter-spacing: 2px; color: var(--plum); }
+    .B .nm, .C .nm { font: 400 22px/1.4 var(--label); letter-spacing: .04em; color: var(--plum); }
+    .A .bt, .B .bt, .C .bt { display: inline-block; padding: 10px 16px; border: 2px solid var(--ink); border-radius: 10px; box-shadow: 3px 3px 0 var(--ink); background: var(--rose);
+      text-transform: uppercase; font-size: 14px; }
+    .A .bt { font-family: "Courier Prime", monospace; font-weight: 700; letter-spacing: 2px; }
+    .B .bt, .C .bt { font-family: var(--label); font-weight: 700; letter-spacing: .14em; font-size: 15px; }
+    .A .nt { font: 600 24px/1.1 "Caveat", cursive; color: var(--plum); display: inline-block; transform: rotate(-3deg); }
+    .B .nt, .C .nt { font: italic 400 19px/1.2 var(--label); color: var(--plum); display: inline-flex; align-items: center; gap: 10px; }
+    .B .nt::after, .C .nt::after { content: ""; width: 56px; border-top: 2px dotted currentColor; }
+    .A .cr { font: 400 15px/1.5 var(--sans); color: var(--ink-2); }
+    .B .cr, .C .cr { font: italic 400 17px/1.4 var(--label); color: var(--ink-2); }
+    .ab { font: 400 20px/1.6 var(--label); letter-spacing: .02em; }
+    .A .ab { font-family: "Courier Prime", monospace; font-size: 18px; }
+    @media (max-width: 900px) {
+      .faces { grid-template-columns: 1fr; }
+      .faces .h.blank { display: none; }
+      .faces .role { border-bottom: 0; padding-bottom: 0; font-size: 18px; color: var(--ink); }
+      .faces > :not(.role):not(.h) { display: none; }
+      html[data-set="a"] .faces .A:not(.h), html[data-set="b"] .faces .B:not(.h), html[data-set="c"] .faces .C:not(.h) { display: block; }
+      .faces .h { display: none; }
+    }
+
+    /* the page, in the chosen set */
+    .page { margin-top: 8px; border-top: 1.5px solid var(--plate-ink); }
+    .page .section--light { background: var(--paper-bg); }
+
+    /* the plate */
+    .plate { background: var(--plate-paper); max-width: 1240px; margin: 0 auto; padding: 8px 16px 72px; }
+    .plate svg { width: 100%; height: auto; overflow: visible; }
+    .plate text { font-family: var(--label); fill: var(--plate-ink); }
+    .plate .ttl { font-size: 34px; letter-spacing: .14em; }
+    .plate .lab { font-size: 30px; }
+    .plate .rn { font-size: 34px; }
+    .plate .dib { font-size: 24px; font-style: italic; }
+    /* black dots, each in a small ring of paper, so they read over the painting */
+    .plate .lead-halo { stroke: var(--plate-paper); stroke-width: 7.5; stroke-dasharray: 0.1 8; stroke-linecap: round; fill: none; opacity: .9; }
+    .plate .lead { stroke: var(--plate-ink); stroke-width: 3.6; stroke-dasharray: 0.1 8; stroke-linecap: round; fill: none; }
+    .plate .brk { stroke: var(--plate-ink); stroke-width: 1.6; fill: none; }
+    .legend { columns: 2 320px; column-gap: 48px; max-width: 980px; margin: 28px auto 0; font: 400 17px/1.5 var(--label); color: var(--plate-ink); }
+    .legend h3 { column-span: all; text-align: center; font: 400 20px/1.3 var(--label); letter-spacing: .14em; margin: 0 0 14px; font-variation-settings: normal; }
+    .legend p { margin: 0 0 6px; break-inside: avoid; }
+    .legend b { font-weight: 400; display: inline-block; min-width: 4.2em; }
+    .legend i { color: var(--ink-2); }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <g id="arrow"><path d="M4,6 Q22,2 34,18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M26,18 L35,20 L36,11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+    </defs>
+  </svg>
+
+  <div class="bar">
+    <b>Type specimen</b>
+    <div class="seg" role="group" aria-label="Type set">
+      <button type="button" data-set="a">A · Now</button>
+      <button type="button" data-set="b">B · Bridge</button>
+      <button type="button" data-set="c">C · Plate</button>
+    </div>
+    <small>Keys 1, 2, 3 switch too. The set applies to the page below; the table shows all three.</small>
+  </div>
+
+  <!-- I. the faces -->
+  <section class="part" aria-labelledby="faces-t">
+    <h2 class="t" id="faces-t">I. — The faces</h2>
+    <p class="sub">Cajal’s plates label in a small “Modern” roman: abbreviations, dotted leaders, roman numerals for layers, primes for variants, an italic credit. B and C borrow that system for every label; the body stays IBM Plex Sans in all three.</p>
+    <div class="faces">
+      <div class="h blank"></div>
+      <div class="h A"><b>A</b>Now</div>
+      <div class="h B"><b>B</b>Bridge</div>
+      <div class="h C"><b>C</b>Plate</div>
+
+      <div class="role">Headline</div>
+      <div class="A"><div class="hl">Agents want to <em>see</em> like we do.</div></div>
+      <div class="B"><div class="hl">Agents want to <em>see</em> like we do.</div></div>
+      <div class="C"><div class="hl">Agents want to <em>see</em> like we do.</div></div>
+
+      <div class="role">Section heading</div>
+      <div class="A"><div class="sh">An LLM doesn’t see an image. It reads a list of patches.</div></div>
+      <div class="B"><div class="sh">An LLM doesn’t see an image. It reads a list of patches.</div></div>
+      <div class="C"><div class="sh">An LLM doesn’t see an image. It reads a list of patches.</div></div>
+
+      <div class="role">Body<br>(Plex in all)</div>
+      <div class="A"><p class="bd">sehn.ai is an MCP service. Tell your agent to use the tools at sehn.ai, and it gains a sense of space it did not have before.</p></div>
+      <div class="B"><p class="bd">sehn.ai is an MCP service. Tell your agent to use the tools at sehn.ai, and it gains a sense of space it did not have before.</p></div>
+      <div class="C"><p class="bd">sehn.ai is an MCP service. Tell your agent to use the tools at sehn.ai, and it gains a sense of space it did not have before.</p></div>
+
+      <div class="role">Label</div>
+      <div class="A"><div class="lb">✦ How it works</div></div>
+      <div class="B"><div class="lb">III. — How it works</div></div>
+      <div class="C"><div class="lb">III. — How it works</div></div>
+
+      <div class="role">Numbers</div>
+      <div class="A"><div class="nm">01 &nbsp;02 &nbsp;03</div></div>
+      <div class="B"><div class="nm">I. &nbsp;II. &nbsp;III. &nbsp;·&nbsp; Gc Gc′ Gc″</div></div>
+      <div class="C"><div class="nm">I. &nbsp;II. &nbsp;III. &nbsp;·&nbsp; Gc Gc′ Gc″</div></div>
+
+      <div class="role">Button</div>
+      <div class="A"><span class="bt">Get an API key</span></div>
+      <div class="B"><span class="bt">Get an API key</span></div>
+      <div class="C"><span class="bt">Get an API key</span></div>
+
+      <div class="role">Note</div>
+      <div class="A"><span class="nt">go on, pick a box</span></div>
+      <div class="B"><span class="nt">go on, pick a box</span></div>
+      <div class="C"><span class="nt">go on, pick a box</span></div>
+
+      <div class="role">Credit</div>
+      <div class="A"><p class="cr">The dive is inspired by Santiago Ramón y Cajal’s drawings of the retina.</p></div>
+      <div class="B"><p class="cr">sehn.ai dib., after the plates of S. Ramón y Cajal.</p></div>
+      <div class="C"><p class="cr">sehn.ai dib., after the plates of S. Ramón y Cajal.</p></div>
+
+      <div class="role">Alphabet</div>
+      <div class="A"><p class="ab">Aa Bb Cc Gg Rr Ss 0123456789 &amp; ¿? ′ ″</p></div>
+      <div class="B"><p class="ab">Aa Bb Cc Gg Rr Ss 0123456789 &amp; ¿? ′ ″</p></div>
+      <div class="C"><p class="ab">Aa Bb Cc Gg Rr Ss 0123456789 &amp; ¿? ′ ″</p></div>
+    </div>
+  </section>
+
+  <!-- II. the page, in the chosen set (markup from public/index.html) -->
+  <section class="part" aria-labelledby="page-t" style="padding-bottom:0">
+    <h2 class="t" id="page-t">II. — On the page</h2>
+    <p class="sub">Three sections of the real page, in the set chosen above.</p>
+  </section>
+  <div class="page">
+    <section class="section section--dark hero" aria-label="Hero">
+      <div class="wrap hero__grid">
+        <div class="hero__text">
+          <p class="eyebrow" data-n="I">Visual-spatial perception for AI agents</p>
+          <h1>Agents want to <em>see</em> like we&nbsp;do.</h1>
+          <p class="hero__sub">Giving AI a sense of shape, distance and how things fit together.</p>
+          <p class="hero__tagline">Every AI that sees should see like we do.</p>
+          <div class="hero__ctas">
+            <a class="btn btn--rose" href="#plate">Get an API key</a>
+            <a class="btn btn--ghost" href="#plate">Try the puzzle ↓</a>
+          </div>
+          <p class="hero__pron"><span class="note">sehn = “to see” · say “zane”</span></p>
+        </div>
+        <div class="hero__art">
+          <svg class="hero__logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 260" width="580" height="377" role="img" aria-label="sehn.ai logo: a friendly eye with a rose iris, a sparkle of light and a trail of magic dust turning into pixels"><defs><radialGradient id="irisA" cx="0.42" cy="0.38"><stop offset="0" stop-color="#F7D3DE"/><stop offset="0.65" stop-color="#E7A1B6"/><stop offset="1" stop-color="#8E2F55"/></radialGradient><clipPath id="eyeOpening"><path d="M104,146 Q200,58 296,146 L282,152 Q200,196 118,152 Z"/></clipPath></defs><ellipse cx="200" cy="140" rx="140" ry="86" fill="#E7A1B6" opacity="0.08"/><g clip-path="url(#eyeOpening)"><g class="iris"><circle cx="200" cy="138" r="34" fill="url(#irisA)"/><circle cx="200" cy="138" r="13" fill="#0E1726"/><path d="M188,118 Q190,126 197,128 Q190,130 188,138 Q186,130 179,128 Q186,126 188,118 Z" fill="#FFF8EC"/><circle cx="211" cy="148" r="3" fill="#FFF8EC"/></g></g><path d="M104,146 Q200,58 296,146" fill="none" stroke="#F5F2EA" stroke-width="6" stroke-linecap="round"/><path d="M118,152 Q200,196 282,152" fill="none" stroke="#F5F2EA" stroke-width="3.5" stroke-linecap="round" opacity="0.7"/><g fill="none" stroke="#F5F2EA" stroke-width="4" stroke-linecap="round"><path d="M238,109 Q243,90 256,82"/><path d="M258,118 Q266,100 280,96"/><path d="M277,130 Q288,116 302,114"/></g><g class="logo-dust"><g fill="#F7DDE5"><circle cx="50" cy="200" r="2.5" style="--i:0"/><circle cx="110" cy="218" r="3.5" style="--i:2"/><circle cx="170" cy="224" r="5" style="--i:4"/></g><g fill="#E7A1B6"><circle cx="80" cy="210.5" r="3" style="--i:1"/><circle cx="140" cy="222.5" r="4.5" style="--i:3"/><circle cx="200" cy="222.5" r="5.5" style="--i:5"/><rect x="225" y="213" width="10" height="10" rx="1.5" style="--i:6"/><rect x="285.5" y="195.5" width="8" height="8" rx="1.5" style="--i:8"/></g><g fill="#F7DDE5"><rect x="255.5" y="206" width="9" height="9" rx="1.5" style="--i:7"/><rect x="316.5" y="183" width="7" height="7" rx="1.5" style="--i:9"/></g></g><path class="logo-star s1" d="M350,156 Q352,166 362,168 Q352,170 350,180 Q348,170 338,168 Q348,166 350,156 Z" fill="#E7A1B6"/><path class="logo-star s2" d="M330,40 Q333,57 350,60 Q333,63 330,80 Q327,63 310,60 Q327,57 330,40 Z" fill="#E7A1B6"/><path class="logo-star s3" d="M78,72 Q80,82 90,84 Q80,86 78,96 Q76,86 66,84 Q76,82 78,72 Z" fill="#F5F2EA"/><circle class="logo-star s4" cx="112" cy="48" r="2.5" fill="#F5F2EA"/><circle class="logo-star s5" cx="296" cy="96" r="2" fill="#F7DDE5"/></svg>
+          <p class="note" aria-hidden="true">it follows you around<svg viewBox="0 0 46 30"><use href="#arrow"/></svg></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--light" aria-label="How it works">
+      <div class="wrap">
+        <div class="split-head">
+          <div>
+            <p class="eyebrow" data-n="III">How it works</p>
+            <h2>One sentence, and your agent can see.</h2>
+          </div>
+          <p class="lead">sehn.ai is an MCP service. Tell your agent to use the tools at sehn.ai, and it gains a sense of space it did not have before.</p>
+        </div>
+        <div class="how">
+          <ol class="steps-v">
+            <li>
+              <span class="num" data-r="I.">01</span>
+              <div>
+                <h3>Any agent</h3>
+                <p>Bring the agent you already use.</p>
+                <ul class="chips"><li class="chip">Claude</li><li class="chip">GPT</li><li class="chip">Gemini</li><li class="chip">Any agent</li></ul>
+              </div>
+            </li>
+            <li>
+              <span class="num" data-r="II.">02</span>
+              <div>
+                <h3>The sehn.ai MCP server</h3>
+                <p class="quote">“use the tools at sehn.ai”</p>
+                <ul class="chips"><li class="chip">Paths, connections</li><li class="chip chip--soon">More coming</li></ul>
+              </div>
+            </li>
+            <li>
+              <span class="num" data-r="III.">03</span>
+              <div>
+                <h3>New answers</h3>
+                <p>About shape, position and connection, that it could not give before.</p>
+              </div>
+            </li>
+          </ol>
+          <div>
+            <p class="note" aria-hidden="true">flip the switch<svg viewBox="0 0 46 30" style="transform:rotate(60deg)"><use href="#arrow"/></svg></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="section section--dark footer">
+      <div class="wrap">
+        <img src="../../public/assets/brand/logo.svg" width="160" height="104" alt="sehn.ai logo">
+        <p>sehn.ai is a product of <a href="https://mindsprings.ai">Mindsprings</a></p>
+        <p class="credits">The dive into the eye is inspired by Santiago Ramón y Cajal’s drawings of the retina, Disney’s multiplane camera, and the films of McBess.</p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- III. the plate: a frame of the forest, labelled the way Cajal labels his -->
+  <section class="part" id="plate" aria-labelledby="plate-t" style="padding-bottom:0">
+    <h2 class="t" id="plate-t">III. — In the dive</h2>
+    <p class="sub">A frame of the forest, labelled as a Cajal plate: abbreviations in the margins, dotted leaders (one label can fan out to several cells), roman numerals for the layers, and the legend below. In the dive these could appear as we pass each layer.</p>
+  </section>
+  <figure class="plate">
+    <svg id="plateSvg" viewBox="-250 -90 2100 1160" role="img" aria-label="A frame of the retina forest with Cajal-style labels: ganglion cells in the roof, amacrine cells in the canopy, bipolar and horizontal cells, rods and cones as trunks, Müller glia, the capillary and its red blood cells, and the boat."></svg>
+    <figcaption class="legend">
+      <h3>Explanation of Plate I</h3>
+      <p><b>I.</b> Ganglion cell layer, the roof</p>
+      <p><b>II.</b> Inner plexiform layer, the canopy</p>
+      <p><b>III.</b> Outer plexiform layer, the lower branches</p>
+      <p><b>IV.</b> Rods and cones, the trunks</p>
+      <p><b>Gc, Gc′</b> ganglion cells</p>
+      <p><b>Ac</b> amacrine cells</p>
+      <p><b>Bc</b> bipolar cell</p>
+      <p><b>Hc</b> horizontal cells</p>
+      <p><b>R</b> rods</p>
+      <p><b>C, C′</b> cones</p>
+      <p><b>Mg, Mg′</b> Müller glia, <i>roots lifted</i></p>
+      <p><b>Cap</b> capillary of the deep plexus</p>
+      <p><b>Cap′</b> capillary on the floor</p>
+      <p><b>Rbc</b> red blood cell</p>
+      <p><b>S</b> our eye, in its boat</p>
+    </figcaption>
+  </figure>
+
+  <script>
+    // the set: buttons, keys 1-3, and ?set= in the address
+    (function () {
+      var root = document.documentElement, btns = document.querySelectorAll('.seg button');
+      function use(s) {
+        root.setAttribute('data-set', s);
+        btns.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.set === s ? 'true' : 'false'); });
+        document.querySelectorAll('.faces > .A, .faces > .B, .faces > .C').forEach(function (el) { el.classList.toggle('on', el.classList.contains(s.toUpperCase())); });
+      }
+      btns.forEach(function (b) { b.addEventListener('click', function () { use(b.dataset.set); }); });
+      addEventListener('keydown', function (e) { var s = { 1: 'a', 2: 'b', 3: 'c' }[e.key]; if (s) use(s); });
+      use(new URLSearchParams(location.search).get('set') || 'b');
+    })();
+
+    // the plate: the frame, its labels in the margins with dotted leaders, the layers' numerals and the credit.
+    // Coordinates are the frame's pixels (1600 x 1000); labels at x < 0 sit in the left margin, x > 1600 in the right.
+    (function () {
+      var NS = 'http://www.w3.org/2000/svg', svg = document.getElementById('plateSvg');
+      function el(name, attrs, text) {
+        var e = document.createElementNS(NS, name);
+        for (var k in attrs) e.setAttribute(k, attrs[k]);
+        if (text) e.textContent = text;
+        svg.appendChild(e);
+        return e;
+      }
+      el('image', { href: 'forest.jpg', x: 0, y: 0, width: 1600, height: 1000 });
+      el('text', { x: 800, y: -38, 'text-anchor': 'middle', class: 'ttl' }, 'Lámina I');
+      var labels = [
+        { t: 'Gc', x: -36, y: 70, to: [[240, 45], [445, 140]] },
+        { t: 'Ac', x: -36, y: 290, to: [[172, 270], [316, 320]] },
+        { t: 'Hc', x: -36, y: 384, to: [[300, 372], [92, 352]] },
+        { t: 'Mg′', x: -36, y: 560, to: [[690, 560]] },
+        { t: 'C', x: -36, y: 720, to: [[170, 740], [270, 700]] },
+        { t: 'R', x: -36, y: 890, to: [[440, 900]] },
+        { t: 'Gc′', x: 1636, y: 236, to: [[1240, 236]] },
+        { t: 'Cap', x: 1636, y: 432, to: [[1420, 432]] },
+        { t: 'Bc', x: 1636, y: 522, to: [[1126, 522]] },
+        { t: 'Mg', x: 1636, y: 616, to: [[1560, 620]] },
+        { t: 'C′', x: 1636, y: 700, to: [[1243, 690]] },
+        { t: 'S', x: 1636, y: 790, to: [[946, 738]] },
+        { t: 'Rbc', x: 1636, y: 900, to: [[756, 905]] },
+        { t: 'Cap′', x: 1636, y: 975, to: [[700, 975]] }
+      ];
+      labels.forEach(function (l) {
+        var left = l.x < 0, sx = left ? l.x + 10 : l.x - 10, sy = l.y - 8;
+        l.to.forEach(function (p) {
+          var d = 'M' + sx + ',' + sy + ' L' + p[0] + ',' + p[1];
+          el('path', { d: d, class: 'lead-halo' });
+          el('path', { d: d, class: 'lead' });
+        });
+        el('text', { x: l.x, y: l.y, 'text-anchor': left ? 'end' : 'start', class: 'lab' }, l.t);
+      });
+      // the layers, as seen at the left edge where the trees are nearest
+      [['I', 0, 130], ['II', 130, 320], ['III', 320, 430], ['IV', 430, 930]].forEach(function (L) {
+        var x = -150, a = L[1] + 6, b = L[2] - 6;
+        el('path', { d: 'M' + (x + 14) + ',' + a + ' L' + x + ',' + a + ' L' + x + ',' + b + ' L' + (x + 14) + ',' + b, class: 'brk' });
+        el('text', { x: x - 16, y: (a + b) / 2 + 10, 'text-anchor': 'end', class: 'rn' }, L[0]);
+      });
+      el('text', { x: 0, y: 1052, class: 'dib' }, 'sehn.ai dib., after S. Ramón y Cajal');
+    })();
+  </script>
+</body>
+</html>

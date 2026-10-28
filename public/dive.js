@@ -1,0 +1,2073 @@
+// sehn.ai lab: a dive into the eye.
+// Everything on screen is a flat plane at some depth, and only the camera moves,
+// like Disney's multiplane camera: the depth you feel comes from parallax alone.
+// The story: the eye; through the pupil into the dark of the vitreous; a fall straight down onto the
+// retina, its layers seen from above, into the roof of the forest; a cut hidden in the dark of that roof;
+// and we come out inside the retina, looking along it, among its cells.
+(function () {
+  'use strict';
+
+  var canvas = document.getElementById('stage');
+  var ctx = canvas.getContext('2d');
+  var q = new URLSearchParams(location.search);
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // for screenshots and tuning: ?p=0.5 holds the camera there, ?px=&py= hold the pointer (-1..1), ?flat, ?debug, ?seed=
+  var fixedP = q.has('p') ? clamp(parseFloat(q.get('p')) || 0, 0, 1) : null;
+  var fixedPtr = q.has('px') || q.has('py') ? { x: parseFloat(q.get('px')) || 0, y: parseFloat(q.get('py')) || 0 } : null;
+  var SEED = parseInt(q.get('seed'), 10) || 7;
+  var SKIP = (q.get('skip') || '').split(',');   // ?skip=planes,slices,veil,rays,river,trunks: leave things out, to see what costs what
+  var TAU = Math.PI * 2;
+
+  // the scroll, start to end: rest; fly at the eye until the pupil fills the screen; a moment of dark; the retina
+  // glows up far below and we fall into it; the cut, in the dark of the roof; down into the forest; deeper in
+  var P_DIVE = 0.03, P_PUPIL = 0.14, P_GLOW = 0.16, P_CUT = 0.4, P_REST = 0.66;
+  var Z_EYE = 1, FLAT_REF = 3;   // flattened, every plane sways with the pointer as one this far away would
+  var FALL_TOP = 45, ROOF_H = 0.26;   // the fall: camera height above the floor of rods and cones, and the roof we fall into
+  var BLIND = { x: -0.62, y: 0.05 };  // the blind spot, where the nerve fibres leave and the vessels come in
+  // the retina edge on, in world units, down is positive: its inner surface, where the glia's roots stop, the floor
+  var ILM = -0.9, OLM = 0.6, FLOOR = 0.9;
+  var SLICES = [13, 7.5, 4.4, 2.7, 1.7, 1.25];   // the last one frames the view: trees at its edges, its middle open
+  var CAM_Z0 = -0.6, CAM_Z1 = 1;      // the forest camera's depth just after the cut, and at the very end
+  var HAZE = '#DDB57C', DARK = '#0E1726';
+
+  // ---------- small helpers ----------
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function smooth(a, b, v) { var t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
+  function easeInOut(t) { return 0.5 - 0.5 * Math.cos(Math.PI * clamp(t, 0, 1)); }
+  function angDiff(a, b) { var d = (b - a) % TAU; return d > Math.PI ? d - TAU : d < -Math.PI ? d + TAU : d; }
+  function cm(a, b, c, d, t) { return 0.5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (3 * b - a - 3 * c + d) * t * t * t); }
+  function rng(seed) {
+    var s = seed >>> 0;
+    return function () {
+      s = (s + 0x6D2B79F5) >>> 0;
+      var t = Math.imul(s ^ (s >>> 15), s | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function rgb(h) { var n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+  function mix(a, b, t) {
+    var A = rgb(a), B = rgb(b), c = '#';
+    for (var i = 0; i < 3; i++) c += (256 | Math.round(A[i] + (B[i] - A[i]) * t)).toString(16).slice(1);
+    return c;
+  }
+  function alpha(h, a) { var c = rgb(h); return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; }
+  function circle(x, y, r) { var c = new Path2D(); c.arc(x, y, r, 0, TAU); return c; }
+
+  // ---------- ink: filled outlines, with a bounding box for culling ----------
+  // A stroke that thins out, as one filled outline. pts: [[x, y, halfWidth], ...]
+  // Every outline winds the same way, so overlapping strokes merge instead of punching holes.
+  function taper(path, pts) {
+    var n = pts.length, L = [], R = [], i, a, b, dx, dy, d, nx, ny, w;
+    if (n < 2) return;
+    for (i = 0; i < n; i++) {
+      a = pts[i > 0 ? i - 1 : 0]; b = pts[i < n - 1 ? i + 1 : n - 1];
+      dx = b[0] - a[0]; dy = b[1] - a[1]; d = Math.hypot(dx, dy) || 1;
+      nx = -dy / d; ny = dx / d; w = pts[i][2];
+      L.push(pts[i][0] + nx * w, pts[i][1] + ny * w);
+      R.push(pts[i][0] - nx * w, pts[i][1] - ny * w);
+    }
+    path.moveTo(L[0], L[1]);
+    for (i = 2; i < L.length; i += 2) path.lineTo(L[i], L[i + 1]);
+    for (i = R.length - 2; i >= 0; i -= 2) path.lineTo(R[i], R[i + 1]);
+    path.closePath();
+  }
+
+  // Chrome makes each step added to a Path2D slower the bigger the path already is, so an ink collects its
+  // shapes in chunks of a few hundred and joins them into one path only when it is drawn.
+  function Ink() { this.chunks = [new Path2D()]; this.n = 0; this.merged = null; this.box = [Infinity, Infinity, -Infinity, -Infinity]; }
+  Ink.prototype.cur = function () {
+    if (++this.n % 300 === 0) this.chunks.push(new Path2D());
+    this.merged = null;
+    return this.chunks[this.chunks.length - 1];
+  };
+  Object.defineProperty(Ink.prototype, 'path', { get: function () {
+    if (this.chunks.length === 1) return this.chunks[0];
+    if (!this.merged) { var m = new Path2D(); this.chunks.forEach(function (c) { m.addPath(c); }); this.merged = m; }
+    return this.merged;
+  } });
+  Ink.prototype.fit = function (x, y, r) {
+    var b = this.box;
+    if (x - r < b[0]) b[0] = x - r;
+    if (y - r < b[1]) b[1] = y - r;
+    if (x + r > b[2]) b[2] = x + r;
+    if (y + r > b[3]) b[3] = y + r;
+  };
+  // While the forest is painted, strokes swell and thin along their length, like a brush.
+  var wobble = 0, wob = Math.random;
+  Ink.prototype.taper = function (pts) {
+    if (wobble) {
+      var ph = wob() * TAU, ph2 = wob() * TAU;
+      pts = pts.map(function (pt, i) { return [pt[0], pt[1], pt[2] * (1 + wobble * (0.6 * Math.sin(i * 0.9 + ph) + 0.4 * Math.sin(i * 2.3 + ph2)))]; });
+    }
+    taper(this.cur(), pts);
+    for (var i = 0; i < pts.length; i++) this.fit(pts[i][0], pts[i][1], pts[i][2]);
+  };
+  // a rounded cell body, drawn out towards ang
+  Ink.prototype.blob = function (x, y, r, ang, point) {
+    var n = 28, i, t, rr, px, py, P = this.cur();
+    for (i = 0; i <= n; i++) {
+      t = -i / n * TAU;
+      rr = r * (1 + point * Math.pow(Math.max(0, Math.cos(t)), 5));
+      px = x + Math.cos(ang + t) * rr; py = y + Math.sin(ang + t) * rr;
+      if (i) P.lineTo(px, py); else P.moveTo(px, py);
+    }
+    P.closePath();
+    this.fit(x, y, r * (1 + point));
+  };
+  // a rounded triangle, pointing up (the broad foot of a cone)
+  Ink.prototype.tri = function (x, y, r) {
+    var n = 30, i, t, rr, px, py, P = this.cur();
+    for (i = 0; i <= n; i++) {
+      t = -i / n * TAU;
+      rr = r * (1 + 0.32 * Math.cos(3 * t));
+      px = x + Math.cos(t - Math.PI / 2) * rr; py = y - r * 0.2 + Math.sin(t - Math.PI / 2) * rr;
+      if (i) P.lineTo(px, py); else P.moveTo(px, py);
+    }
+    P.closePath();
+    this.fit(x, y, r * 1.4);
+  };
+  Ink.prototype.dot = function (x, y, r) {
+    var P = this.cur();
+    P.moveTo(x + r, y);
+    P.arc(x, y, r, 0, TAU, true);
+    this.fit(x, y, r);
+  };
+  Ink.prototype.hex = function (x, y, r, a) {
+    var P = this.cur();
+    for (var i = 0; i <= 6; i++) {
+      var t = a - i / 6 * TAU, px = x + Math.cos(t) * r, py = y + Math.sin(t) * r;
+      if (i) P.lineTo(px, py); else P.moveTo(px, py);
+    }
+    P.closePath();
+    this.fit(x, y, r);
+  };
+
+  // ---------- dendrites, after Cajal ----------
+  // The thinnest a stroke may get, in drawing units, set per layer so that every twig stays visible:
+  // Cajal inked every last branch, and that is what makes his cells dense.
+  var minInk = 0;
+  // Where the cells are, for the plate's labels: while a slice paints, each cell marks its body (in the slice's units).
+  var marks = null;
+  function mark(k, x, y) { if (marks) marks.push({ k: k, x: x, y: y }); }
+
+  // Grow a dendrite: a wandering stroke that thins out, sprouts spines and side branches, then forks.
+  function grow(ink, o, rnd, x, y, ang, len, w, depth) {
+    var n = Math.max(2, Math.round(len / o.step)), seg = len / n, pts = [[x, y, Math.max(minInk, w)]], wi = w, i, cut = false;
+    for (i = 1; i <= n; i++) {
+      ang += (rnd() - 0.5) * o.wiggle + (o.curl || 0);
+      if (o.pull != null) ang += angDiff(ang, o.pull) * o.pullK;
+      x += Math.cos(ang) * seg; y += Math.sin(ang) * seg;
+      wi = Math.max(minInk, w * (1 - (1 - o.taper) * i / n));
+      pts.push([x, y, wi]);
+      if (o.inside && !o.inside(x, y)) { cut = true; break; }
+      if (o.spine && rnd() < o.spine) {
+        var sa = ang + (rnd() < 0.5 ? -1 : 1) * (0.7 + rnd() * 0.8), sl = o.spineLen * (0.5 + rnd());
+        ink.taper([[x, y, wi * 0.8], [x + Math.cos(sa) * sl, y + Math.sin(sa) * sl, 0]]);
+      }
+      if (o.side && i < n && depth + 2 <= o.depth && rnd() < o.side) {
+        grow(ink, o, rnd, x, y, ang + (rnd() < 0.5 ? -1 : 1) * (0.5 + rnd() * 0.6), len * o.sideK, wi * 0.65, depth + 2);
+      }
+    }
+    var end = cut || depth >= o.depth;
+    if (end) pts[pts.length - 1][2] = 0;
+    ink.taper(pts);
+    if (end && o.leafInk && rnd() < o.leaf) o.leafInk.blob(x, y, o.leafR * (0.6 + rnd() * 0.8), ang, 0.2 + rnd() * 0.5);   // a tuft of foliage
+    if (end) return;
+    if (o.joint) ink.dot(x, y, wi);   // a round joint where it forks, so the branches grow out of it smoothly
+    for (i = 0; i < 2; i++) {
+      grow(ink, o, rnd, x, y, ang + (i - 0.5) * o.spread * (0.7 + rnd() * 0.6), len * o.lenK * (0.75 + rnd() * 0.5), wi * o.wK, depth + 1);
+    }
+  }
+
+  // ---------- textures ----------
+  // tileable value noise, a few octaves, 0..1
+  function noiseTile(n, cells, octaves, rnd) {
+    var out = new Float32Array(n * n), amp = 1, total = 0, o, x, y;
+    for (o = 0; o < octaves; o++) {
+      var c = cells << o, g = new Float32Array(c * c);
+      for (x = 0; x < c * c; x++) g[x] = rnd();
+      for (y = 0; y < n; y++) {
+        for (x = 0; x < n; x++) {
+          var fx = x / n * c, fy = y / n * c, ix = Math.floor(fx), iy = Math.floor(fy), tx = fx - ix, ty = fy - iy;
+          tx = tx * tx * (3 - 2 * tx); ty = ty * ty * (3 - 2 * ty);
+          var x1 = (ix + 1) % c, y1 = (iy + 1) % c;
+          out[y * n + x] += amp * lerp(lerp(g[iy * c + ix], g[iy * c + x1], tx), lerp(g[y1 * c + ix], g[y1 * c + x1], tx), ty);
+        }
+      }
+      total += amp; amp *= 0.5;
+    }
+    for (x = 0; x < n * n; x++) out[x] /= total;
+    return out;
+  }
+  function texCanvas(w, h, draw) {
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    draw(c.getContext('2d'), w, h);
+    return c;
+  }
+  function pixels(n, fn) {
+    return texCanvas(n, n, function (g) {
+      var img = g.createImageData(n, n), i, px;
+      for (i = 0; i < n * n; i++) { px = fn(i); img.data[i * 4] = px[0]; img.data[i * 4 + 1] = px[1]; img.data[i * 4 + 2] = px[2]; img.data[i * 4 + 3] = px[3]; }
+      g.putImageData(img, 0, 0);
+    });
+  }
+
+  var TEX = {};
+  function makeTextures() {
+    var rnd = rng(SEED + 9);
+    // pigment settling unevenly in a wash: soft dark blotches
+    var nz = noiseTile(256, 4, 4, rnd);
+    TEX.mottle = pixels(256, function (i) { return [34, 12, 14, clamp((nz[i] - 0.38) * 2.2, 0, 1) * 255]; });
+    var nw = noiseTile(256, 3, 3, rnd);
+    TEX.warm = pixels(256, function (i) { return [176, 96, 34, clamp((nw[i] - 0.45) * 2.6, 0, 1) * 255]; });
+    var ns = noiseTile(128, 16, 2, rnd);
+    TEX.speckle = pixels(128, function (i) { return [0, 0, 0, smooth(0.56, 0.72, ns[i]) * 255]; });
+    // the grain of the paper
+    TEX.grain = pixels(128, function () { var v = rnd(); return [40, 20, 16, v < 0.5 ? v * 70 : 0]; });
+    // rods seen end on: a fine honeycomb of pale discs
+    TEX.rods = texCanvas(24, 42, function (g) {
+      g.fillStyle = '#C9902F'; g.fillRect(0, 0, 24, 42);
+      [[0, 0], [24, 0], [12, 21], [0, 42], [24, 42]].forEach(function (c) {
+        var gr = g.createRadialGradient(c[0], c[1], 0, c[0], c[1], 11);
+        gr.addColorStop(0, '#FBE59A'); gr.addColorStop(0.7, '#F2CD6A'); gr.addColorStop(1, 'rgba(242,205,106,0)');
+        g.fillStyle = gr; g.beginPath(); g.arc(c[0], c[1], 11, 0, TAU); g.fill();
+      });
+    });
+    // nuclei seen from above: a scatter of small dark dots
+    TEX.dots = texCanvas(64, 64, function (g) {
+      for (var i = 0; i < 40; i++) { g.fillStyle = 'rgba(80,36,30,' + (0.3 + rnd() * 0.4).toFixed(2) + ')'; g.beginPath(); g.arc(rnd() * 64, rnd() * 64, 1.2 + rnd() * 1.6, 0, TAU); g.fill(); }
+    });
+    // pale streaks in the plasma, lying along the flow
+    TEX.streak = texCanvas(256, 64, function (g) {
+      for (var i = 0; i < 26; i++) {
+        var y = rnd() * 64, x = rnd() * 256, l = 30 + rnd() * 90, w = 1 + rnd() * 2.5;
+        g.strokeStyle = 'rgba(255,214,200,' + (0.18 + rnd() * 0.3).toFixed(2) + ')'; g.lineWidth = w; g.lineCap = 'round';
+        [-256, 0, 256].forEach(function (ox) { g.beginPath(); g.moveTo(x + ox, y); g.quadraticCurveTo(x + ox + l / 2, y + (rnd() - 0.5) * 6, x + ox + l, y); g.stroke(); });
+      }
+    });
+    // the floor seen in perspective: the pigment epithelium's cells, hexagons washed in yellow
+    TEX.floor = texCanvas(60, 104, function (g) {
+      g.fillStyle = 'rgba(140,72,20,.55)'; g.fillRect(0, 0, 60, 104);
+      [[0, 0], [60, 0], [30, 52], [0, 104], [60, 104]].forEach(function (c) {
+        g.fillStyle = 'rgba(255,228,140,.9)'; g.beginPath();
+        for (var i = 0; i <= 6; i++) { var t = Math.PI / 6 + i / 6 * TAU; g[i ? 'lineTo' : 'moveTo'](c[0] + Math.cos(t) * 28, c[1] + Math.sin(t) * 28); }
+        g.fill();
+      });
+    });
+    // the roof seen from below: the bodies of ganglion cells, dark against the light coming through
+    TEX.roof = texCanvas(96, 96, function (g) {
+      for (var i = 0; i < 16; i++) {
+        var x = rnd() * 96, y = rnd() * 96, r = 8 + rnd() * 9;
+        [-96, 0, 96].forEach(function (ox) { [-96, 0, 96].forEach(function (oy) {
+          g.fillStyle = 'rgba(70,24,36,' + (0.28 + rnd() * 0.25).toFixed(2) + ')'; g.beginPath(); g.ellipse(x + ox, y + oy, r, r * 0.8, 0, 0, TAU); g.fill();
+        }); });
+      }
+    });
+    // a shaft of light: soft across, fading as it goes down
+    TEX.ray = texCanvas(64, 256, function (g) {
+      var img = g.createImageData(64, 256), x, y;
+      for (y = 0; y < 256; y++) {
+        for (x = 0; x < 64; x++) {
+          var u = (x - 31.5) / 32, a = Math.exp(-u * u * 4.5) * (1 - 0.7 * y / 255) * smooth(0, 20, y), i = (y * 64 + x) * 4;
+          img.data[i] = 255; img.data[i + 1] = 240; img.data[i + 2] = 205; img.data[i + 3] = a * 255;
+        }
+      }
+      g.putImageData(img, 0, 0);
+    });
+  }
+  // Red blood cells, painted once: a biconcave disc, lit from the upper left, in tilts from face-on to edge-on.
+  // Drawn in turn as a cell tumbles, they make it look round.
+  var CELL_R = 50, CELL_S = 128;
+  function paintCells() {
+    var N = 12, R = CELL_R, S = CELL_S, T = 0.3 * R, frames = [];
+    // half the cell's height at x (u = x / R): its rim seen at the tilt, plus its own thickness, thin in the middle
+    function half(u, c, sn) {
+      var r = Math.sqrt(Math.max(0, 1 - u * u));
+      return R * c * r + T * 1.75 * r * (0.25 + 1.1 * u * u) * sn;
+    }
+    for (var f = 0; f < N; f++) {
+      var th = f / (N - 1) * Math.PI / 2 * 0.97, c = Math.cos(th), sn = Math.sin(th);
+      var dry = texCanvas(S, S, function (g) {
+        g.translate(S / 2, S / 2);
+        var body = new Path2D(), n = 48, i, x;
+        for (i = 0; i <= n; i++) { x = -R + 2 * R * i / n; if (i) body.lineTo(x, -half(x / R, c, sn)); else body.moveTo(x, -half(x / R, c, sn)); }
+        for (i = n; i >= 0; i--) { x = -R + 2 * R * i / n; body.lineTo(x, half(x / R, c, sn)); }
+        body.closePath();
+        var gr = g.createRadialGradient(-0.35 * R, -0.45 * R, 0.08 * R, 0, 0, 1.15 * R);
+        gr.addColorStop(0, '#B42E3C'); gr.addColorStop(0.5, '#86132A'); gr.addColorStop(1, '#520812');
+        g.fillStyle = gr; g.fill(body);
+        // the dimple: a hollow, so lit on its far side; lighter than the rim, still darker than the plasma
+        if (c > 0.12) {
+          var dr = 0.55 * R, dg = g.createLinearGradient(-dr, -dr * c, dr, dr * c);
+          dg.addColorStop(0, 'rgba(66,6,16,.85)'); dg.addColorStop(1, 'rgba(176,56,66,.8)');
+          g.globalAlpha = smooth(0.12, 0.5, c);
+          g.fillStyle = dg; g.beginPath(); g.ellipse(0, 0, dr, dr * c, 0, 0, TAU); g.fill();
+          g.globalAlpha = 1;
+        }
+        // light catching the near rim, upper left
+        g.strokeStyle = 'rgba(244,150,150,.55)'; g.lineWidth = 0.07 * R; g.lineCap = 'round';
+        g.beginPath(); g.ellipse(0, -T * 0.4 * sn, 0.84 * R, 0.84 * R * c + 0.2 * T * sn + 0.5, 0, Math.PI * 1.05, Math.PI * 1.55); g.stroke();
+        // uneven pigment, pooled darker along the outline
+        g.save(); g.clip(body);
+        g.globalAlpha = 0.32; g.fillStyle = pattern(g, TEX.mottle, 0.5, 37 * f, 11 * f); g.fillRect(-S / 2, -S / 2, S, S);
+        g.restore();
+        g.strokeStyle = 'rgba(46,4,12,.55)'; g.lineWidth = 0.045 * R; g.stroke(body);
+      });
+      // a soft bleed under it, as wet paint spreads
+      frames.push(texCanvas(S, S, function (g) {
+        g.filter = 'blur(2.5px)'; g.globalAlpha = 0.4; g.drawImage(dry, 0, 0);
+        g.filter = 'none'; g.globalAlpha = 1; g.drawImage(dry, 0, 0);
+      }));
+    }
+    TEX.cells = frames;
+    TEX.cellShadow = texCanvas(64, 32, function (g) {
+      var gr = g.createRadialGradient(32, 16, 0, 32, 16, 32);
+      gr.addColorStop(0, 'rgba(84,8,18,.6)'); gr.addColorStop(1, 'rgba(84,8,18,0)');
+      g.setTransform(1, 0, 0, 0.5, 0, 8); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    });
+  }
+
+  // A blood cell at (x, y), rr across, tumbling (tilt 0 face-on .. 1 edge-on), turned by rot, fading by a,
+  // flattened a little (sq) to sit in the plane of the river.
+  function drawCell(x, y, rr, tilt, rot, a, sq) {
+    var img = TEX.cells[Math.round(clamp(tilt, 0, 1) * (TEX.cells.length - 1))], k = rr / CELL_R;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.globalAlpha = 0.4 * a;
+    ctx.drawImage(TEX.cellShadow, x - rr * 1.05, y + rr * (0.2 + 0.25 * sq), rr * 2.3, rr * 0.9 * sq);
+    var cs = Math.cos(rot) * k * dpr, sn = Math.sin(rot) * k * dpr;
+    ctx.setTransform(cs, sn * sq, -sn, cs * sq, x * dpr, y * dpr);
+    ctx.globalAlpha = a;
+    ctx.drawImage(img, -CELL_S / 2, -CELL_S / 2);
+    ctx.globalAlpha = 1;
+  }
+
+  function pattern(g, tex, scale, ox, oy) {
+    var key = g === backCtx ? 'patB' : g === ctx ? 'pat' : null;
+    var pt = key ? tex[key] || (tex[key] = g.createPattern(tex, 'repeat')) : g.createPattern(tex, 'repeat');
+    pt.setTransform(new DOMMatrix([scale, 0, 0, scale, ox || 0, oy || 0]));
+    return pt;
+  }
+
+  // ---------- watercolour ----------
+  // The forest is painted once, slice by slice, into bitmaps: cels for the multiplane's glass. Each colour goes
+  // down as a wash: uneven pigment, a soft bleed past its edges, pigment pooling darker along them, then the paper.
+  var scratch = [];
+  function blank(i, w, h) {
+    var c = scratch[i] || (scratch[i] = document.createElement('canvas')), g;
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    g = c.getContext('2d');
+    g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.filter = 'none';
+    g.clearRect(0, 0, w, h);
+    return c;
+  }
+  // ibox: the shape's bounds in the same units as box; the wash only works on that part of the canvas.
+  // strip: [x0, x1] in the same units: lay down only that strip of it (a big wash is laid down strip by strip,
+  // each with a margin, so the bleed across a strip's edge is right, and only its own strip kept).
+  function wash(out, path, colour, edge, qpx, box, soft, dry, ibox, strip) {
+    var W0 = out.width, H0 = out.height, o = out.getContext('2d'), r = Math.max(0.8, soft * qpx), pad = Math.ceil(r * 2.5 + 2);
+    var x0 = 0, y0 = 0, x1 = W0, y1 = H0, kx0 = 0, kx1 = W0;
+    if (ibox) {
+      x0 = clamp(Math.floor((ibox[0] - box[0]) * qpx) - pad, 0, W0); y0 = clamp(Math.floor((ibox[1] - box[1]) * qpx) - pad, 0, H0);
+      x1 = clamp(Math.ceil((ibox[2] - box[0]) * qpx) + pad, 0, W0); y1 = clamp(Math.ceil((ibox[3] - box[1]) * qpx) + pad, 0, H0);
+    }
+    if (strip) {
+      kx0 = clamp(Math.round((strip[0] - box[0]) * qpx), 0, W0); kx1 = clamp(Math.round((strip[1] - box[0]) * qpx), 0, W0);
+      x0 = Math.max(x0, kx0 - pad); x1 = Math.min(x1, kx1 + pad);
+    }
+    var w = x1 - x0, h = y1 - y0, hw = Math.max(1, Math.ceil(w / 2)), hh = Math.max(1, Math.ceil(h / 2));
+    if (w < 1 || h < 1) return;
+    var A = blank(0, w, h), B = blank(1, hw, hh), E = blank(2, w, h), a = A.getContext('2d'), b = B.getContext('2d'), e = E.getContext('2d');
+    // the shape in its colour, the pigment settling unevenly (textures stay put relative to the whole canvas)
+    a.setTransform(qpx, 0, 0, qpx, -box[0] * qpx - x0, -box[1] * qpx - y0);
+    a.fillStyle = colour; a.fill(path);
+    a.setTransform(1, 0, 0, 1, 0, 0);
+    a.globalCompositeOperation = 'source-atop'; a.globalAlpha = 0.55;
+    a.fillStyle = pattern(a, TEX.mottle, 1.4, -x0, -y0); a.fillRect(0, 0, w, h);
+    a.globalAlpha = 0.22;
+    a.fillStyle = pattern(a, TEX.warm, 2.2, 37 - x0, 91 - y0); a.fillRect(0, 0, w, h);
+    if (dry) {
+      a.globalCompositeOperation = 'destination-out'; a.globalAlpha = dry;
+      a.fillStyle = pattern(a, TEX.speckle, 1 + qpx / 1500, 13 - x0, 7 - y0); a.fillRect(0, 0, w, h);
+    }
+    a.globalCompositeOperation = 'source-over'; a.globalAlpha = 1;
+    // a soft copy, at half size: it bleeds past the edges, and tells us where the edges are
+    b.filter = 'blur(' + (r / 2).toFixed(1) + 'px)'; b.drawImage(A, 0, 0, hw, hh); b.filter = 'none';
+    // pigment pooling along the edges: the shape minus its soft copy, darker
+    e.drawImage(A, 0, 0);
+    e.globalCompositeOperation = 'destination-out'; e.drawImage(B, 0, 0, w, h);
+    e.globalCompositeOperation = 'source-in'; e.fillStyle = edge; e.fillRect(0, 0, w, h);
+    if (strip) { o.save(); o.beginPath(); o.rect(kx0, 0, kx1 - kx0, H0); o.clip(); }
+    o.globalAlpha = 0.42; o.drawImage(B, x0, y0, w, h);
+    o.globalAlpha = 0.88; o.drawImage(A, x0, y0);
+    o.globalAlpha = 0.6; o.drawImage(E, x0, y0);
+    o.globalAlpha = 1;
+    if (strip) o.restore();
+  }
+
+  // Cut a wash into strips of at most about half a million pixels, so each is a short step of painting.
+  // Returns the strips, in drawing units ([null] when it is small enough as it is).
+  function strips(ibox, qpx) {
+    var w = (ibox[2] - ibox[0]) * qpx, h = (ibox[3] - ibox[1]) * qpx, n = Math.ceil(w * h / 5e5);
+    if (n <= 1) return [null];
+    var out = [];
+    for (var i = 0; i < n; i++) out.push([lerp(ibox[0], ibox[2], i / n), lerp(ibox[0], ibox[2], (i + 1) / n)]);
+    out[0][0] = -1e9; out[n - 1][1] = 1e9;
+    return out;
+  }
+  function paper(out, strength) {
+    var o = out.getContext('2d');
+    o.globalCompositeOperation = 'source-atop'; o.globalAlpha = strength;
+    o.fillStyle = pattern(o, TEX.grain, 1); o.fillRect(0, 0, out.width, out.height);
+    o.globalCompositeOperation = 'source-over'; o.globalAlpha = 1;
+  }
+
+  // ---------- state ----------
+  var W, H, dpr, A, F, C, halfDiag, eyePx, EYE_S, dMin, cam0;
+  // Resolution. The eye is drawn at the screen's full sharpness (dprEye). Inside it everything is soft paint, so it
+  // is drawn within a budget of pixels (dprBase), and lower still if the device cannot keep up (dprIn, adapted in
+  // frame()); the browser scales the canvas up, and the page's text, being HTML, stays sharp. The forest is painted
+  // at paintScale (fixed when it is painted).
+  var PIXEL_BUDGET = 1.6e6, dprEye = 1, dprBase = 1, dprIn = 0, paintScale = 1, forceScale = parseFloat(q.get('scale')) || 0;
+  var cost = { n: 0, slow: 0, fast: 0, last: 0 };
+  function useScale(sc) {
+    var w = Math.round(W * sc), h = Math.round(H * sc);
+    if (canvas.width === w && canvas.height === h && dpr === sc) return;
+    dpr = sc; canvas.width = w; canvas.height = h;
+  }
+  // wait for the drawing to finish, by copying a pixel of it into a tiny canvas and reading that (reading the
+  // stage itself back would make the browser take it off the GPU for good)
+  var one = null;
+  function flush() {
+    one = one || document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+    one.drawImage(canvas, 0, 0, 1, 1, 0, 0, 1, 1);
+    one.getImageData(0, 0, 1, 1);
+  }
+  var fall, forest, sparks, nightGrad, glowGrad, irisGrad, irisArt;
+  var p = fixedP != null ? fixedP : 0, flatT = q.has('flat') ? 1 : 0, flatTarget = flatT;
+  var rollC = 1, rollS = 0, buildMs = 0;
+  var ptr = { x: 0, y: 0, tx: 0, ty: 0, cx: 0, cy: 0, last: -1e9 };
+  var iris = { x: 0, y: 0, tx: 0, ty: 0, wanderAt: 0 };
+  var blink = { at: 2.2, start: -10, v: 0 };
+  var CAM = { x: 0, y: 0, z: 0 }, FC = { x: 0, y: 0, c: FALL_TOP, roll: 0 }, SC = { x: 0, y: 0, by: 0, py: 0, z: 0, deep: 0 }, PT = { s: 1, tx: 0, ty: 0 };
+
+  // ---------- projection ----------
+  // local -> screen: (x * s + tx, y * s + ty), then the camera roll about the middle, then device pixels
+  function setT(s, tx, ty) {
+    var c = rollC * dpr, sn = rollS * dpr, px = tx - C.x, py = ty - C.y;
+    ctx.setTransform(c * s, sn * s, -sn * s, c * s, dpr * C.x + c * px - sn * py, dpr * C.y + sn * px + c * py);
+  }
+
+  function drawItems(items, T, mult) {
+    var pad = rollS ? halfDiag : 40;
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i], b = it.box;
+      if (b && (b[2] * T.s + T.tx < -pad || b[0] * T.s + T.tx > W + pad || b[3] * T.s + T.ty < -pad || b[1] * T.s + T.ty > H + pad)) continue;
+      ctx.globalAlpha = (it.a == null ? 1 : it.a) * mult;
+      if (it.comp) ctx.globalCompositeOperation = it.comp;
+      if (it.img) ctx.drawImage(it.img, b[0], b[1], b[2] - b[0], b[3] - b[1]);
+      else {
+        if (it.fill) { ctx.fillStyle = it.fill; ctx.fill(it.path); }
+        if (it.stroke) { ctx.strokeStyle = it.stroke; ctx.lineWidth = it.lw; ctx.stroke(it.path); }
+      }
+      if (it.comp) ctx.globalCompositeOperation = 'source-over';
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- the eye (the logo, on the night sky) ----------
+  var EYE = {
+    lower: new Path2D('M118,152 Q200,196 282,152'),
+    lashes: [new Path2D('M238,109 Q243,90 256,82'), new Path2D('M258,118 Q266,100 280,96'), new Path2D('M277,130 Q288,116 302,114')],
+    lashT: [0.7, 0.8, 0.9],
+    glint: new Path2D('M188,118 Q190,126 197,128 Q190,130 188,138 Q186,130 179,128 Q186,126 188,118 Z'),
+    glint2: new Path2D(),
+    irisRing: new Path2D()
+  };
+  EYE.glint2.arc(211, 148, 3, 0, TAU);
+  EYE.irisRing.moveTo(234, 138); EYE.irisRing.arc(200, 138, 34, 0, TAU);
+  EYE.irisRing.moveTo(213, 138); EYE.irisRing.arc(200, 138, 13, 0, TAU);
+  var lidCache = { c: null, upper: null, opening: null };
+  function lids(v) {
+    var c = Math.round(lerp(58, 196, v) * 10) / 10;
+    if (c !== lidCache.c) {
+      lidCache.c = c;
+      lidCache.upper = new Path2D('M104,146 Q200,' + c + ' 296,146');
+      lidCache.opening = new Path2D('M104,146 Q200,' + c + ' 296,146 L282,152 Q200,196 118,152 Z');
+    }
+    return lidCache;
+  }
+
+  // fibres of the iris; up close, their ends fork like dendrites
+  function buildIris(rnd) {
+    var lite = new Ink(), dark = new Ink(), ruff = new Path2D(), collar = new Path2D(), i, k, a, r, x, y;
+    var o = { step: 0.6, wiggle: 0.5, taper: 0.2, spread: 0.8, lenK: 0.6, wK: 0.6, depth: 1 };
+    for (i = 0; i < 220; i++) {
+      var th = (i + rnd() * 0.8) / 220 * TAU, r1 = 26 + rnd() * 7, ang = th, pts = [], ink = i % 3 ? lite : dark;
+      for (k = 0; k <= 10; k++) {
+        r = lerp(13.8, r1, k / 10); ang += (rnd() - 0.5) * 0.04;
+        x = 200 + Math.cos(ang) * r; y = 138 + Math.sin(ang) * r;
+        pts.push([x, y, 0.27 * (1 - k / 12)]);
+      }
+      ink.taper(pts);
+      if (rnd() < 0.45) grow(ink, o, rnd, x, y, ang + (rnd() - 0.5) * 0.8, 1.8 + rnd() * 1.5, 0.06, 0);
+    }
+    // the pupil's dark frill
+    var ph = rnd() * TAU;
+    for (k = 0; k <= 90; k++) {
+      a = -k / 90 * TAU; r = 13.75 + 0.28 * Math.sin(a * 17 + 2 * Math.sin(a * 3 + ph)) + 0.16 * Math.sin(a * 41);
+      if (k) ruff.lineTo(200 + Math.cos(a) * r, 138 + Math.sin(a) * r); else ruff.moveTo(200 + Math.cos(a) * r, 138 + Math.sin(a) * r);
+    }
+    ruff.closePath(); ruff.moveTo(212.6, 138); ruff.arc(200, 138, 12.6, 0, TAU);
+    // the collarette, a wavy ring part way out
+    for (k = 0; k <= 140; k++) {
+      a = k / 140 * TAU; r = 19 + 1.1 * Math.sin(a * 15) + 0.5 * Math.sin(a * 37);
+      if (k) collar.lineTo(200 + Math.cos(a) * r, 138 + Math.sin(a) * r); else collar.moveTo(200 + Math.cos(a) * r, 138 + Math.sin(a) * r);
+    }
+    return { lite: lite.path, dark: dark.path, ruff: ruff, collar: collar };
+  }
+
+  // the logo's sparkles and its trail of dust, each at its own depth (the trail recedes left to right)
+  var SPARKS = [
+    [350, 168, 'star', 12, '#E7A1B6', -0.2], [330, 60, 'star', 20, '#E7A1B6', 0.22], [78, 84, 'star', 12, '#F5F2EA', -0.12],
+    [112, 48, 'dot', 2.5, '#F5F2EA', 0.3], [296, 96, 'dot', 2, '#F7DDE5', 0.1],
+    [50, 200, 'dot', 2.5, '#F7DDE5', -0.24], [80, 210.5, 'dot', 3, '#E7A1B6', -0.2], [110, 218, 'dot', 3.5, '#F7DDE5', -0.16],
+    [140, 222.5, 'dot', 4.5, '#E7A1B6', -0.12], [170, 224, 'dot', 5, '#F7DDE5', -0.08], [200, 222.5, 'dot', 5.5, '#E7A1B6', -0.04],
+    [230, 218, 'px', 10, '#E7A1B6', 0], [260, 210.5, 'px', 9, '#F7DDE5', 0.05], [289.5, 199.5, 'px', 8, '#E7A1B6', 0.1], [320, 186.5, 'px', 7, '#F7DDE5', 0.15]
+  ];
+  var SHAPES = { star: new Path2D('M0,-1 Q0.17,-0.17 1,0 Q0.17,0.17 0,1 Q-0.17,0.17 -1,0 Q-0.17,-0.17 0,-1 Z'), dot: new Path2D(), px: new Path2D() };
+  SHAPES.dot.arc(0, 0, 1, 0, TAU);
+  if (SHAPES.px.roundRect) SHAPES.px.roundRect(-0.5, -0.5, 1, 1, 0.15); else SHAPES.px.rect(-0.5, -0.5, 1, 1);
+
+  // Place each one so that, seen from the rest position, it sits exactly where the logo has it.
+  function buildSparks() {
+    return SPARKS.map(function (s) {
+      var k = 1 + s[5];
+      return {
+        x: cam0.x + ((s[0] - 200) * EYE_S - cam0.x) * k, y: cam0.y + ((s[1] - 138) * EYE_S - cam0.y) * k,
+        z: Z_EYE + s[5], size: s[3] * EYE_S * k, shape: s[2], col: s[4], back: s[5] >= 0
+      };
+    });
+  }
+
+  function drawSparks(cam, now, back) {
+    for (var i = 0; i < sparks.length; i++) {
+      var s = sparks[i], d = s.z - cam.z;
+      if (s.back !== back || d < 0.03) continue;
+      var k = F / d, sx = C.x + (s.x - cam.x) * k, sy = C.y + (s.y - cam.y) * k;
+      var size = s.size * k * (reduce ? 1 : 1 + 0.1 * Math.sin(now * 0.0021 + i * 1.7));
+      if (sx < -size * 2 || sx > W + size * 2 || sy < -size * 2 || sy > H + size * 2) continue;
+      setT(size, sx, sy);
+      ctx.fillStyle = s.col;
+      ctx.fill(SHAPES[s.shape]);
+    }
+  }
+
+  function drawEye(cam, now) {
+    var de = Z_EYE - cam.z, se = EYE_S * F / de, zoom = 1 / de, i;
+    var ox = C.x + (-200 * EYE_S - cam.x) * F / de, oy = C.y + (-138 * EYE_S - cam.y) * F / de;
+    var ix = iris.x, iy = iris.y, lid = lids(blink.v);
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = nightGrad;
+    ctx.fillRect(0, 0, W, H);
+    drawSparks(cam, now, true);
+    setT(se, ox, oy);
+    ctx.save();
+    ctx.translate(200, 140); ctx.scale(1, 86 / 140);
+    ctx.fillStyle = glowGrad;
+    ctx.fillRect(-140, -140, 280, 280);
+    ctx.restore();
+
+    // the iris, under the lids, around a pupil that stays dark: there is nothing to see in there yet
+    ctx.save();
+    ctx.clip(lid.opening);
+    ctx.translate(ix, iy);
+    ctx.fillStyle = DARK;
+    ctx.beginPath(); ctx.arc(200, 138, 13.2, 0, TAU); ctx.fill();
+    ctx.fillStyle = irisGrad;
+    ctx.fill(EYE.irisRing, 'evenodd');
+    var fa = 0.5 + 0.5 * smooth(1.5, 6, zoom);
+    ctx.globalAlpha = fa * 0.6; ctx.fillStyle = '#FBE2EA'; ctx.fill(irisArt.lite);
+    ctx.globalAlpha = fa * 0.5; ctx.fillStyle = '#8E2F55'; ctx.fill(irisArt.dark);
+    ctx.globalAlpha = fa * 0.55; ctx.strokeStyle = '#B4506F'; ctx.lineWidth = 0.5; ctx.stroke(irisArt.collar);
+    ctx.globalAlpha = 1; ctx.fillStyle = '#4B1C33'; ctx.fill(irisArt.ruff, 'evenodd');
+    // the glints reflect the light outside, so they fade as we come close
+    var g = 1 - smooth(1.6, 3.5, zoom);
+    if (g > 0) { ctx.globalAlpha = g; ctx.fillStyle = '#FFF8EC'; ctx.fill(EYE.glint); ctx.fill(EYE.glint2); ctx.globalAlpha = 1; }
+    ctx.restore();
+
+    // lids and lashes
+    ctx.strokeStyle = '#F5F2EA';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 6; ctx.stroke(lid.upper);
+    ctx.globalAlpha = 0.7; ctx.lineWidth = 3.5; ctx.stroke(EYE.lower); ctx.globalAlpha = 1;
+    ctx.lineWidth = 4;
+    for (i = 0; i < 3; i++) {
+      var t = EYE.lashT[i];
+      ctx.save(); ctx.translate(0, 2 * t * (1 - t) * (lid.c - 58)); ctx.stroke(EYE.lashes[i]); ctx.restore();
+    }
+    drawSparks(cam, now, false);
+  }
+
+  function eyeCam(pp) {
+    var c = CAM, u = clamp((pp - P_DIVE) / (P_PUPIL - P_DIVE), 0, 1);
+    var d = Math.exp(Math.log(dMin) * Math.pow(u, 1.5));   // a steady zoom rate, gently started
+    var f = (d - dMin) / (1 - dMin);                          // 1 at rest, 0 at the pupil: drift to its middle
+    c.z = Z_EYE - d;
+    c.x = (cam0.x + ptr.x * 0.014) * f;
+    c.y = (cam0.y + ptr.y * 0.009) * f;
+    return c;
+  }
+
+  // ---------- the fall: the retina from above ----------
+  // We fall straight down, as Disney's multiplane camera looked down through its stacked glass. The retina's
+  // layers lie one under the other, and we see down through them: the vessels and nerve fibres on top, the
+  // honeycomb roof of ganglion cells, the lace of the amacrine cells, the cell bodies of the middle layer
+  // like bubbles, the stars of the horizontal cells, and at the bottom the yellow floor of rods and cones.
+  // World units, centred on the spot we fall towards; layers by their height above the floor.
+
+  // Scatter things on a jittered hex grid inside a circle, thinning out towards its edge,
+  // grouped in tiles so we only draw what is on screen.
+  function scatter(rnd, R, step, jit, fn) {
+    var tiles = {}, n = Math.ceil(R / step) + 1, ts = Math.max(R / 6, step * 4), i, j;
+    for (j = -n; j <= n; j++) {
+      for (i = -n; i <= n; i++) {
+        var x = (i + (j & 1 ? 0.5 : 0)) * step + (rnd() - 0.5) * jit * step, y = j * step * 0.866 + (rnd() - 0.5) * jit * step;
+        if (rnd() < smooth(R * 0.45, R, Math.hypot(x, y))) continue;
+        var key = Math.floor(x / ts) + ':' + Math.floor(y / ts);
+        fn(tiles[key] || (tiles[key] = new Ink()), x, y);
+      }
+    }
+    return Object.keys(tiles).map(function (k) { return tiles[k]; });
+  }
+  function layer(h, size, near) { return { h: h, size: size, near: near || 0, items: [] }; }
+
+  // An organic honeycomb: a hex lattice whose corners are nudged (each corner once, so neighbours still meet),
+  // its cells drawn as soft pillows set a little apart, so you see down between them, each with its nucleus.
+  function honeycomb(rnd, R, s, jit) {
+    var tiles = {}, n = Math.ceil(R / s) + 2, ts = R / 6, cr = s / Math.sqrt(3), i, j, c;
+    function nudge(x, y) {   // the same corner always moves the same way, whichever cell asks
+      var h = Math.sin(Math.round(x * 1e4) * 12.9898 + Math.round(y * 1e4) * 78.233) * 43758.5453, f = h - Math.floor(h);
+      var a = f * TAU, m = (0.5 + 0.5 * Math.sin(f * 91.7)) * jit * s;
+      return [x + Math.cos(a) * m, y + Math.sin(a) * m];
+    }
+    for (j = -n; j <= n; j++) {
+      for (i = -n; i <= n; i++) {
+        var cx = (i + (j & 1 ? 0.5 : 0)) * s, cy = j * s * 0.866;
+        if (rnd() < smooth(R * 0.45, R, Math.hypot(cx, cy))) continue;
+        var key = Math.floor(cx / ts) + ':' + Math.floor(cy / ts);
+        var t = tiles[key] || (tiles[key] = { cells: [new Ink(), new Ink(), new Ink()], nuc: new Ink() }), pts = [];
+        for (c = 0; c < 6; c++) {
+          var a = Math.PI / 6 + c / 6 * TAU, q = nudge(cx + Math.cos(a) * cr, cy + Math.sin(a) * cr), inset = 0.84 + rnd() * 0.06;
+          pts.push([lerp(cx, q[0], inset), lerp(cy, q[1], inset)]);
+        }
+        var ink = t.cells[Math.floor(rnd() * 3)], P = ink.cur();
+        P.moveTo((pts[5][0] + pts[0][0]) / 2, (pts[5][1] + pts[0][1]) / 2);
+        for (c = 0; c < 6; c++) { var nx = pts[(c + 1) % 6]; P.quadraticCurveTo(pts[c][0], pts[c][1], (pts[c][0] + nx[0]) / 2, (pts[c][1] + nx[1]) / 2); }
+        P.closePath();
+        ink.fit(cx, cy, cr * 1.2);
+        if (rnd() < 0.8) t.nuc.dot(cx + (rnd() - 0.5) * s * 0.25, cy + (rnd() - 0.5) * s * 0.25, s * (0.11 + rnd() * 0.06));
+      }
+    }
+    return Object.keys(tiles).map(function (k) { return tiles[k]; });
+  }
+  function disc(R, colour) {
+    var g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+    g.addColorStop(0, colour); g.addColorStop(0.55, colour); g.addColorStop(1, alpha(colour, 0));
+    return { path: circle(0, 0, R), fill: g, box: [-R, -R, R, R] };
+  }
+
+  function buildFall(rnd) {
+    var list = [], L, g, i;
+
+    // the floor: the orange disc of the fundus, yellow in the middle
+    L = layer(0, 0);
+    g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1.9);
+    g.addColorStop(0, '#F6CB55'); g.addColorStop(0.12, '#EEAA42'); g.addColorStop(0.42, '#D9692E');
+    g.addColorStop(0.76, '#A63623'); g.addColorStop(1, 'rgba(60,14,12,0)');
+    L.items.push({ path: circle(0, 0, 1.9), fill: g, box: [-1.9, -1.9, 1.9, 1.9] });
+    list.push(L);
+
+    // up close, the floor is a fine honeycomb of rods with the odd cone among them, darker
+    L = layer(0.0005, 0.0012);
+    var rods = pattern(ctx, TEX.rods, 0.0048 / 24);
+    L.items.push({ path: circle(0, 0, 0.5), fill: rods, box: [-0.5, -0.5, 0.5, 0.5] });
+    scatter(rnd, 0.48, 0.012, 0.8, function (ink, x, y) { ink.dot(x, y, 0.0028 + rnd() * 0.0012); })
+      .forEach(function (t) { L.items.push({ path: t.path, fill: 'rgba(122,52,24,.82)', box: t.box }); });
+    list.push(L);
+
+    // the nuclei of the rods and cones, a little above
+    L = layer(0.05, 0.0015);
+    L.items.push(Object.assign(disc(0.45, '#FFFFFF'), { fill: pattern(ctx, TEX.dots, 0.03 / 64), a: 0.55 }));
+    list.push(L);
+
+    // horizontal cells: wide, flat stars
+    L = layer(0.09, 0.004);
+    var stars = new Ink(), so = { step: 0.004, wiggle: 0.5, taper: 0.4, spread: 0.8, lenK: 0.6, wK: 0.65, depth: 2 };
+    scatter(rnd, 0.45, 0.055, 1, function (ink, x, y) {
+      for (var j = 0; j < 6; j++) grow(ink, so, rnd, x, y, j / 6 * TAU + rnd(), 0.018 + rnd() * 0.012, 0.0008, 0);
+      ink.dot(x, y, 0.0025);
+    }).forEach(function (t) { L.items.push({ path: t.path, fill: 'rgba(70,30,26,.55)', box: t.box }); });
+    list.push(L);
+
+    // the middle layer's cell bodies, packed like bubbles, see-through
+    L = layer(0.15, 0.005);
+    scatter(rnd, 0.42, 0.0115, 0.5, function (ink, x, y) { ink.dot(x, y, 0.0042 + rnd() * 0.0016); })
+      .forEach(function (t) { L.items.push({ path: t.path, fill: 'rgba(150,70,40,.16)', stroke: 'rgba(74,34,38,.6)', lw: 0.0011, box: t.box }); });
+    list.push(L);
+
+    // the amacrine cells' lace
+    L = layer(0.205, 0.004);
+    var lo = { step: 0.004, wiggle: 0.6, taper: 0.5, spread: 0.9, lenK: 0.62, wK: 0.66, depth: 3 };
+    scatter(rnd, 0.42, 0.035, 1, function (ink, x, y) {
+      for (var j = 0; j < 4; j++) grow(ink, lo, rnd, x, y, j / 4 * TAU + rnd() * 1.5, 0.012 + rnd() * 0.01, 0.0007, 0);
+      ink.dot(x, y, 0.002);
+    }).forEach(function (t) { L.items.push({ path: t.path, fill: 'rgba(58,24,30,.6)', box: t.box }); });
+    list.push(L);
+
+    // the roof: an organic honeycomb of ganglion cells, see-through, in three shades, each with its nucleus
+    L = layer(ROOF_H, 0.009);
+    var cells = [], nuclei = [], shades = ['rgba(110,40,58,.24)', 'rgba(88,30,48,.34)', 'rgba(132,54,72,.17)'];
+    honeycomb(rnd, 0.5, 0.02, 0.22).forEach(function (t) {
+      t.cells.forEach(function (ink, c) { if (isFinite(ink.box[0])) cells.push({ path: ink.path, fill: shades[c], stroke: 'rgba(62,20,34,.5)', lw: 0.0009, box: ink.box }); });
+      if (isFinite(t.nuc.box[0])) nuclei.push({ path: t.nuc.path, fill: 'rgba(58,18,32,.5)', box: t.nuc.box });
+    });
+    L.items = cells.concat(nuclei);
+    list.push(L);
+
+    // on top: the nerve fibres, streaming to the blind spot, and the vessels, red rivers coming out of it
+    L = layer(0.3, 0, 0.07);
+    var nfl = new Ink(), fo = { step: 0.02, wiggle: 0.05, taper: 0.7, spread: 0.3, lenK: 0.8, wK: 0.8, depth: 0 };
+    for (i = 0; i < 160; i++) {
+      var a0 = rnd() * TAU, r0 = 0.15 + rnd() * 1.4, sx = Math.cos(a0) * r0, sy = Math.sin(a0) * r0;
+      fo.pull = Math.atan2(BLIND.y - sy, BLIND.x - sx); fo.pullK = 0.12;
+      grow(nfl, fo, rnd, sx, sy, fo.pull + (rnd() - 0.5) * 0.6, Math.hypot(BLIND.x - sx, BLIND.y - sy) * 0.9, 0.0012, 0);
+    }
+    L.items.push({ path: nfl.path, fill: 'rgba(255,236,200,.2)', box: nfl.box });
+    g = ctx.createRadialGradient(BLIND.x, BLIND.y, 0, BLIND.x, BLIND.y, 0.16);
+    g.addColorStop(0, '#FFF8E6'); g.addColorStop(0.25, '#FCEBB8'); g.addColorStop(0.6, '#F6D27E'); g.addColorStop(0.8, '#E9A548'); g.addColorStop(1, 'rgba(225,140,60,0)');
+    L.items.push({ path: circle(BLIND.x, BLIND.y, 0.16), fill: g, box: [BLIND.x - 0.16, BLIND.y - 0.16, BLIND.x + 0.16, BLIND.y + 0.16] });
+    var veins = new Ink(), arteries = new Ink();
+    var o = { step: 0.008, wiggle: 0.06, taper: 0.82, spread: 0.55, lenK: 0.7, wK: 0.74, depth: 5, side: 0.03, sideK: 0.45, joint: true,
+      inside: function (x, y) { var r2 = x * x + y * y; return r2 > 0.02 && r2 < 3; } };   // they keep out of the very middle
+    [[-0.42, 0.022, 0.015, veins], [-0.56, 0.024, 0.011, arteries], [0.42, -0.022, 0.015, veins], [0.56, -0.024, 0.011, arteries],
+      [Math.PI + 0.5, 0, 0.012, veins], [Math.PI - 0.5, 0, 0.011, arteries], [Math.PI + 0.1, 0, 0.009, arteries], [Math.PI - 0.15, 0, 0.009, veins]].forEach(function (v) {
+      o.curl = v[1] * o.step / 0.02;   // the curl is per step: keep the same turning per unit of length
+      grow(v[3], o, rnd, BLIND.x + Math.cos(v[0]) * 0.03, BLIND.y + Math.sin(v[0]) * 0.03, v[0], 0.62, v[2], 0);
+    });
+    L.items.push({ path: veins.path, fill: '#8C1626', stroke: '#4A0A14', lw: 0.003, box: veins.box });
+    L.items.push({ path: arteries.path, fill: '#C3343B', stroke: '#5E0E1C', lw: 0.0025, box: arteries.box });
+    list.push(L);
+
+    // floaters in the vitreous: faint threads and beads, the only things in the dark on the way down
+    [16, 9, 4.6, 2.3, 1.1].forEach(function (h) {
+      var fl = new Ink(), n = 2 + Math.floor(rnd() * 2), k, s;
+      for (k = 0; k < n; k++) {
+        var a = rnd() * TAU, r = rnd() * h * 0.3, x = Math.cos(a) * r, y = Math.sin(a) * r, ang = rnd() * TAU, pts = [];
+        for (s = 0; s <= 24; s++) {
+          ang += (rnd() - 0.5) * 0.4;
+          x += Math.cos(ang) * h * 0.012; y += Math.sin(ang) * h * 0.012;
+          pts.push([x, y, h * 0.0012]);
+          if (rnd() < 0.12) fl.dot(x, y, h * (0.002 + rnd() * 0.003));
+        }
+        fl.taper(pts);
+      }
+      L = layer(h, h * 0.002, h * 0.25);
+      L.items.push({ path: fl.path, fill: 'rgba(70,30,28,.22)', box: fl.box });
+      list.push(L);
+    });
+
+    list.sort(function (a, b) { return a.h - b.h; });   // farthest (lowest) first
+    return list;
+  }
+
+  function fallCam(pp) {
+    var c = FC, u = clamp((pp - P_PUPIL) / (P_CUT - P_PUPIL), 0, 1);
+    c.c = ROOF_H + Math.exp(lerp(Math.log(FALL_TOP - ROOF_H), Math.log(0.0015), u));   // a steady zoom towards the roof
+    c.x = ptr.x * 0.07 * (c.c - ROOF_H);   // in step with our height above the roof, so the layers below slide against it
+    c.y = ptr.y * 0.05 * (c.c - ROOF_H);
+    c.roll = reduce ? 0 : 0.6 * u;   // a slow spin, like a falling leaf
+    return c;
+  }
+
+  function drawFall(cam) {
+    rollC = Math.cos(cam.roll); rollS = Math.sin(cam.roll);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#0A0C14';
+    ctx.fillRect(0, 0, W, H);
+    var e = smooth(P_GLOW - 0.005, P_GLOW + 0.04, p), T = PT, i, L, d, s, a;
+    if (e > 0) {
+      for (i = 0; i < fall.length; i++) {
+        L = fall[i]; d = cam.c - L.h;
+        if (d < 0.0012) continue;
+        s = F / d;
+        a = L.size ? smooth(0.6, 2.5, L.size * s) : 1;
+        if (L.near) a *= smooth(L.near * 0.15, L.near, d);   // things above the roof fade before they reach us
+        if (a < 0.01) continue;
+        T.s = s; T.tx = C.x - cam.x * s; T.ty = C.y - cam.y * s;
+        setT(T.s, T.tx, T.ty);
+        drawItems(L.items, T, a);
+      }
+      // the light falls off towards the edges, as when you look through an ophthalmoscope
+      var f = clamp((p - P_GLOW) / (P_CUT - P_GLOW), 0, 1);
+      var v = ctx.createRadialGradient(C.x, C.y, halfDiag * lerp(0.1, 0.65, f), C.x, C.y, halfDiag * lerp(0.75, 1.6, f));
+      v.addColorStop(0, 'rgba(10,12,20,0)'); v.addColorStop(1, 'rgba(10,12,20,.9)');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = v;
+      ctx.fillRect(0, 0, W, H);
+    }
+    // dark until the light comes up, and dark again as we sink into the roof
+    var dark = Math.max(1 - e, smooth(0.006, 0.0018, cam.c - ROOF_H));
+    if (dark > 0) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = alpha(p < P_GLOW + 0.05 ? DARK : '#160A0E', dark.toFixed(3));
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  // ---------- the forest: the retina, edge on ----------
+  // The retina is a slab of layers, upside down: the light comes in through the top. The roof is the ganglion
+  // cells, under it the lacy canopy of the amacrine cells, then the bipolar cells as upper trunks, the horizontal
+  // cells as lower branches, and the trunks are the rods (slim columns) and cones (fat, like bottle palms),
+  // standing on the yellow floor. The glia are the odd trees out: Müller cells, hanging from the roof, with lifted
+  // roots like a mangrove's that stop short of the floor. Each plane is one slice of the slab at some depth;
+  // heights (Y) are world units divided by the slice's depth (k = 1 / D), which makes floor and roof meet in the distance.
+  function haze(D) { return 0.95 * (1 - Math.exp(-Math.max(0, D - 1.5) / 3.2)); }
+
+  // Rod or cone. Returns its foot, where the bipolar and horizontal cells reach it.
+  function rodOrCone(g, rnd, x, k, cone, fl, sc) {
+    fl = fl == null ? FLOOR * k : fl; sc = sc || 1;
+    var os = (cone ? 0.1 : 0.17) * k * sc, is = (cone ? 0.18 : 0.1) * k * sc, w = (cone ? 0.011 : 0.0065) * k * sc;
+    var osTop = fl - os, isTop = osTop - is, sw = (rnd() - 0.5) * 0.02 * k;
+    // the outer segment: rods a straight column, cones a cone pointing down into the floor
+    g.seg.taper(cone ? [[x, fl, w * 0.25], [x, osTop, w * 0.85]] : [[x, fl, w * 0.95], [x, osTop, w * 0.95]]);
+    if (g.discs) for (var yy = fl - 0.012 * k; yy > osTop; yy -= 0.012 * k) { g.discs.moveTo(x - w, yy); g.discs.lineTo(x + w, yy); }
+    // the inner segment: cones swell like a bottle palm
+    var ink = cone || !g.rod ? g.pr : g.rod;   // rods in a lighter ink, so the cones stand out
+    ink.taper(cone ? [[x, osTop, w * 0.9], [x, osTop - is * 0.4, w * 1.9], [x, isTop, w * 1.05]] : [[x, osTop, w], [x, isTop, w * 0.9]]);
+    // the fibre up through the outer nuclear layer, with the nucleus somewhere along it, then the foot
+    var ny = (cone ? OLM - 0.04 : lerp(0.33, OLM - 0.03, rnd())) * k, ft = (0.27 + (rnd() - 0.5) * 0.02) * k, fw = w * (cone ? 0.55 : 0.32);
+    ink.taper([[x, isTop, fw * 1.4], [x + sw * 0.3, ny, fw], [x + sw, ft, fw * 0.9]]);
+    ink.dot(x + sw * 0.3, ny, w * (cone ? 1.1 : 0.9));
+    if (cone) ink.tri(x + sw, ft + w * 0.15, w * 0.7); else ink.dot(x + sw, ft, w * 0.4);
+    mark(cone ? 'C' : 'R', x, cone ? osTop - is * 0.4 : (osTop + fl) / 2);   // a cone's swelling, a rod's stack of discs
+    return { x: x + sw, y: ft };
+  }
+
+  // A bipolar cell: an upper trunk from the feet of a few rods and cones up into the canopy, its body hanging
+  // on it like a lantern. A tree's own bipolar cell is thicker.
+  function bipolarCell(g, rnd, x, k, feet, sc) {
+    sc = sc || 1;
+    var sy = (-0.2 + rnd() * 0.26) * k, top = (-0.48 - rnd() * 0.12) * k, wob = (rnd() - 0.5) * 0.04 * k, i;
+    for (i = 0; i < feet.length; i++) {
+      var f = feet[i];
+      g.ink.taper([[x, sy, 0.003 * k * sc], [lerp(x, f.x, 0.55), lerp(sy, f.y, 0.75), 0.002 * k * sc], [f.x, f.y, 0.0012 * k]]);
+    }
+    g.ink.taper([[x, sy, 0.0045 * k * sc], [x + wob * 0.5, (sy + top) / 2, 0.0038 * k * sc], [x + wob, top, 0.003 * k * sc]]);
+    grow(g.ink, { step: 0.012 * k, wiggle: 0.6, taper: 0.3, spread: 0.9, lenK: 0.55, wK: 0.6, depth: 2 }, rnd, x + wob, top, -Math.PI / 2, 0.04 * k * sc, 0.0022 * k * sc, 0);
+    g.lamp.blob(x, sy, 0.018 * k * sc, -Math.PI / 2, 0.6);
+    mark('Bc', x, sy);
+  }
+
+  // A horizontal cell: lower branches spreading wide from the foot of a tree, drooping, with tufts down to the
+  // feet of the rods and cones around it.
+  function horizontalCell(g, rnd, x, y, k, lod, sc) {
+    var s, j, o = { step: 0.018 * k, wiggle: 0.26, taper: 0.5, spread: 0.6, lenK: 0.58, wK: 0.66, depth: 1 + lod, pullK: 0.06, leafInk: g.leafLow, leaf: lod ? 0.6 : 0.3, leafR: 0.011 * k * sc };
+    for (s = -1; s <= 1; s += 2) {
+      o.pull = s > 0 ? 0.35 : Math.PI - 0.35;
+      for (j = 0; j < 1 + (lod >> 1); j++) grow(g.ink, o, rnd, x, y, s > 0 ? -0.25 - rnd() * 0.3 : Math.PI + 0.25 + rnd() * 0.3, (0.13 + rnd() * 0.12) * k * sc, 0.0055 * k * sc, 0);
+    }
+    var drop = { step: 0.012 * k, wiggle: 0.4, taper: 0.3, spread: 0.7, lenK: 0.5, wK: 0.6, depth: 1, pull: Math.PI / 2, pullK: 0.1 };
+    for (j = 0; j < 2 + lod; j++) grow(g.ink, drop, rnd, x + (rnd() - 0.5) * 0.3 * k * sc, y + 0.01 * k, Math.PI / 2, 0.07 * k, 0.0025 * k, 0);
+    g.gang.blob(x, y - 0.012 * k, 0.015 * k * sc, 0, 0.3);
+    mark('Hc', x, y - 0.012 * k);
+  }
+
+  // An amacrine cell: branches rising into the canopy and spreading flat, a lacy crown with tufts of foliage.
+  function amacrineCell(g, rnd, x, k, lod, sc) {
+    sc = sc || 1;
+    var y = (-0.36 - rnd() * 0.06) * k, j;
+    var o = { step: 0.016 * k, wiggle: 0.38, taper: 0.5, spread: 0.75, lenK: 0.6, wK: 0.66, depth: 2 + lod, pullK: 0.1, spine: lod > 1 ? 0.15 : 0, spineLen: 0.008 * k,
+      leafInk: g.leaf, leaf: lod ? 0.75 : 0.5, leafR: 0.016 * k * sc };
+    for (j = 0; j < 3 + lod; j++) {
+      var side = j % 2 ? 1 : -1;
+      o.pull = side > 0 ? -0.2 : Math.PI + 0.2;
+      grow(g.ink, o, rnd, x, y, -Math.PI / 2 + side * (0.3 + rnd() * 0.7), (0.12 + rnd() * 0.14) * k * sc, 0.004 * k * sc, 0);
+    }
+    g.gang.blob(x, y, 0.016 * k * sc, -Math.PI / 2, 0.5);
+    mark('Ac', x, y);
+  }
+
+  // One tree of the strange forest, built the way the retina is: a cone for its trunk, horizontal cells for its
+  // lower branches, a bipolar cell for its upper trunk, amacrine cells for its canopy, a ganglion cell in the roof.
+  function tree(g, rnd, x, k, lod, ground, feet) {
+    var sc = 0.8 + rnd() * 0.55, fl = ground(x);
+    var foot = rodOrCone(g, rnd, x, k, true, fl, sc * 1.25);
+    feet.push(foot);
+    horizontalCell(g, rnd, foot.x + (rnd() - 0.5) * 0.02 * k, (0.15 + rnd() * 0.04) * k, k, lod, sc);
+    var near = feet.filter(function (f) { return Math.abs(f.x - foot.x) < 0.07 * k; }).slice(0, 4);
+    var bx = foot.x + (rnd() - 0.5) * 0.03 * k;
+    bipolarCell(g, rnd, bx, k, near, sc * 1.35);
+    var n = lod > 1 ? 3 : 2;
+    for (var j = 0; j < n; j++) amacrineCell(g, rnd, bx + (j - (n - 1) / 2) * 0.09 * k * sc + (rnd() - 0.5) * 0.03 * k, k, lod, sc);
+    if (rnd() < 0.8) ganglionCell(g, rnd, bx + (rnd() - 0.5) * 0.1 * k, k, lod);
+  }
+
+  // A ganglion cell: a big body in the roof, dendrites down into the canopy, an axon up and away along the top.
+  function ganglionCell(g, rnd, x, k, lod) {
+    var y = (-0.78 + (rnd() - 0.5) * 0.05) * k, dir = rnd() < 0.5 ? -1 : 1, j;
+    var o = { step: 0.02 * k, wiggle: 0.32, taper: 0.45, spread: 0.75, lenK: 0.6, wK: 0.65, depth: lod, pull: Math.PI / 2, pullK: 0.04 };
+    for (j = 0; j < 1 + lod; j++) grow(g.ink, o, rnd, x, y, Math.PI / 2 + (rnd() - 0.5) * 1.4, (0.1 + rnd() * 0.12) * k, 0.0055 * k, 0);
+    var ay = (ILM - 0.02 - rnd() * 0.06) * k;
+    g.ink.taper([[x, y, 0.005 * k], [x + dir * 0.015 * k, ay + 0.03 * k, 0.004 * k], [x + dir * 0.06 * k, ay, 0.003 * k], [x + dir * 0.14 * k, ay - 0.015 * k, 0]]);
+    g.gang.blob(x, y, (0.022 + rnd() * 0.012) * k, -Math.PI / 2, 0.7);
+    mark('Gc', x, y);
+  }
+
+  // The roof seen from inside: the ganglion cells' bodies packed along it like clumps of leaves, three rows deep,
+  // darker and lower towards us, with gaps where the light comes through.
+  function roof(g, rnd, X, k) {
+    [[g.roofC, -0.9, 0.034, 0.1], [g.roofB, -0.85, 0.027, 0.15], [g.roofA, -0.8, 0.021, 0.24]].forEach(function (row) {
+      var x = -X - rnd() * 0.05 * k;
+      while (x < X) {
+        if (rnd() < row[3]) { x += (0.06 + rnd() * 0.14) * k; continue; }
+        var r = row[2] * (0.6 + rnd() * 0.8) * k, y = (row[1] + (rnd() - 0.5) * 0.06 + 0.03 * Math.sin(x / k * 2.1 + row[1] * 9)) * k;
+        row[0].blob(x, y, r, -Math.PI / 2 + (rnd() - 0.5) * 0.8, 0.2 + rnd() * 0.5);
+        // now and then a cluster hangs lower, a few smaller cells strung below
+        if (rnd() < 0.16) for (var j = 1, hx = x, hy = y; j <= 1 + Math.floor(rnd() * 3); j++) {
+          hx += (rnd() - 0.5) * r; hy += r * (1.2 + rnd() * 0.5);
+          row[0].blob(hx, hy, r * (0.75 - j * 0.12), -Math.PI / 2, 0.3);
+        }
+        x += r * (1.1 + rnd() * 0.9);
+      }
+    });
+  }
+
+  // A Müller cell: the mangrove. End feet splayed against the roof, a feathery trunk hanging down through the
+  // layers, then lifted roots arching out and down, stopping at the outer limiting membrane, short of the floor.
+  function mullerCell(g, rnd, x, k, lod) {
+    var top = ILM * k, soma = (-0.12 + (rnd() - 0.5) * 0.06) * k, split = (0.2 + rnd() * 0.1) * k, lean = (rnd() - 0.5) * 0.06 * k, i, s;
+    for (i = 0; i < 3 + lod; i++) {
+      var fx = x + (i / (2 + lod) - 0.5) * 0.1 * k;
+      g.glia.taper([[x, top + 0.07 * k, 0.005 * k], [lerp(x, fx, 0.7), top + 0.02 * k, 0.004 * k], [fx, top, 0.007 * k]]);
+    }
+    var pts = [], n = 20;
+    for (i = 0; i <= n; i++) {
+      var y = lerp(top + 0.06 * k, split, i / n), tx = x + lean * i / n + Math.sin(i * 0.9) * 0.004 * k;
+      pts.push([tx, y, (0.0065 + 0.0018 * Math.sin(i)) * k]);
+      if (lod && i % 2 && i < n) {
+        var sd = i % 4 === 1 ? 1 : -1;
+        g.glia.taper([[tx, y, 0.0025 * k], [tx + sd * 0.025 * k, y + 0.012 * k, 0]]);
+      }
+    }
+    g.glia.taper(pts);
+    g.glia.blob(x + lean * 0.55, soma, 0.016 * k, -Math.PI / 2, 0.8);
+    var nr = 3 + Math.floor(rnd() * 3), bx = x + lean;
+    for (i = 0; i < nr; i++) {
+      var ex = bx + (i / (nr - 1) - 0.5) * (0.22 + rnd() * 0.1) * k, cp = [];
+      for (s = 0; s <= 12; s++) {
+        var t = s / 12;
+        cp.push([lerp(bx, ex, Math.pow(t, 0.6)), lerp(split, OLM * k, t), 0.005 * k * (1 - 0.5 * t)]);
+      }
+      g.glia.taper(cp);
+      g.glia.dot(ex, OLM * k, 0.006 * k);
+    }
+    mark('Mg', bx, lerp(split, OLM * k, 0.4));   // among its lifted roots
+  }
+
+  // A slice is painted in small steps, queued on forest.steps, so the page stays smooth while it grows:
+  // lay out the ground and the rods, grow the trees a few at a time, the rest, then one wash at a time, then finish.
+  function sliceSteps(D, view) {
+    var S = {}, rnd = forest.rnd, k = 1 / D, hz = haze(D), lod = D < 3 ? 2 : D < 8 ? 1 : 0, frame = D < 1.5;
+    var X = (view + 0.42) * (D - CAM_Z0) / D, x, i, g, feet = [];
+    function open(x, wide) {
+      if (frame && Math.abs(x) < view * (wide ? 0.62 : 0.45)) return true;
+      return Math.abs(x - S.rx) < (wide ? 0.3 : 0.09) * k * (0.8 + rnd() * 0.4);
+    }
+    function ink(on) { minInk = on ? 0.7 / S.qpx : 0; wobble = on ? 0.35 : 0; if (on) wob = S.wob; marks = on ? S.marks : null; }
+    return [
+      function layout() {
+        g = S.g = { pr: new Ink(), rod: new Ink(), seg: new Ink(), glia: new Ink(), ink: new Ink(), lamp: new Ink(), gang: new Ink(), leaf: new Ink(), leafLow: new Ink(),
+          roofA: new Ink(), roofB: new Ink(), roofC: new Ink(), ground: new Ink(), lumps: new Ink(), discs: lod > 1 ? new Path2D() : null };
+        S.marks = [];
+        // keep an avenue open along the river, wide for the trees, narrow for the rods and cones on its banks
+        S.rx = riverX(D) * k;
+        // fine where we come close, coarser where it gets blurred anyway: far off, and right in front of us
+        S.qpx = H * clamp(D / Math.max(0.5, D - CAM_Z1), 1, 1.3) * paintScale * (frame ? 0.55 : D > 6 ? 0.7 : 1);
+        S.wob = rng(Math.round(D * 1000));
+        ink(true);
+        // the ground: rolling, lumpy with cells, low where the river runs
+        var ph1 = rnd() * TAU, ph2 = rnd() * TAU, mounds = [];
+        for (i = 0; i < Math.ceil(X / k * 1.5) + 3; i++) mounds.push({ c: lerp(-X, X, rnd()), w: (0.18 + rnd() * 0.4) * k, h: (0.03 + rnd() * 0.09) * k });
+        S.ground = function (x) {
+          var h = 0.03 * k * (1 + Math.sin(x / k * 1.7 + ph1)) + 0.016 * k * (1 + Math.sin(x / k * 4.3 + ph2));
+          for (var j = 0; j < mounds.length; j++) { var t = (x - mounds[j].c) / mounds[j].w; h += mounds[j].h * Math.exp(-t * t * 2); }
+          return FLOOR * k - h * smooth(0.08 * k, 0.4 * k, Math.abs(x - S.rx));
+        };
+        var gp = g.ground.cur(), steps = 160;
+        S.bottom = (FLOOR + 0.4) * k;
+        gp.moveTo(X, S.bottom);   // right to left along the top, so it winds the same way as the strokes
+        for (i = 0; i <= steps; i++) { x = lerp(X, -X, i / steps); gp.lineTo(x, S.ground(x)); }
+        gp.lineTo(-X, S.bottom); gp.closePath();
+        g.ground.fit(-X, FLOOR * k - 0.3 * k, 0); g.ground.fit(X, S.bottom, 0);
+        for (x = -X; x < X; x += (0.012 + rnd() * 0.014) * k) {   // the cell bodies that make its surface lumpy
+          if (rnd() < 0.85) g.lumps.blob(x, S.ground(x) + (0.004 + rnd() * 0.012) * k, (0.007 + rnd() * 0.009) * k, -Math.PI / 2, 0.15);
+        }
+        // an understorey of rods, with the odd cone, in clumps
+        for (x = -X + rnd() * 0.5 * k; x < X; x += Math.max(0.06, 0.03 * k) * (0.7 + rnd() * 0.6) * (rnd() < 0.15 ? 2.5 : 1)) {
+          if (!open(x, false)) feet.push(rodOrCone(g, rnd, x, k, rnd() < 0.08, S.ground(x), 0.8 + rnd() * 0.4));
+        }
+        S.tstep = Math.max(0.05, (frame ? 0.22 : lod > 1 ? 0.3 : 0.34) * k);
+        S.tx = -X + rnd() * S.tstep;
+        ink(false);
+      },
+      function trees() {
+        var t0 = performance.now();
+        ink(true);
+        while (S.tx < X && performance.now() - t0 < 14) {
+          if (!open(S.tx, true)) tree(g, rnd, S.tx, k, lod, S.ground, feet);
+          S.tx += S.tstep * (0.6 + rnd() * 0.8);
+        }
+        ink(false);
+        return S.tx >= X;
+      },
+      function rest() {
+        ink(true);
+        // a few thin bipolar cells between the trees, more ganglion cells, the roof, and the occasional mangrove
+        for (x = -X + rnd() * 0.1 * k; x < X; x += Math.max(0.08, 0.3 * k) * (0.7 + rnd() * 0.6)) {
+          if (open(x, true)) continue;
+          bipolarCell(g, rnd, x, k, feet.filter(function (f) { return Math.abs(f.x - x) < 0.05 * k; }).slice(0, 3), 0.8);
+        }
+        for (x = -X + rnd() * 0.3 * k; x < X; x += Math.max(0.12, 0.5 * k) * (0.7 + rnd() * 0.6)) if (!open(x, true)) ganglionCell(g, rnd, x, k, lod);
+        roof(g, rnd, X, k);
+        for (x = -X + rnd() * 0.5 * k; x < X; x += Math.max(0.22, 1.1 * k) * (0.7 + rnd() * 0.6)) if (!open(x, true)) mullerCell(g, rnd, x, k, lod);
+        ink(false);
+        // the canvas, and the washes to lay on it, back to front
+        var box = S.box = [-X, (ILM - 0.24) * k, X, S.bottom], cv = S.cv = document.createElement('canvas');
+        // at most 4096 pixels either way: on a wide screen the slice is painted a little coarser, the same both ways,
+        // so the painting still fills its canvas exactly (or it would be stretched and the ground lifted)
+        S.qpx = Math.min(S.qpx, 4096 / (box[2] - box[0]), 4096 / (box[3] - box[1]));
+        cv.width = Math.ceil((box[2] - box[0]) * S.qpx); cv.height = Math.ceil((box[3] - box[1]) * S.qpx);
+        var earth = ctx.createLinearGradient(0, (FLOOR - 0.15) * k, 0, S.bottom);
+        earth.addColorStop(0, mix('#E9B54A', HAZE, hz)); earth.addColorStop(0.35, mix('#D99A36', HAZE, hz)); earth.addColorStop(1, mix('#B8742A', HAZE, hz));
+        S.washes = [[g.roofC, '#A56A7C', 0.2, 1], [g.ground, earth, 0.15, 0, '#C98A2E'], [g.lumps, '#D7A03E', 0.2], [g.seg, '#C48A3A', 0.3], [g.rod, '#A0703E', 0.35], [g.pr, '#6B3A24', 0.3],
+          [g.glia, '#7E86A8', 0.35], [g.leafLow, '#7A4A3A', 0.3], [g.ink, '#3E1C24', 0.45], [g.leaf, '#8E4E5E', 0.25],
+          [g.roofB, '#83405A', 0.2, 1], [g.gang, '#7A2E4A', 0.25], [g.roofA, '#64263E', 0.2, 1], [g.lamp, '#C9587C', 0.2]];
+      },
+      function washes() {
+        var t0 = performance.now(), soft = 0.012 * k;
+        function edge(c) { return mix(mix(c, '#14080B', 0.45), HAZE, hz * 0.8); }
+        do {
+          var w = S.washes[0], base = w[4] || w[1];
+          if (!isFinite(w[0].box[0])) { S.washes.shift(); continue; }
+          w.strips = w.strips || strips(w[0].box, S.qpx);
+          // the roofs fade into the light more than the rest of their slice
+          var c = typeof w[1] !== 'string' ? w[1] : w[3] ? mix(w[1], HAZE, Math.min(1, hz * 1.25)) : mix(w[1], HAZE, hz);
+          wash(S.cv, w[0].path, c, w[3] ? mix(edge(base), HAZE, hz * 0.4) : edge(base), S.qpx, S.box, soft, w[2], w[0].box, w.strips.shift());
+          if (w.strips.length) continue;
+          S.washes.shift();
+          if (w[0] === g.seg && g.discs) {
+            var o = S.cv.getContext('2d');
+            o.setTransform(S.qpx, 0, 0, S.qpx, -S.box[0] * S.qpx, -S.box[1] * S.qpx);
+            o.strokeStyle = alpha('#5C3214', 0.4); o.lineWidth = 0.0016 * k; o.stroke(g.discs);
+            o.setTransform(1, 0, 0, 1, 0, 0);
+          }
+        } while (S.washes.length && performance.now() - t0 < 6);
+        return !S.washes.length;
+      },
+      function finish() {
+        var cv = S.cv;
+        paper(cv, 0.6);
+        // far off, the air softens everything; right in front of us, the lens does, focused further in
+        if (D > 6 || frame) {
+          var bl = blank(1, cv.width, cv.height), b = bl.getContext('2d');
+          b.filter = 'blur(' + (frame ? 1.3 : 0.4 + D * 0.045).toFixed(1) + 'px)'; b.drawImage(cv, 0, 0); b.filter = 'none';
+          var o2 = cv.getContext('2d'); o2.clearRect(0, 0, cv.width, cv.height); o2.drawImage(bl, 0, 0);
+        }
+        forest.planes.push({ D: D, items: [settle({ img: cv, box: S.box })] });
+        forest.planes.sort(function (a, b) { return b.D - a.D; });
+        // the cells the plate may name: not in the blurred frame right in front of us, nor so far off they are specks
+        if (!frame && D < 5) S.marks.forEach(function (m) { addMark(m.k, { x: m.x * D, Y: m.y * D, D: D }); });
+        S = null; g = null;
+      }
+    ];
+  }
+
+  // Hand a freshly painted bitmap to the browser to get ready for drawing, in the background, so that the first
+  // frame that needs it does not stall while it is uploaded.
+  function settle(item) {
+    if (window.createImageBitmap) createImageBitmap(item.img).then(function (bm) { item.img = bm; }, function () {});
+    return item;
+  }
+
+  // A rod or cone of the grove we end up in, close enough at the end to be as wide as a tree: painted once as a
+  // tall, narrow cel, at about the size it will be when we get there.
+  function paintTrunk(t) {
+    var g = { pr: new Ink(), seg: new Ink(), discs: new Path2D() }, rnd = rng(Math.round(t.D * 9973 + t.x * 1013 + 7));
+    var qpx = Math.min(F / Math.max(0.12, t.D - CAM_Z1) * paintScale, 2400 / 0.7);
+    wob = rnd; wobble = 0.25; minInk = 0.7 / qpx;
+    rodOrCone(g, rnd, 0, 1, t.cone);
+    wobble = 0; minInk = 0;
+    var box = [-0.032, 0.235, 0.032, FLOOR + 0.004], cv = document.createElement('canvas');
+    cv.width = Math.ceil((box[2] - box[0]) * qpx); cv.height = Math.ceil((box[3] - box[1]) * qpx);
+    wash(cv, g.seg.path, '#C48A3A', mix('#C48A3A', '#14080B', 0.45), qpx, box, 0.0016, 0.25);
+    var o = cv.getContext('2d');
+    o.setTransform(qpx, 0, 0, qpx, -box[0] * qpx, -box[1] * qpx);
+    o.strokeStyle = alpha('#5C3214', 0.42); o.lineWidth = 0.0016; o.stroke(g.discs);
+    o.setTransform(1, 0, 0, 1, 0, 0);
+    wash(cv, g.pr.path, '#6B3A24', mix('#6B3A24', '#14080B', 0.45), qpx, box, 0.0016, 0.25);
+    paper(cv, 0.6);
+    t.cel = settle({ img: cv, box: box });
+  }
+
+  // Until its cel is painted, a trunk is drawn live.
+  function drawTrunk(t, cam, now) {
+    if (t.cel) {
+      var at = proj(t.x, 0, t.D, cam), T = PT;
+      if (at.den < 0.05) return;
+      T.s = at.s; T.tx = at.x; T.ty = at.y;
+      setT(T.s, T.tx, T.ty);
+      drawItems([t.cel], T, 1);
+      return;
+    }
+    var pr = proj(t.x, FLOOR, t.D, cam), s = pr.s;
+    if (pr.den < 0.05) return;
+    var w = (t.cone ? 0.011 : 0.0065) * s, x = pr.x, fl = pr.y, os = (t.cone ? 0.1 : 0.17) * s, is = (t.cone ? 0.18 : 0.1) * s;
+    if (x + w * 3 < 0 || x - w * 3 > W) return;
+    var osTop = fl - os, isTop = osTop - is, foot = fl - (FLOOR - 0.27) * s, nuc = fl - (FLOOR - (t.cone ? OLM - 0.04 : t.nuc)) * s;
+    var hz = haze(t.D), ink = mix('#6B3A24', HAZE, hz), lit = mix('#B98048', HAZE, hz), dk = mix('#33160F', HAZE, hz);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var body = new Path2D(), seg = new Path2D();
+    taper(seg, t.cone ? [[x, fl, w * 0.25], [x, osTop, w * 0.85]] : [[x, fl, w * 0.95], [x, osTop, w * 0.95]]);
+    // up from the inner segment as a fibre, with its nucleus, to the foot where the next cells meet it
+    taper(body, t.cone ? [[x, osTop, w * 0.9], [x, osTop - is * 0.4, w * 1.9], [x, isTop, w * 1.05], [x, isTop - 0.03 * s, w * 0.6], [x, foot, w * 0.32]]
+      : [[x, osTop, w], [x, isTop, w * 0.9], [x, isTop - 0.03 * s, w * 0.36], [x, foot, w * 0.16]]);
+    body.moveTo(x + w * 1.1, nuc); body.ellipse(x, nuc, w * (t.cone ? 1.15 : 0.8), w * 1.6, 0, 0, TAU, true);
+    // round, lit from above and the left: a wash that is lighter on one side
+    var gr = ctx.createLinearGradient(x - w * 2, 0, x + w * 2, 0);
+    gr.addColorStop(0, dk); gr.addColorStop(0.38, lit); gr.addColorStop(0.62, ink); gr.addColorStop(1, dk);
+    ctx.fillStyle = gr; ctx.fill(body);
+    var sg = ctx.createLinearGradient(x - w, 0, x + w, 0);
+    sg.addColorStop(0, '#8A5A22'); sg.addColorStop(0.4, '#E3B25A'); sg.addColorStop(1, '#7A4A1A');
+    ctx.fillStyle = sg; ctx.fill(seg);
+    // the discs stacked in the outer segment
+    ctx.strokeStyle = 'rgba(92,50,20,.45)'; ctx.lineWidth = Math.max(1, 0.0016 * s);
+    ctx.beginPath();
+    for (var yy = fl - 0.012 * s; yy > osTop; yy -= 0.012 * s) { ctx.moveTo(x - w, yy); ctx.lineTo(x + w, yy); }
+    ctx.stroke();
+    // pigment and paper over the whole trunk
+    ctx.globalAlpha = 0.35; ctx.fillStyle = pattern(ctx, TEX.mottle, Math.max(0.5, s * 0.004)); ctx.fill(body); ctx.fill(seg);
+    ctx.globalAlpha = 0.5; ctx.strokeStyle = dk; ctx.lineWidth = 1.2; ctx.stroke(body);
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- the forest's living things: light, blood, and a boat ----------
+  // Where a point of the forest lands on screen. The camera's own path (cam.by, cam.z) is seen with true depth;
+  // the sway that follows the pointer (cam.x, cam.py) is the parallax, and flattening takes the depth out of just
+  // that: every plane then sways alike, so the picture stays the same but no longer comes apart as you move.
+  function sway(den) { return F / lerp(den, FLAT_REF, flatT); }
+  var PR = { x: 0, y: 0, s: 1, den: 1 };
+  function proj(x, Y, D, cam) {
+    var den = Math.max(0.02, D - cam.z), k = D / den, sw = sway(den);
+    PR.x = C.x + x / D * H * k - cam.x * sw;
+    PR.y = C.y + Y / D * H * k - cam.by * F / den - cam.py * sw;
+    PR.s = F / D * k;
+    PR.den = den;
+    return PR;
+  }
+
+  // the river: a capillary running along the floor, plasma with dark red blood cells drifting in it
+  function makeRiver(ctrl) {
+    var pts = [], n = ctrl.length, i, k;
+    for (i = 0; i < n - 1; i++) {
+      var a = ctrl[Math.max(0, i - 1)], b = ctrl[i], c = ctrl[i + 1], d = ctrl[Math.min(n - 1, i + 2)];
+      for (k = 0; k < 14; k++) { var t = k / 14; pts.push([cm(a[0], b[0], c[0], d[0], t), cm(a[1], b[1], c[1], d[1], t)]); }
+    }
+    pts.push(ctrl[n - 1].slice());
+    return pts;
+  }
+  // where the river is across, at a depth
+  function riverX(D) {
+    var R = forest.river;
+    for (var i = 0; i < R.length - 1; i++) if (D <= R[i + 1][1]) return lerp(R[i][0], R[i + 1][0], clamp((D - R[i][1]) / (R[i + 1][1] - R[i][1]), 0, 1));
+    return R[R.length - 1][0];
+  }
+  function riverAt(river, t) {
+    var f = clamp(t, 0, 1) * (river.length - 1), i = Math.min(river.length - 2, Math.floor(f)), u = f - i;
+    return [lerp(river[i][0], river[i + 1][0], u), lerp(river[i][1], river[i + 1][1], u)];
+  }
+
+  // The river, painted in layers like a wash: a soft bleed into the banks, darker plasma along the edges and
+  // lighter in the middle, uneven pigment that stays put on the river, pigment pooled along the banks, pale streaks
+  // flowing downstream, and the cells, tumbling in it.
+  function drawRiverRun(r, cam, now) {
+    var R = forest.river, wid = 0.075, i, a, sc = [], n;
+    // The river is a ribbon lying on the floor: at each point, its width runs across its course, in the floor's
+    // plane, and is seen in perspective. sc: the middle on screen, and the vector to its right bank.
+    // Only what is in front of us: the river's near end runs past the camera at the end of the scroll.
+    for (i = r.a0; i <= r.b; i++) {   // runs meet exactly at a shared point, so nothing doubles up where they join
+      if (R[i][1] - cam.z < 0.08) continue;
+      var i0 = Math.max(0, i - 1), i1 = Math.min(R.length - 1, i + 1), dx = R[i1][0] - R[i0][0], dD = R[i1][1] - R[i0][1], dl = Math.hypot(dx, dD) || 1;
+      var nx = dD / dl * wid, nD = -dx / dl * wid, mid = proj(R[i][0], FLOOR - 0.002, R[i][1], cam), mx = mid.x, my = mid.y, ms = mid.s;
+      var rb = proj(R[i][0] + nx, FLOOR - 0.002, Math.max(cam.z + 0.04, R[i][1] + nD), cam);
+      sc.push([mx, my, ms * wid, rb.x - mx, rb.y - my]);
+    }
+    n = sc.length;
+    if (n < 2) return;
+    var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (i = 0; i < n; i++) {
+      var ex = Math.abs(sc[i][3]) * 1.3, ey = Math.abs(sc[i][4]) * 1.3;
+      x0 = Math.min(x0, sc[i][0] - ex); x1 = Math.max(x1, sc[i][0] + ex); y0 = Math.min(y0, sc[i][1] - ey); y1 = Math.max(y1, sc[i][1] + ey);
+    }
+    if (x1 < 0 || x0 > W || y1 < 0 || y0 > H) return;
+    // a band k half-widths wide, shifted by dx half-widths towards the right bank
+    function band(k, dx) {
+      var p = new Path2D(), c, f;
+      dx = dx || 0;
+      for (i = 0; i < n; i++) { c = sc[i]; f = dx - k; if (i) p.lineTo(c[0] + c[3] * f, c[1] + c[4] * f); else p.moveTo(c[0] + c[3] * f, c[1] + c[4] * f); }
+      for (i = n - 1; i >= 0; i--) { c = sc[i]; f = dx + k; p.lineTo(c[0] + c[3] * f, c[1] + c[4] * f); }
+      p.closePath();
+      return p;
+    }
+    // the paint's texture is pinned to the river as a whole (forest.rf, once a frame), so the runs match up
+    var rf = forest.rf, s0 = rf.s, body = band(1);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = 'rgba(120,26,30,.1)'; ctx.fill(band(1.2));                                // bleed
+    ctx.fillStyle = '#A8323A'; ctx.fill(body);                                                // plasma, darker at the edges
+    ctx.fillStyle = '#D15A55'; ctx.fill(band(0.8, -0.06));
+    ctx.fillStyle = '#E07B6C'; ctx.fill(band(0.46, -0.12));                                  // lighter in the middle, towards the light
+    ctx.save(); ctx.clip(body);
+    var ox = rf.x, oy = rf.y;
+    ctx.globalAlpha = 0.34; ctx.fillStyle = pattern(ctx, TEX.mottle, s0 * 0.0022, ox, oy); ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.globalAlpha = 0.1; ctx.fillStyle = pattern(ctx, TEX.speckle, s0 * 0.004, ox + 13, oy + 7); ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    // pale streaks, carried downstream along the river's course
+    ctx.globalAlpha = 0.55; ctx.lineCap = 'round'; ctx.strokeStyle = 'rgba(255,212,196,.5)';
+    var flow = now * 0.00006;
+    for (var lane = -0.55; lane <= 0.56; lane += 0.55) {
+      ctx.setLineDash([s0 * 0.05, s0 * 0.11]); ctx.lineDashOffset = -(flow * s0 * 3 + lane * s0 * 0.4) + r.a0 * 7.3;
+      ctx.lineWidth = Math.max(0.6, s0 * 0.004);
+      ctx.beginPath();
+      for (i = 0; i < n; i++) { var lx = sc[i][0] + lane * 0.8 * sc[i][3], ly = sc[i][1] + lane * 0.8 * sc[i][4]; if (i) ctx.lineTo(lx, ly); else ctx.moveTo(lx, ly); }
+      ctx.stroke();
+    }
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    ctx.restore();
+    // pigment pooled along the banks (just the banks: the ends of a run are where the next one joins)
+    var banks = new Path2D();
+    [-1, 1].forEach(function (side) {
+      for (i = 0; i < n; i++) { var c = sc[i]; if (i) banks.lineTo(c[0] + c[3] * side, c[1] + c[4] * side); else banks.moveTo(c[0] + c[3] * side, c[1] + c[4] * side); }
+    });
+    ctx.strokeStyle = 'rgba(94,14,28,.5)'; ctx.lineWidth = Math.max(1, s0 * 0.003); ctx.stroke(banks);
+    // blood cells drifting with the flow, far ones first; some deeper in the plasma than others
+    var list = [];
+    for (var j = 0; j < forest.cells.length; j++) {
+      var bc = forest.cells[j], t = (bc.t + now * 0.000012 * bc.v) % 1, fi = t * (R.length - 1);
+      if (fi >= r.a0 && fi < r.b && riverAt(R, t)[1] - cam.z > 0.1) list.push([fi, bc, t]);
+    }
+    list.sort(function (p1, p2) { return p2[0] - p1[0] || p2[1].d - p1[1].d; });
+    for (j = 0; j < list.length; j++) {
+      var c = list[j][1], at = riverAt(R, list[j][2]), q2 = proj(at[0] + c.off * wid, FLOOR - 0.003, at[1], cam);
+      var squash = clamp((FLOOR - cam.y) / q2.den, 0.15, 1), ph = c.ph + now * 0.0007 * c.spin;
+      drawCell(q2.x, q2.y, 0.024 * q2.s * c.size, Math.abs(Math.sin(ph)), c.rot + 0.4 * Math.sin(ph * 0.5), 1 - 0.45 * c.d, 0.55 + 0.45 * squash);
+    }
+    // the boat rides on the run it is on, over the cells in it (sorted on its own, the run could cover it)
+    var bf = forest.boat.t * (R.length - 1);
+    if (bf >= r.a0 && bf < r.b && SKIP.indexOf('boat') < 0) drawBoat(cam, now);
+  }
+
+  // the capillary of the deep plexus, a tube winding among the lower branches, painted the same way, its cells
+  // seen through its wall
+  function drawTube(r, cam, now) {
+    var tb = forest.tube, pts = tb.pts, i, sc = [], n = pts.length;
+    for (i = r.a; i <= r.b; i++) { var a = proj(pts[i][0], pts[i][1], pts[i][2], cam); sc.push([a.x, a.y, tb.R * a.s * pts[i][3]]); }
+    function off(k, side) {
+      return sc.map(function (c, m) {
+        var i0 = Math.max(0, m - 1), i1 = Math.min(sc.length - 1, m + 1), tx = sc[i1][0] - sc[i0][0], ty = sc[i1][1] - sc[i0][1], tl = Math.hypot(tx, ty) || 1;
+        return [c[0] + ty / tl * c[2] * side, c[1] - tx / tl * c[2] * side, c[2] * k];
+      });
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var path = new Path2D(); taper(path, sc.map(function (c) { return [c[0], c[1], c[2] * 1.25]; })); ctx.fillStyle = 'rgba(120,26,30,.14)'; ctx.fill(path);
+    path = new Path2D(); taper(path, sc.map(function (c) { return [c[0], c[1], c[2] + Math.max(0.6, c[2] * 0.12)]; })); ctx.fillStyle = '#7A1622'; ctx.fill(path);
+    path = new Path2D(); taper(path, sc); ctx.fillStyle = '#C24A4C'; ctx.fill(path);
+    path = new Path2D(); taper(path, off(0.55, 0.2)); ctx.fillStyle = 'rgba(226,116,104,.85)'; ctx.fill(path);
+    var list = [];
+    for (var j = 0; j < tb.cells.length; j++) {
+      var fi = ((tb.cells[j].t + now * 0.00005) % 1) * (n - 1);
+      if (fi >= r.a0 && fi < r.b) list.push([fi, tb.cells[j]]);
+    }
+    list.sort(function (p1, p2) { return p2[0] - p1[0]; });
+    for (j = 0; j < list.length; j++) {
+      var k = clamp(Math.floor(list[j][0]) - r.a, 0, sc.length - 1), c = sc[k], tc = list[j][1], ph = tc.ph + now * 0.0008;
+      drawCell(c[0], c[1], c[2] * 0.75, Math.abs(Math.sin(ph)), tc.rot, 0.9, 1);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    path = new Path2D(); taper(path, off(0.14, 0.5)); ctx.fillStyle = 'rgba(255,214,200,.5)'; ctx.fill(path);   // the light on the wall, over the cells
+  }
+
+  // a slanting shaft of light, from the roof down to a pool on the floor
+  function drawRay(ray, cam, now) {
+    var tp = proj(ray.x, ILM, ray.D, cam), tx = tp.x, ty = tp.y, s = tp.s;
+    var bt = proj(ray.x + (FLOOR - ILM) * ray.slant, FLOOR, ray.D, cam), w = ray.w * s;
+    if (Math.max(tx, bt.x) + w < 0 || Math.min(tx, bt.x) - w > W) return;
+    ctx.globalCompositeOperation = 'screen';
+    // the pool where it lands
+    var squash = clamp((FLOOR - cam.y) / bt.den, 0.12, 1), pr = w * 1.6, pg = ctx.createRadialGradient(bt.x, bt.y, 0, bt.x, bt.y, pr);
+    pg.addColorStop(0, 'rgba(255,238,190,.5)'); pg.addColorStop(1, 'rgba(255,238,190,0)');
+    ctx.setTransform(dpr, 0, 0, dpr * squash, 0, bt.y * dpr * (1 - squash));
+    ctx.fillStyle = pg; ctx.beginPath(); ctx.arc(bt.x, bt.y, pr, 0, TAU); ctx.fill();
+    // the shaft: the soft sprite, skewed from the roof down to the pool
+    ctx.setTransform(w * dpr, 0, (bt.x - tx) * dpr, (bt.y - ty) * dpr, (tx - w / 2) * dpr, ty * dpr);
+    ctx.globalAlpha = ray.a;
+    ctx.drawImage(TEX.ray, 0, 0, 1, 1);
+    // motes drifting slowly down through the light
+    if (s > 60 && !reduce) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = '#FFF6DC';
+      for (var i = 0; i < 14; i++) {
+        var v = ((ray.x * 7.3 + i * 0.137 + now * 0.000012 * (1 + i % 3)) % 1 + 1) % 1, u = 0.5 + 0.32 * Math.sin(i * 2.1 + now * 0.0004);
+        var mx = tx - w / 2 + u * w + (bt.x - tx) * v, my = ty + (bt.y - ty) * v, mr = (0.6 + (i % 4) * 0.35) * Math.min(3, s / 250);
+        ctx.globalAlpha = 0.35 + 0.35 * Math.sin(i * 1.3 + now * 0.002);
+        ctx.beginPath(); ctx.arc(mx, my, mr, 0, TAU); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+
+  // The boat: a red blood cell, round and dished, riding the river, and sitting in it our eye, small, looking around.
+  // Crisp, like a cel-animated character over the painted ground.
+  function drawBoat(cam, now) {
+    var b = forest.boat, at = riverAt(forest.river, b.t), pr = proj(at[0], FLOOR - 0.004, at[1], cam);
+    var R = 0.062 * pr.s, x = pr.x, y = pr.y + Math.sin(now * 0.0016) * R * 0.05, tilt = Math.sin(now * 0.0012) * 0.06;
+    if (x + R * 2 < 0 || x - R * 2 > W || pr.den < 0.06) return;
+    var c = Math.cos(tilt) * R * dpr, s = Math.sin(tilt) * R * dpr;
+    // its shadow on the plasma, and ripples
+    ctx.setTransform(R * dpr, 0, 0, R * dpr, x * dpr, (pr.y + R * 0.1) * dpr);
+    ctx.fillStyle = 'rgba(90,10,20,.35)'; ctx.beginPath(); ctx.ellipse(0, 0.12, 1.3, 0.24, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,214,200,.5)'; ctx.lineWidth = 0.035;
+    var rp = (now * 0.0006) % 1;
+    ctx.globalAlpha = 1 - rp; ctx.beginPath(); ctx.ellipse(0, 0.06, 1.15 + rp * 0.5, 0.2 + rp * 0.09, 0, 0, TAU); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.setTransform(c, s, -s, c, x * dpr, y * dpr);   // boat units: half its width is 1
+    // the hull, and the dished middle of the cell, behind the eye
+    ctx.fillStyle = '#6E0C18'; ctx.beginPath(); ctx.ellipse(0, 0, 1, 0.42, 0, 0, Math.PI); ctx.fill();
+    ctx.fillStyle = '#B83A48'; ctx.beginPath(); ctx.ellipse(0, 0, 1, 0.2, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5A0A14'; ctx.beginPath(); ctx.ellipse(0, 0.01, 0.74, 0.12, 0, 0, TAU); ctx.fill();
+    // the eye: an eyeball with the rose iris, looking where the pointer is, blinking now and then
+    var ey = -0.36, er = 0.44, lx = clamp(ptr.x, -1, 1) * 0.11, ly = clamp(ptr.y, -1, 1) * 0.06;
+    var eb = ctx.createRadialGradient(-0.14, ey - 0.2, 0.05, 0, ey, er);
+    eb.addColorStop(0, '#FFFBF2'); eb.addColorStop(1, '#E6D2C2');
+    ctx.fillStyle = eb; ctx.beginPath(); ctx.arc(0, ey, er, 0, TAU); ctx.fill();
+    var ig = ctx.createRadialGradient(lx - 0.05, ey - 0.05 + ly, 0, lx, ey + ly, 0.23);
+    ig.addColorStop(0, '#F7D3DE'); ig.addColorStop(0.65, '#E7A1B6'); ig.addColorStop(1, '#8E2F55');
+    ctx.fillStyle = ig; ctx.beginPath(); ctx.arc(lx, ey + ly, 0.23, 0, TAU); ctx.fill();
+    ctx.fillStyle = DARK; ctx.beginPath(); ctx.arc(lx, ey + ly, 0.095, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#FFF8EC'; ctx.beginPath(); ctx.arc(lx - 0.07, ey - 0.08 + ly, 0.034, 0, TAU); ctx.fill();
+    var bk = (now / 1000 + b.t * 7) % 5.2, shut = bk < 0.18 ? Math.sin(bk / 0.18 * Math.PI) : 0;
+    if (shut > 0) {
+      ctx.save(); ctx.beginPath(); ctx.arc(0, ey, er, 0, TAU); ctx.clip();
+      ctx.fillStyle = '#EAD6C6'; ctx.fillRect(-er, ey - er, er * 2, er * 2 * shut);
+      ctx.restore();
+    }
+    // the logo's lid and lashes, for a brow
+    ctx.strokeStyle = '#3A1820'; ctx.lineCap = 'round'; ctx.lineWidth = 0.065;
+    var lid = ey - er + er * 2 * shut * 0.9;
+    ctx.beginPath(); ctx.moveTo(-0.46, ey - 0.12 + shut * 0.5); ctx.quadraticCurveTo(0, lid - 0.12 * (1 - shut), 0.46, ey - 0.12 + shut * 0.5); ctx.stroke();
+    ctx.lineWidth = 0.05;
+    // three lashes, from points along the right of the brow (relative to the eye's middle)
+    [[0.14, -0.32, 0.2, -0.5], [0.28, -0.26, 0.4, -0.42], [0.39, -0.185, 0.55, -0.28]].forEach(function (l) {
+      var dy = ey + shut * 0.45;
+      ctx.beginPath(); ctx.moveTo(l[0], l[1] + dy); ctx.lineTo(l[2], l[3] + dy); ctx.stroke();
+    });
+    // the near rim of the cell, in front of the eye: it sits in the boat, not on it
+    ctx.fillStyle = '#B83A48'; ctx.beginPath(); ctx.ellipse(0, 0, 1, 0.2, 0, 0, Math.PI); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,200,190,.5)'; ctx.lineWidth = 0.03; ctx.beginPath(); ctx.ellipse(0, 0, 0.98, 0.18, 0, 0.15, Math.PI - 0.15); ctx.stroke();
+    // little arms over the rim, with an oar
+    var row = Math.sin(now * 0.0024) * 0.25;
+    ctx.strokeStyle = '#3A1820'; ctx.lineWidth = 0.05;
+    ctx.beginPath(); ctx.moveTo(-0.36, -0.22); ctx.quadraticCurveTo(-0.52, -0.08, -0.3 + row * 0.3, 0.02); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0.36, -0.22); ctx.quadraticCurveTo(0.5, -0.08, 0.26 + row * 0.3, -0.02); ctx.stroke();
+    ctx.strokeStyle = '#E7A1B6'; ctx.lineWidth = 0.06;
+    ctx.beginPath(); ctx.moveTo(-0.5 + row, -0.12); ctx.lineTo(0.72 + row * 0.6, 0.3); ctx.stroke();
+    ctx.fillStyle = '#E7A1B6'; ctx.beginPath(); ctx.ellipse(0.8 + row * 0.6, 0.34, 0.16, 0.07, 0.4, 0, TAU); ctx.fill();
+  }
+
+  function buildForest() {
+    var view = A / 2, rnd = rng(SEED + 1), i;
+    var river = makeRiver([[0.55, 1.02], [0.05, 1.28], [-0.1, 1.7], [0.25, 2.4], [0.45, 3.4], [-0.1, 5], [-0.55, 7.5], [0.15, 11], [0.6, 16], [0.1, 26]]);
+    var cells = [];
+    var crnd = rng(SEED + 21);
+    for (i = 0; i < 70; i++) cells.push({ t: rnd(), v: 0.6 + rnd() * 0.8, off: (rnd() - 0.5) * 1.1,
+      d: crnd(), ph: crnd() * TAU, spin: 0.5 + crnd(), rot: (crnd() - 0.5) * 1.2, size: 0.85 + crnd() * 0.3 });
+    var tubeCtrl = [[3.2, 0.2, 1.5], [1.0, 0.17, 2.3], [0.2, 0.15, 3.6], [-0.7, 0.16, 5.4], [-1.2, 0.18, 8], [-0.6, 0.17, 12], [0.2, 0.16, 18]], tpts = [];
+    for (i = 0; i < tubeCtrl.length - 1; i++) {
+      var a = tubeCtrl[Math.max(0, i - 1)], b = tubeCtrl[i], c = tubeCtrl[i + 1], d = tubeCtrl[Math.min(tubeCtrl.length - 1, i + 2)];
+      for (var k = 0; k < 18; k++) { var t = k / 18; tpts.push([cm(a[0], b[0], c[0], d[0], t), cm(a[1], b[1], c[1], d[1], t), cm(a[2], b[2], c[2], d[2], t)]); }
+    }
+    tpts.push(tubeCtrl[tubeCtrl.length - 1].slice());
+    tpts.forEach(function (pt, j) { pt[3] = 1 - 0.85 * smooth(0.8, 1, j / (tpts.length - 1)); });
+    var tcells = [];
+    for (i = 0; i < 9; i++) tcells.push({ t: (i + rnd() * 0.6) / 9, ph: crnd() * TAU, rot: (crnd() - 0.5) * 1.4 });
+    // the grove at the end: rods and cones close enough to be trees, either side of the river
+    var grove = [[-0.12, 1.14, 0], [0.16, 1.17, 1], [-0.24, 1.26, 1], [0.27, 1.3, 0], [-0.17, 1.47, 0], [0.36, 1.48, 1], [-0.36, 1.55, 0], [0.12, 1.62, 1], [-0.18, 1.66, 0], [0.24, 1.2, 0]]
+      .map(function (g) { return { x: g[0] * Math.max(1, view / 0.75), D: g[1], cone: !!g[2], nuc: lerp(0.34, OLM - 0.04, rnd()) }; });
+    var rays = [];
+    [[13, 1], [7.5, 2], [4.4, 1], [2.7, 1], [1.9, 1]].forEach(function (r) {
+      for (i = 0; i < r[1]; i++) rays.push({ D: r[0] * (0.82 + rnd() * 0.12), x: lerp(-view, view, rnd()) * r[0] * 0.9, w: (0.22 + rnd() * 0.3) * Math.sqrt(r[0] / 3), slant: 0.32, a: 0.5 + rnd() * 0.25 });
+    });
+    forest = { planes: [], steps: [], rnd: rnd, view: view, river: river, cells: cells, tube: { pts: tpts, R: 0.02, cells: tcells }, grove: grove, rays: rays, boat: { t: 0.5 }, markBy: {} };
+    // for the plate: what is not painted into the slices (the slices add their cells as they are painted)
+    grove.forEach(function (t) { addMark(t.cone ? 'C' : 'R', { x: t.x, Y: t.cone ? 0.73 : 0.8, D: t.D }); });
+    for (i = 0; i < tpts.length; i += 6) addMark('Cap', { x: tpts[i][0], Y: tpts[i][1], D: tpts[i][2] });
+    for (i = 0; i < river.length; i += 4) addMark('Cap', { x: river[i][0], Y: FLOOR, D: river[i][1] });
+    cells.forEach(function (c) { addMark('Rbc', { cell: c }); });
+    addMark('S', { boat: true });
+    // what there is to paint, in order: the veil we meet first, the slices far to near, then the grove's trunks
+    forest.steps.push.apply(forest.steps, veilSteps(rnd));
+    SLICES.forEach(function (D) { forest.steps.push.apply(forest.steps, sliceSteps(D, view)); });
+    grove.forEach(function (t) { forest.steps.push(function trunk() { paintTrunk(t); }); });
+    // split the river and the tube where they pass a slice, so the slices can cover them and they the slices
+    forest.riverRuns = split(river.map(function (r) { return r[1]; }));
+    forest.tubeRuns = split(tpts.map(function (r) { return r[2]; }));
+  }
+  function split(depths) {
+    var runs = [], a = 0, n = depths.length, i;
+    function iv(D) { var c = 0; for (var j = 0; j < SLICES.length; j++) if (SLICES[j] > D) c++; return c; }
+    var cur = iv(depths[0]);
+    for (i = 1; i < n; i++) {
+      var j = iv(depths[i]);
+      if (j !== cur || i === n - 1) {
+        var sum = 0;
+        for (var k = a; k <= i; k++) sum += depths[k];
+        runs.push({ a0: a, a: Math.max(0, a - 1), b: i, D: sum / (i - a + 1) });
+        a = i; cur = j;
+      }
+    }
+    return runs;
+  }
+  // The veil: the roof all around us just after the cut, seen from right inside it: the same leafy mass of cell
+  // bodies as the forest's roof, dense above, thinning into hanging clusters below, with dendrites dangling from
+  // them. It slides up and away as we drop out of it. Painted in world units at a fixed depth.
+  function veilSteps(rnd) {
+    var dark, mid, lite, ink, glia, cv, box, qpx, washes;
+    return [
+      function veil() {
+        dark = new Ink(); mid = new Ink(); lite = new Ink(); ink = new Ink(); glia = new Ink();
+        var x, y, j;
+        wob = rnd; wobble = 0.3; minInk = 0.0012;
+        // the mass: rows of cells, packed tight up top, more gaps further down
+        for (y = -1.46; y < -0.9; y += 0.028) {
+          var gap = smooth(-1.2, -0.9, y) * 0.45;
+          for (x = -0.72 - rnd() * 0.04; x < 0.72;) {
+            var r = (0.022 + rnd() * 0.026) * (1 - 0.3 * smooth(-1.3, -0.9, y));
+            if (rnd() > gap) (y < -1.25 ? dark : rnd() < 0.55 ? mid : lite).blob(x, y + (rnd() - 0.5) * 0.03, r, -Math.PI / 2 + (rnd() - 0.5), 0.15 + rnd() * 0.4);
+            x += r * (1.2 + rnd() * 0.8);
+          }
+        }
+        // clusters hanging below it, each a few cells on a stalk, with dendrites dangling
+        var DEN = { step: 0.008, wiggle: 0.35, taper: 0.4, spread: 0.7, lenK: 0.6, wK: 0.65, depth: 2, pull: Math.PI / 2, pullK: 0.05 };
+        for (x = -0.68; x < 0.68; x += 0.05 + rnd() * 0.09) {
+          var hy = -0.92 + (rnd() - 0.5) * 0.04, n = 1 + Math.floor(rnd() * 3), hx = x;
+          for (j = 0; j < n; j++) {
+            hx += (rnd() - 0.5) * 0.02; hy += 0.03 + rnd() * 0.02;
+            (rnd() < 0.5 ? mid : lite).blob(hx, hy, 0.018 + rnd() * 0.012, -Math.PI / 2 + (rnd() - 0.5) * 0.6, 0.3 + rnd() * 0.4);
+          }
+          if (rnd() < 0.7) grow(ink, DEN, rnd, hx, hy + 0.01, Math.PI / 2 + (rnd() - 0.5) * 0.8, 0.06 + rnd() * 0.08, 0.0035, 0);
+        }
+        // a few Müller cells' end feet, pale stems coming down out of it
+        for (x = -0.6; x < 0.6; x += 0.22 + rnd() * 0.16) glia.taper([[x, -1.2, 0.0035], [x + (rnd() - 0.5) * 0.03, -0.8, 0.0028], [x + (rnd() - 0.5) * 0.04, -0.6, 0]]);
+        wobble = 0; minInk = 0;
+        box = [-0.72, -1.5, 0.72, -0.5]; qpx = Math.min(1600, H * 1.6 * paintScale) / (box[3] - box[1]); cv = document.createElement('canvas');
+        cv.width = Math.ceil((box[2] - box[0]) * qpx); cv.height = Math.ceil((box[3] - box[1]) * qpx);
+        washes = [[glia, '#5E6488', 0.3], [lite, '#7E3C56', 0.2], [mid, '#5C2440', 0.2], [ink, '#2A1218', 0.35], [dark, '#3A1424', 0.15]];
+      },
+      function veilWash() {
+        var w = washes[0];
+        w.strips = w.strips || strips(w[0].box, qpx);
+        wash(cv, w[0].path, w[1], mix(w[1], '#0A0406', 0.5), qpx, box, 0.006, w[2], w[0].box, w.strips.shift());
+        if (!w.strips.length) washes.shift();
+        return !washes.length;
+      },
+      function veilFinish() {
+        paper(cv, 0.6);
+        forest.veil = settle({ z: -0.22, img: cv, box: box });
+      }
+    ];
+  }
+
+  // paint the slices one at a time, so the page stays smooth while they grow
+  var stepStats = { n: 0, max: 0, over30: 0, by: {} }, lastStep = null;
+  // one small step of painting; a step that is not done yet says so, and is called again
+  function paintNext() {
+    if (!forest || !forest.steps.length) return false;
+    var t0 = performance.now();
+    lastStep = forest.steps[0];
+    if (lastStep() !== false) forest.steps.shift();
+    var dt = performance.now() - t0;
+    buildMs += dt; stepStats.n++; stepStats.max = Math.max(stepStats.max, dt); if (dt > 30) stepStats.over30++;
+    var key = lastStep.name || 'anon';
+    stepStats.by[key] = Math.max(stepStats.by[key] || 0, Math.round(dt));
+    return true;
+  }
+  // paint in the gaps between frames (one painter at a time, however often the forest is built again)
+  var idle = window.requestIdleCallback ? function (f) { requestIdleCallback(f, { timeout: 200 }); } : function (f) { setTimeout(f, 16); };
+  var painting = false;
+  function paintLater() { if (paintNext()) idle(paintLater); else painting = false; }
+  function paintSoon() { if (!painting) { painting = true; setTimeout(paintLater, 60); } }
+
+  // where things are in the forest: the slices, and everything that lives between them
+  var queue = [];
+  function drawForest(cam, now) {
+    while (!forest.veil || forest.planes.length < SLICES.length) paintNext();   // we got here before the slices were painted: finish them now
+    rollC = 1; rollS = 0;
+    if (SKIP.indexOf('planes') < 0) drawBackdrop(cam);
+    var ref = proj(0, FLOOR, cam.z + 2, cam);
+    forest.rf = { x: ref.x, y: ref.y, s: ref.s * 0.6 };
+    var T = PT, i;
+    queue.length = 0;
+    forest.planes.forEach(function (pl) { queue.push({ D: pl.D, k: 0, pl: pl }); });
+    forest.riverRuns.forEach(function (r) { queue.push({ D: r.D, k: 1, r: r }); });
+    forest.tubeRuns.forEach(function (r) { queue.push({ D: r.D, k: 2, r: r }); });
+    forest.rays.forEach(function (r) { queue.push({ D: r.D, k: 3, r: r }); });
+    forest.grove.forEach(function (t) { queue.push({ D: t.D, k: 4, t: t }); });
+    queue.push({ D: -10, k: 5 });
+    queue.sort(function (a, b) { return b.D - a.D; });
+    var names = ['slices', 'river', 'river', 'rays', 'trunks', 'veil'];   // the boat is drawn with the river
+    for (i = 0; i < queue.length; i++) {
+      var it = queue[i];
+      if (SKIP.indexOf(names[it.k]) >= 0) continue;
+      if (it.k === 0) {
+        var den = it.D - cam.z, sw = sway(den);
+        if (den < 0.25) continue;
+        T.s = H * it.D / den; T.tx = C.x - cam.x * sw; T.ty = C.y - cam.by * F / den - cam.py * sw;
+        setT(T.s, T.tx, T.ty);
+        drawItems(it.pl.items, T, smooth(0.25, 0.55, den));   // slices we reach just before the end slip away
+      } else if (it.k === 1) drawRiverRun(it.r, cam, now);
+      else if (it.k === 2) drawTube(it.r, cam, now);
+      else if (it.k === 3) drawRay(it.r, cam, now);
+      else if (it.k === 4) drawTrunk(it.t, cam, now);
+      else {
+        var v = forest.veil, vd = v.z - cam.z;
+        if (vd > 0.05) {
+          var vs = sway(vd);
+          T.s = F / vd; T.tx = C.x - cam.x * vs; T.ty = C.y - cam.by * T.s - cam.py * vs;
+          setT(T.s, T.tx, T.ty);
+          drawItems([v], T, smooth(0.05, 0.12, vd));
+        }
+      }
+    }
+  }
+
+  // ---------- the plate ----------
+  // Cajal labelled his plates: the layers numbered down a margin, the cells named by abbreviations in the margins,
+  // each with a dotted leader to one or two of the cells it names. Here, over the forest: the layers down the left,
+  // and down the right a few cells, picked among those in view and followed as we move, so the labels stay put on
+  // the glass while the leaders reach into the depth. Drawn in SVG over the canvas, so the type stays sharp.
+  var SVGNS = 'http://www.w3.org/2000/svg', plateEl = document.getElementById('plate'), plate = null;
+  var KINDS = [['Gc', 'ganglion cell'], ['Ac', 'amacrine cell'], ['Bc', 'bipolar cell'], ['Hc', 'horizontal cell'], ['Mg', 'Müller glia'],
+    ['C', 'cones', 2], ['R', 'rods', 2], ['Cap', 'capillary'], ['Rbc', 'red blood cell'], ['S', 'sehn']];
+  var LAYERS = [['I', 'ganglion cells', ILM, -0.7], ['II', 'inner plexiform', -0.7, -0.38], ['III', 'inner nuclear', -0.38, 0.1],
+    ['IV', 'outer plexiform', 0.1, 0.27], ['V', 'outer nuclear', 0.27, OLM], ['VI', 'rods and cones', OLM, FLOOR]];
+  var PLATE_TOP = 84;   // below the site's header
+  function addMark(k, m) { (forest.markBy[k] = forest.markBy[k] || []).push(m); }
+  function svgEl(name, cls, parent) {
+    var e = document.createElementNS(SVGNS, name);
+    if (cls) e.setAttribute('class', cls);
+    parent.appendChild(e);
+    return e;
+  }
+  function attr(e, k, v) { if (e['_' + k] !== v) { e['_' + k] = v; e.setAttribute(k, v); } }
+  function buildPlate() {
+    var narrow = W < 600;   // on a phone, the names alone: there is no room for a legend
+    plateEl.textContent = '';
+    plate = { kinds: [], layers: [], at: 0, shown: -1, narrow: narrow };
+    LAYERS.forEach(function (L) {
+      var o = { brk: svgEl('path', 'brk', plateEl), rn: svgEl('text', 'rn', plateEl), nm: narrow ? null : svgEl('text', 'nm', plateEl) };
+      o.rn.textContent = L[0] + '.';
+      if (o.nm) o.nm.textContent = L[1];
+      plate.layers.push(o);
+    });
+    KINDS.forEach(function (K) {
+      var g = svgEl('g', '', plateEl), o = { k: K[0], n: K[2] || 1, g: g, leads: [], picks: [], qs: [], a: 0, y: -1, w: 0, retry: 0 };
+      for (var i = 0; i < o.n; i++) o.leads.push([svgEl('path', 'halo', g), svgEl('path', 'lead', g)]);
+      o.text = svgEl('text', 'lab', g);
+      if (!narrow) svgEl('tspan', 'ab', o.text).textContent = K[0] + ' ';
+      svgEl('tspan', 'nm', o.text).textContent = K[1];
+      attr(o.text, 'text-anchor', 'end');
+      g.style.opacity = 0;
+      plate.kinds.push(o);
+    });
+  }
+  // where a mark is on screen now (cells and the boat move along the river)
+  var MP = { x: 0, y: 0, den: 0 };
+  function markAt(m, cam, now) {
+    var q, at;
+    if (m.cell) { at = riverAt(forest.river, (m.cell.t + now * 0.000012 * m.cell.v) % 1); q = proj(at[0] + m.cell.off * 0.075, FLOOR - 0.005, at[1], cam); }
+    else if (m.boat) { at = riverAt(forest.river, forest.boat.t); q = proj(at[0], FLOOR - 0.03, at[1], cam); }
+    else q = proj(m.x, m.Y, m.D, cam);
+    MP.x = q.x; MP.y = q.y; MP.den = q.den;
+    return MP;
+  }
+  function inView(q, cam) {
+    if (!(q.den > 0.32 && q.x > W * 0.06 && q.x < plate.xMax && q.y > PLATE_TOP + 8 && q.y < plate.floor - 12)) return false;
+    // not behind what is nearer: the blurred frame's trees (only at its sides), or a trunk of the grove
+    var x = q.x, y = q.y, den = q.den, df = SLICES[SLICES.length - 1] - cam.z, i, t, dt;
+    if (df > 0.3 && den > df && Math.abs(x - C.x) > 0.62 * forest.view * H * SLICES[SLICES.length - 1] / df) return false;
+    for (i = 0; i < forest.grove.length; i++) {
+      t = forest.grove[i]; dt = t.D - cam.z;
+      if (dt < 0.12 || dt > den) continue;
+      // a thin fibre from its top, the inner segment (a cone's swelling), then the slim outer segment
+      var tp = proj(t.x, 0.235, t.D, cam), top = tp.y, tx = tp.x, is0 = proj(t.x, 0.63, t.D, cam).y, is1 = proj(t.x, 0.8, t.D, cam).y;
+      if (y > top && Math.abs(x - tx) < (y > is0 && y < is1 && t.cone ? 0.024 : 0.009) * F / dt) return false;
+    }
+    return true;
+  }
+  var FIRST = { S: 0.35, Rbc: 0.6, Cap: 0.8 };   // the boat, its cells and its river are named first
+  // the best of a kind in view: near but not too near, in the front slice where nothing else covers it, and
+  // towards the right, so the leader stays short; for two, two well apart
+  function pick(o, cam, now) {
+    var list = forest.markBy[o.k] || [], best = [], i, q;
+    for (i = 0; i < list.length; i++) {
+      q = markAt(list[i], cam, now);
+      if (!inView(q, cam)) continue;
+      best.push([-Math.abs(Math.log(q.den / 1.3)) + 0.6 * q.x / W + (list[i].D < 2 ? 0.4 : 0), list[i], q.x]);
+    }
+    best.sort(function (a, b) { return b[0] - a[0]; });
+    o.picks = [];
+    for (i = 0; i < best.length && o.picks.length < o.n; i++) {
+      if (o.picks.length && Math.abs(best[i][2] - o.px) < W * 0.06) continue;
+      o.picks.push(best[i][1]); o.px = best[i][2];
+    }
+    o.la = 0;
+  }
+  function drawPlate(cam, now) {
+    if (!plate) buildPlate();
+    var dt = plate.at ? clamp((now - plate.at) / 1000, 0, 0.1) : 0.016, show = SKIP.indexOf('plate') < 0 ? smooth(P_CUT + 0.07, P_CUT + 0.13, p) : 0;
+    plate.at = now;
+    show = Math.round(show * 100) / 100;
+    if (show !== plate.shown) { plate.shown = show; plateEl.style.opacity = show; plateEl.style.visibility = show > 0 ? 'visible' : 'hidden'; }
+    if (show <= 0) return;
+    var xr = W - 16, maxW = 0, act = [], i, j, o, q, ease = fixedP != null ? 1 : 1 - Math.exp(-dt * 10);
+    plate.kinds.forEach(function (o) { if (!o.w) o.w = o.text.getComputedTextLength(); maxW = Math.max(maxW, o.w); });
+    plate.xMax = xr - maxW - 36;
+    // at the very end the legend's paper comes up from below: the labels stay above it
+    plate.floor = legendEl ? Math.min(H, legendEl.getBoundingClientRect().top + H * 0.1) : H;
+
+    // the layers, read at a fixed distance in front of us: they slide up as we go down
+    var Dl = cam.z + 2;
+    plate.layers.forEach(function (o, i) {
+      var a = proj(0, LAYERS[i][2], Dl, cam).y + 3, b = proj(0, LAYERS[i][3], Dl, cam).y - 3;
+      a = Math.max(a, PLATE_TOP); b = Math.min(b, H - 10);
+      var on = b - a > 22, mid = Math.round((a + b) / 2);
+      attr(o.brk, 'd', on ? 'M52,' + a.toFixed(1) + 'H44V' + b.toFixed(1) + 'H52' : '');
+      attr(o.rn, 'x', 14); attr(o.rn, 'y', mid + 6); attr(o.rn, 'opacity', on ? 1 : 0);
+      if (o.nm) { attr(o.nm, 'x', 60); attr(o.nm, 'y', mid + 5); attr(o.nm, 'opacity', on ? 1 : 0); }
+    });
+
+    // the cells: keep what is picked while it stays in view, pick again when it leaves (not too often)
+    var ready = [];
+    plate.kinds.forEach(function (o) {
+      var ok = o.picks.length > 0;
+      for (j = 0; ok && j < o.picks.length; j++) if (!inView(markAt(o.picks[j], cam, now), cam)) ok = false;
+      if (!ok && now >= o.retry) { pick(o, cam, now); o.retry = now + 400; ok = o.picks.length > 0; }
+      o.on = false;
+      if (!ok) return;
+      o.qs.length = 0;
+      var ty = 0, x0 = W;
+      for (j = 0; j < o.picks.length; j++) { q = markAt(o.picks[j], cam, now); o.qs.push([q.x, q.y]); ty += q.y; x0 = Math.min(x0, q.x); }
+      o.ty = ty / o.picks.length + 5;
+      o.len = (xr - x0) * (o.a > 0.5 ? 0.7 : 1) * (FIRST[o.k] || 1);   // the ones showing hold on a little, so they do not flicker
+      ready.push(o);
+    });
+    // a few at a time, those with the shortest leaders: a plate, not a tangle
+    // (and the one named from the legend, whatever its leader)
+    ready.sort(function (a, b) { return (b.k === focusK) - (a.k === focusK) || a.len - b.len; });
+    act = ready.slice(0, plate.narrow ? 4 : 6);
+    act.forEach(function (o) { o.on = true; });
+    plate.kinds.forEach(function (o) { var f = o.k === focusK; if (o.f !== f) { o.f = f; o.g.classList.toggle('is-focus', f); } });
+    // down the margin in the order of their cells, never closer than a line apart
+    act.sort(function (a, b) { return a.ty - b.ty; });
+    var gap = 30, lo = PLATE_TOP + 14, hi = Math.min(H - 64, plate.floor - 14);   // above the flatten switch, and the legend
+    for (i = 0; i < act.length; i++) act[i].ty = Math.max(act[i].ty, i ? act[i - 1].ty + gap : lo);
+    for (i = act.length - 1; i >= 0; i--) act[i].ty = Math.min(act[i].ty, i < act.length - 1 ? act[i + 1].ty - gap : hi);
+    plate.kinds.forEach(function (o) {
+      o.a += ((o.on ? 1 : 0) - o.a) * ease;
+      o.la = o.on ? o.la + (1 - o.la) * ease : o.la;
+      var a = Math.round(o.a * o.la * 100) / 100;
+      if (o.g._a !== a) { o.g._a = a; o.g.style.opacity = a; o.g.style.visibility = a > 0 ? 'visible' : 'hidden'; }   // not display: its width is measured
+      if (!o.on) return;
+      o.y = o.y < 0 ? o.ty : o.y + (o.ty - o.y) * ease;
+      attr(o.text, 'x', xr); attr(o.text, 'y', o.y.toFixed(1));
+      var sx = (xr - o.w - 8).toFixed(1), sy = (o.y - 5).toFixed(1);
+      for (j = 0; j < o.n; j++) {
+        var d = j < o.qs.length ? 'M' + sx + ',' + sy + 'L' + o.qs[j][0].toFixed(1) + ',' + o.qs[j][1].toFixed(1) : '';
+        attr(o.leads[j][0], 'd', d); attr(o.leads[j][1], 'd', d);
+      }
+    });
+  }
+  function hidePlate() {
+    if (plate && plate.shown !== 0) { plate.shown = 0; plateEl.style.opacity = 0; plateEl.style.visibility = 'hidden'; }
+  }
+  // The legend, at the very bottom of the page: point at a line (tap it, on a phone) and its cell is named in the
+  // forest, in plum, even if it was not among the few on show.
+  var legendEl = document.querySelector('.plate-legend'), focusK = null;
+  if (legendEl) legendEl.querySelectorAll('[data-k]').forEach(function (el) {
+    var k = el.getAttribute('data-k');
+    function set(on) {
+      focusK = on ? k : focusK === k ? null : focusK;
+      legendEl.querySelectorAll('[data-k]').forEach(function (e) { e.classList.toggle('is-on', e.getAttribute('data-k') === focusK); });
+      if (plate && on) plate.kinds.forEach(function (o) { if (o.k === k) o.retry = 0; });
+      poke();
+    }
+    el.addEventListener('pointerenter', function (e) { if (e.pointerType === 'mouse') set(true); });
+    el.addEventListener('pointerleave', function (e) { if (e.pointerType === 'mouse') set(false); });
+    var by = '';   // what pressed it (a click does not say, in every browser)
+    el.addEventListener('pointerdown', function (e) { by = e.pointerType; });
+    el.addEventListener('click', function () { if (by !== 'mouse') set(focusK !== k); });
+    el.addEventListener('focus', function () { set(true); });
+    el.addEventListener('blur', function () { set(false); });
+  });
+  // the labels are measured in their own type, once it has arrived
+  if (document.fonts) document.fonts.ready.then(function () { if (plate) plate.kinds.forEach(function (o) { o.w = 0; }); });
+
+  // the light from above, and the roof and the floor as two planes running off into the distance (in strips)
+  // The light, the roof and the floor are soft and fill the whole screen, so they are drawn at half resolution
+  // into their own canvas, then scaled up onto the stage.
+  var back = null, backCtx = null;
+  function drawBackdrop(cam) {
+    var sc = dpr * 0.5, bw = Math.max(1, Math.round(W * sc)), bh = Math.max(1, Math.round(H * sc));
+    if (!back) { back = document.createElement('canvas'); backCtx = back.getContext('2d'); }
+    if (back.width !== bw || back.height !== bh) { back.width = bw; back.height = bh; }
+    var stage = ctx, full = dpr;
+    ctx = backCtx; dpr = sc;
+    try { paintBackdrop(cam); } finally { ctx = stage; dpr = full; }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(back, 0, 0, canvas.width, canvas.height);
+  }
+  function paintBackdrop(cam) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var hy = C.y - cam.by * F / 200 - cam.py * sway(200), g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#F7E2B0'); g.addColorStop(clamp(hy / H - 0.12, 0, 1), '#E2B678'); g.addColorStop(clamp(hy / H, 0, 1), '#E9BC74'); g.addColorStop(1, '#D9993E');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    plane(cam, ILM, '#EFD3A0', '#DDB57C', TEX.roof, 0.12, 0.14);   // only a hint of cells: the leafy roof in the slices carries it
+    plane(cam, FLOOR, '#F2BF45', '#DDB57C', TEX.floor, 0.035, 0.42);
+  }
+  function plane(cam, Y, nearCol, far, tex, cell, texA) {
+    var dy = Y - cam.y, n = 18, i, prev = null, near = Math.max(0.05, Math.abs(dy) * F / (H * 0.62));
+    for (i = 0; i <= n; i++) {
+      var D = cam.z + Math.exp(lerp(Math.log(80), Math.log(near), i / n));
+      if (Math.abs(D) < 1e-3) D = 1e-3;
+      var pr = proj(0, Y, D, cam), y = pr.y;
+      if (prev !== null) {
+        var y0 = Math.min(prev.y, y), y1 = i === n ? (dy > 0 ? H : 0) : Math.max(prev.y, y);
+        if (dy < 0) { y0 = i === n ? 0 : Math.min(prev.y, y); y1 = Math.max(prev.y, y); }
+        var Dm = (prev.D + D) / 2 || 1e-3, pm = proj(0, Y, Dm, cam), sx = pm.s * cell / 60, sq = clamp(Math.abs(dy) / pm.den, 0.04, 1);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.fillStyle = mix(nearCol, far, Math.min(1, haze(Dm) * 1.1));
+        ctx.fillRect(0, y0, W, y1 - y0 + 1);
+        var ta = texA * (1 - haze(Dm)), ma = 0.3 * (1 - haze(Dm) * 0.7);   // far off, the haze all but hides them
+        ctx.setTransform(dpr, 0, 0, dpr * sq, 0, pm.y * dpr * (1 - sq));
+        if (ta > 0.03) {
+          ctx.globalAlpha = ta;
+          ctx.fillStyle = pattern(ctx, tex, sx, pm.x, pm.y);
+          ctx.fillRect(0, pm.y + (y0 - pm.y) / sq, W, (y1 - y0 + 1) / sq);
+        }
+        // an uneven wash over it, fixed to the ground so it does not swim as we move
+        if (ma > 0.12) {
+          ctx.globalAlpha = ma;
+          ctx.fillStyle = pattern(ctx, TEX.mottle, sx * 9, pm.x, pm.y);
+          ctx.fillRect(0, pm.y + (y0 - pm.y) / sq, W, (y1 - y0 + 1) / sq);
+        }
+        ctx.globalAlpha = 1;
+      }
+      prev = { y: y, D: D };
+    }
+  }
+
+  function forestCam(pp) {
+    var c = SC, u, e;
+    if (pp < P_REST) {
+      // out of the roof and down into the forest
+      e = easeInOut(clamp((pp - P_CUT) / (P_REST - P_CUT), 0, 1));
+      c.by = lerp(-0.84, 0, e);
+      c.z = lerp(CAM_Z0, 0, e);
+      c.deep = 0;
+    } else {
+      // down among the rods and cones, to the river
+      e = easeInOut((pp - P_REST) / (1 - P_REST));
+      c.by = lerp(0, 0.8, e);
+      c.z = lerp(0, CAM_Z1, e);
+      c.deep = e;
+    }
+    var wf = smooth(P_CUT, P_CUT + 0.06, pp);
+    c.x = ptr.x * 0.1 * (1 - 0.6 * c.deep) * wf;   // the sway: x is all sway, y is the path plus its sway
+    c.py = ptr.y * 0.035 * (1 - 0.6 * c.deep) * wf;
+    c.y = c.by + c.py;
+    forest.boat.t = lerp(0.55, 0.27, smooth(P_REST - 0.1, 1, pp));
+    return c;
+  }
+
+  // ---------- render ----------
+  function render(now) {
+    useScale(p < P_PUPIL ? dprEye : dprIn);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    rollC = 1; rollS = 0;
+    if (p < P_PUPIL) { hidePlate(); drawEye(eyeCam(p), now); return; }
+    if (p < P_CUT) { hidePlate(); drawFall(fallCam(p)); return; }
+    var fc = forestCam(p);
+    drawForest(fc, now);
+    drawPlate(fc, now);
+    // the far side of the cut: still dark in the roof, until we drop out of it
+    var dark = 1 - smooth(P_CUT, P_CUT + 0.035, p);
+    if (dark > 0) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = alpha('#160A0E', dark.toFixed(3));
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  // ---------- update: scroll, pointer, the eye's own life ----------
+  var root = {}, heroCopy = document.getElementById('hero-copy'), flatBox = document.getElementById('dive-flat'), paperEl = document.querySelector('.paper');
+  var track = document.querySelector('.track');
+  var flatBtn = document.getElementById('flat');
+  function fade(el, v) {
+    v = Math.round(v * 100) / 100;
+    if (el._o === v) return;
+    el._o = v;
+    el.style.opacity = v;
+    el.style.visibility = v > 0 ? 'visible' : 'hidden';
+  }
+  // Scrolling through the track flies the camera from the eye to the forest at rest, arriving as the track's end
+  // reaches the bottom of the screen; then, while the page's sections scroll over it, it goes on, slowly, deeper in.
+  function scrollP() {
+    var y = window.scrollY, vh = window.innerHeight, end = Math.max(1, track.offsetTop + track.offsetHeight - vh);
+    if (y <= end) return P_REST * y / end;
+    // the end is where the plate's folded legend comes in; opened, it scrolls on without moving the camera
+    var max = document.documentElement.scrollHeight - vh, sum = legendEl && legendEl.querySelector('summary');
+    if (sum) max = Math.min(max, legendEl.offsetTop + sum.offsetTop + sum.offsetHeight + 28 - vh);
+    return P_REST + (1 - P_REST) * clamp((y - end) / Math.max(1, max - end), 0, 1);
+  }
+
+  var shown = null, swapAt = 0;
+  function update(dt, now) {
+    var target = fixedP != null ? fixedP : scrollP();
+    if (reduce) {
+      // no flight: fade between the two ends
+      target = target < 0.5 ? 0 : 1;
+      if (shown === null) { shown = target; p = target; }
+      if (target !== shown && !swapAt) { canvas.classList.add('is-fading'); swapAt = now + 300; }
+      if (swapAt && now > swapAt) { shown = target; p = target; swapAt = 0; canvas.classList.remove('is-fading'); }
+    } else {
+      p = fixedP != null ? target : p + (target - p) * (1 - Math.exp(-dt * 6));
+      if (Math.abs(target - p) < 1e-4) p = target;
+    }
+
+    // the pointer, or a slow drift when nobody moves it
+    if (fixedPtr) { ptr.tx = fixedPtr.x; ptr.ty = fixedPtr.y; }
+    else if (now - ptr.last > 2500) {
+      var t = now / 1000;
+      ptr.tx = reduce ? 0 : 0.6 * Math.sin(t * 0.27);
+      ptr.ty = reduce ? 0 : 0.45 * Math.sin(t * 0.41 + 1.3);
+    }
+    var kp = fixedPtr ? 1 : 1 - Math.exp(-dt * 3.5);
+    ptr.x += (ptr.tx - ptr.x) * kp;
+    ptr.y += (ptr.ty - ptr.y) * kp;
+    flatT += (flatTarget - flatT) * (fixedP != null ? 1 : 1 - Math.exp(-dt * 3));
+
+    // the iris follows the pointer, and looks around by itself when nobody moves
+    var MAX_X = 14, MAX_Y = 7;
+    if (fixedPtr || now - ptr.last < 2500) {
+      var px = fixedPtr ? (fixedPtr.x + 1) / 2 * W : ptr.cx, py = fixedPtr ? (fixedPtr.y + 1) / 2 * H : ptr.cy;
+      var dx = px - C.x, dy = py - (C.y - cam0.y * F), d = Math.hypot(dx, dy) || 1, k = Math.min(1, d / (eyePx * 0.55));
+      iris.tx = dx / d * MAX_X * k; iris.ty = dy / d * MAX_Y * k;
+    } else if (now > iris.wanderAt && !reduce) {
+      var a = Math.random() * TAU, kk = 0.4 + Math.random() * 0.6;
+      iris.tx = Math.cos(a) * MAX_X * kk; iris.ty = Math.sin(a) * MAX_Y * kk;
+      iris.wanderAt = now + 1600 + Math.random() * 1800;
+    }
+    var look = 1 - smooth(0.02, 0.08, p), ki = reduce || fixedPtr ? 1 : 1 - Math.exp(-dt * 7);   // diving in, it looks straight at us
+    iris.x += (iris.tx * look - iris.x) * ki;
+    iris.y += (iris.ty * look - iris.y) * ki;
+
+    // a blink now and then, while we are still outside
+    var ts = now / 1000;
+    if (!reduce && fixedP == null && p < 0.02 && ts > blink.at) { blink.start = ts; blink.at = ts + 3.5 + Math.random() * 4; }
+    var bt = (ts - blink.start) / 0.2;
+    blink.v = bt >= 0 && bt <= 1 ? Math.sin(Math.PI * bt) : 0;
+
+    fade(heroCopy, 1 - smooth(0.008, 0.045, p));
+    var diving = p > 0.045;   // the headline has gone (a phone asks about cookies only then)
+    if (diving !== root.diving) { root.diving = diving; document.documentElement.classList.toggle('diving', diving); }
+    fade(paperEl, smooth(P_PUPIL, P_GLOW + 0.03, p));
+    fade(flatBox, smooth(P_CUT + 0.04, P_CUT + 0.1, p) * (1 - smooth(P_REST + 0.008, P_REST + 0.02, p)));   // only while the forest is in full view
+  }
+
+  // ---------- setup ----------
+  // Sizes, scales, and everything cheap that depends on them.
+  function measure() {
+    W = window.innerWidth; H = window.innerHeight;
+    var dev = window.devicePixelRatio || 1;
+    dprEye = Math.min(dev, 2);
+    dprBase = forceScale || Math.min(dev, 1.5, Math.sqrt(PIXEL_BUDGET / (W * H)));
+    dprIn = forceScale || (dprIn ? Math.min(dprIn, dprBase) : dprBase);
+    paintScale = Math.min(dprBase, 1);
+    dpr = 0; useScale(p < P_PUPIL ? dprEye : dprIn);
+    A = W / H; F = H; C = { x: W / 2, y: H / 2 }; halfDiag = Math.hypot(W, H) / 2;
+    var portrait = W < H;
+    eyePx = Math.min(W * (portrait ? 0.6 : 0.5), H * 0.72);   // narrow screens: keep the logo's sparkles on screen
+    EYE_S = eyePx / (192 * H);   // world units per logo unit, at the eye's distance (1) with F = H
+    cam0 = { x: 0, y: portrait ? 0.13 : 0.1 };   // the eye sits above the middle, the headline below it
+    dMin = 13 * EYE_S * F / (1.3 * halfDiag);   // this close, the pupil fills the screen
+    sparks = buildSparks();
+    if (!irisArt) irisArt = buildIris(rng(SEED + 5));
+    irisGrad = ctx.createRadialGradient(194.6, 129.8, 0, 194.6, 129.8, 34);
+    irisGrad.addColorStop(0, '#F7D3DE'); irisGrad.addColorStop(0.65, '#E7A1B6'); irisGrad.addColorStop(1, '#8E2F55');
+    glowGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 140);
+    glowGrad.addColorStop(0, 'rgba(231,161,182,.16)'); glowGrad.addColorStop(0.6, 'rgba(231,161,182,.07)'); glowGrad.addColorStop(1, 'rgba(231,161,182,0)');
+    nightGrad = ctx.createLinearGradient(0, 0, 0, H);
+    nightGrad.addColorStop(0, '#18263F'); nightGrad.addColorStop(1, '#0A111D');
+  }
+
+  // The fall's layers, and the forest: the forest takes a while to paint, and the eye and the fall do not need it,
+  // so it is painted bit by bit meanwhile.
+  var built = null;
+  function build() {
+    var t0 = performance.now();
+    fall = buildFall(rng(SEED));
+    buildForest();
+    plate = null;   // laid out again for the new shape
+    paintSoon();
+    built = { w: W, h: H };
+    buildMs = performance.now() - t0;
+  }
+  function layout() {
+    measure();
+    // On a phone, the address bar showing or hiding changes the height a little: keep what is built (it is drawn
+    // in units of the screen's height, so it just scales). Anything bigger, and it is built again for the new shape.
+    if (built && W === built.w && Math.abs(H - built.h) < built.h * 0.3) return;
+    build();
+  }
+
+  function makeGrain() {
+    var c = document.createElement('canvas'), g = c.getContext('2d'), n = 128, img, i, v;
+    c.width = c.height = n;
+    img = g.createImageData(n, n);
+    for (i = 0; i < n * n; i++) { v = Math.random() * 255; img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v; img.data[i * 4 + 3] = 255; }
+    g.putImageData(img, 0, 0);
+    document.querySelector('.grain').style.backgroundImage = 'url(' + c.toDataURL() + ')';
+    // and a sheet of watercolour paper: warm, faintly fibrous, multiplied over the painting
+    var rnd = rng(SEED + 3), nz = noiseTile(256, 8, 3, rnd);
+    var sheet = pixels(256, function (i) { var v = nz[i] * 22 + rnd() * 10; return [255 - v * 0.6, 252 - v * 0.8, 244 - v * 1.2, 255]; });
+    paperEl.style.backgroundImage = 'url(' + sheet.toDataURL() + ')';
+  }
+
+  // ---------- input ----------
+  window.addEventListener('pointermove', function (e) {
+    if (e.pointerType === 'touch' || fixedPtr) return;
+    ptr.cx = e.clientX; ptr.cy = e.clientY; ptr.last = performance.now();
+    ptr.tx = clamp(e.clientX / W * 2 - 1, -1, 1); ptr.ty = clamp(e.clientY / H * 2 - 1, -1, 1);
+  }, { passive: true });
+  // phones: tilt to look around (where the browser sends orientation without asking)
+  window.addEventListener('deviceorientation', function (e) {
+    if (e.gamma == null || fixedPtr) return;
+    ptr.last = performance.now();
+    ptr.tx = clamp(e.gamma / 25, -1, 1); ptr.ty = clamp((e.beta - 45) / 25, -1, 1);
+    ptr.cx = (ptr.tx + 1) / 2 * W; ptr.cy = (ptr.ty + 1) / 2 * H;
+  });
+  flatBtn.setAttribute('aria-pressed', flatTarget ? 'true' : 'false');
+  flatBtn.addEventListener('click', function () {
+    poke();
+    flatTarget = flatTarget ? 0 : 1;
+    flatBtn.setAttribute('aria-pressed', flatTarget ? 'true' : 'false');
+  });
+  var resizeTimer;
+  window.addEventListener('resize', function () { clearTimeout(resizeTimer); resizeTimer = setTimeout(layout, 150); });
+
+  // ---------- go ----------
+  var hud = q.has('debug') ? document.body.appendChild(document.createElement('pre')) : null, hudAt = 0, renderMs = 0, frameMs = 16, last = 0;
+  if (hud) hud.className = 'hud';
+  var paused = false, tick = 0, lastInput = 0;
+  function poke() { lastInput = performance.now(); }
+  window.addEventListener('scroll', poke, { passive: true });
+  function frame(now) {
+    if (paused) { requestAnimationFrame(frame); return; }
+    // When nobody is doing anything the scene still lives (cells drift, the eye looks around), but every other
+    // frame is enough for that, and it spares the battery.
+    var calm = fixedP == null && now - Math.max(lastInput, ptr.last) > 1500 && Math.abs(scrollP() - p) < 1e-4;
+    if (calm && (tick++ & 1)) { requestAnimationFrame(frame); return; }
+    var dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016;
+    frameMs = lerp(frameMs, last ? now - last : 16, 0.1);
+    last = now;
+    update(dt, now);
+    var t0 = performance.now();
+    render(now);
+    renderMs = lerp(renderMs, performance.now() - t0, 0.1);
+    // Twice a second, inside the eye, measure what a frame really costs, waiting for the drawing to finish (the
+    // time between frames would not do: browsers slow down pages that are not in front). Three slow ones in a row:
+    // draw with fewer pixels; a run of quick ones: with more again, up to the budget.
+    if (p >= P_PUPIL && fixedP == null && !forceScale && ++cost.n % 30 === 0) {
+      flush();
+      var c = cost.last = performance.now() - t0;
+      cost.slow = c > 15 ? cost.slow + (c > 30 ? 1.5 : 1) : 0;   // very slow ones count for more
+      cost.fast = c < 6 ? cost.fast + 1 : 0;
+      if (cost.slow >= 3 && dprIn > 0.45) { dprIn = Math.max(0.45, dprIn * (c > 30 ? 0.75 : 0.84)); cost.slow = 0; }
+      if (cost.fast >= 6 && dprIn < dprBase) { dprIn = Math.min(dprBase, dprIn * 1.1); cost.fast = 0; }
+    }
+    if (hud && now - hudAt > 250) {
+      hudAt = now;
+      hud.textContent = 'fps ' + (1000 / frameMs).toFixed(0) + '  draw ' + renderMs.toFixed(1) + 'ms  build ' + buildMs.toFixed(0) + 'ms  slices ' + (forest ? forest.planes.length : 0) + '/' + SLICES.length + '\n' +
+        'p ' + p.toFixed(3) + '  fall ' + FC.c.toFixed(4) + '  forest ' + SC.y.toFixed(2) + ',' + SC.z.toFixed(2) + '  flat ' + flatT.toFixed(2) + '\n' +
+        'scale ' + dpr.toFixed(2) + ' (inside ' + dprIn.toFixed(2) + ' of ' + dprBase.toFixed(2) + ')  measured ' + cost.last.toFixed(1) + 'ms';
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // for tuning: time a frame at a given scroll position (forces the canvas to finish drawing)
+  window.__dive = {
+    bench: function (pp, n) {
+      var keep = p, t0, i;
+      n = n || 20; p = pp; t0 = performance.now();
+      for (i = 0; i < n; i++) render(t0 + i * 16);
+      flush();
+      var ms = (performance.now() - t0) / n;
+      p = keep;
+      return Math.round(ms * 100) / 100;
+    },
+    build: function () { return Math.round(buildMs); },
+    scale: function () { return { now: dpr, inside: dprIn, base: dprBase, paint: paintScale, eye: dprEye }; },
+    steps: function () { return { n: stepStats.n, max: Math.round(stepStats.max), over30: stepStats.over30, by: stepStats.by }; },
+    // megapixels held in painted bitmaps (each pixel is 4 bytes, on the GPU or in memory)
+    memory: function () {
+      var px = 0;
+      function add(it) { if (it && it.img) px += it.img.width * it.img.height; }
+      if (forest) { forest.planes.forEach(function (pl) { pl.items.forEach(add); }); add(forest.veil); forest.grove.forEach(function (t) { add(t.cel); }); }
+      return { forestMP: Math.round(px / 1e5) / 10, stageMP: Math.round(canvas.width * canvas.height / 1e5) / 10, scratchMP: Math.round(scratch.reduce(function (a, c) { return a + c.width * c.height; }, 0) / 1e5) / 10 };
+    },
+    // hold the camera at a point of the scroll (and, optionally, the pointer), as ?p= and ?px=&py= do
+    seek: function (pp, px, py) {
+      fixedP = clamp(pp, 0, 1); p = fixedP;
+      if (px != null) { fixedPtr = { x: px, y: py || 0 }; ptr.x = ptr.tx = px; ptr.y = ptr.ty = py || 0; }
+    },
+    ready: function () { return !!forest && !forest.steps.length; },
+    // for recording: stop the clock, then draw frames at chosen moments (scroll point, pointer, time in ms, flattening)
+    pause: function () { paused = true; },
+    frameAt: function (pp, px, py, t, flat) {
+      fixedP = clamp(pp, 0, 1); p = fixedP; fixedPtr = { x: px || 0, y: py || 0 };
+      if (flat != null) { flatTarget = flat; flatT = flat; flatBtn.setAttribute('aria-pressed', flat > 0.5 ? 'true' : 'false'); }
+      update(1 / 30, t);
+      render(t);
+    }
+  };
+
+  makeTextures();
+  paintCells();
+  makeGrain();
+  layout();
+  requestAnimationFrame(frame);
+})();

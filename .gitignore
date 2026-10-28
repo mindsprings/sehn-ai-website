@@ -1,6 +1,8 @@
 # Asset library from the deck: contains images with unclear licenses. Never publish.
 assets-source/
 public/img/
+# Inspiration references (McBess, Cajal, photos): not ours to redistribute.
+moodboard/
 
 # Local only
 screenshots/
@@ -9,3 +11,7 @@ node_modules/
 *_check.png
 .DS_Store
 Thumbs.db
+*~
+
+# Renders of lab experiments (preview videos, contact sheets)
+lab/*/renders/

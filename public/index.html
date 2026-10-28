@@ -23,13 +23,122 @@
   <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- the fonts are served from here: see public/assets/fonts -->
+  <link rel="preload" href="assets/fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/plex-sans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/old-standard.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="styles.css">
+  <style>
+    body { background: #0A111D; }
+
+    /* ---------- the dive: one canvas behind the whole page ---------- */
+    .stage { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+    #stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; transition: opacity .3s ease; }
+    #stage.is-fading { opacity: 0; }
+    /* old film: grain and a soft vignette; and a sheet of watercolour paper once we are inside */
+    .grain { position: absolute; inset: -20%; opacity: .09; mix-blend-mode: overlay; background-size: 180px 180px; animation: grain .9s steps(5) infinite; }
+    @keyframes grain {
+      0% { transform: translate(0, 0); } 20% { transform: translate(-4%, 3%); } 40% { transform: translate(3%, -2%); }
+      60% { transform: translate(-2%, -4%); } 80% { transform: translate(4%, 2%); } 100% { transform: translate(0, 0); }
+    }
+    .paper { position: absolute; inset: 0; mix-blend-mode: multiply; background-size: 256px 256px; opacity: 0; visibility: hidden; }
+    /* the plate: Cajal's labels over the forest, in Old Standard TT, a revival of the Modern roman of his plates;
+       each letter and dot ringed in paper, so they read over the painting, under the sheet of paper */
+    .plate { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; opacity: 0; visibility: hidden; }
+    .plate text { font-family: "Old Standard TT", "Times New Roman", serif; fill: #1E1612; paint-order: stroke; stroke: rgba(246, 236, 214, .6); stroke-width: 2.5px; stroke-linejoin: round; }
+    .plate .ab { font-size: 18px; }
+    .plate .nm { font-size: 15px; font-style: italic; }
+    .plate .rn { font-size: 19px; }
+    .plate .halo { fill: none; stroke: rgba(246, 236, 214, .5); stroke-width: 4.6; stroke-dasharray: .1 6.5; stroke-linecap: round; }
+    .plate .lead { fill: none; stroke: #1E1612; stroke-width: 2.6; stroke-dasharray: .1 6.5; stroke-linecap: round; }
+    .plate .brk { fill: none; stroke: #1E1612; stroke-width: 1.4; }
+    .vignette { position: absolute; inset: 0; background: radial-gradient(120% 95% at 50% 45%, transparent 58%, rgba(6, 8, 14, .55) 100%); }
+    @media (prefers-reduced-motion: reduce) { .grain { animation: none; } }
+
+    /* the scroll that drives the camera, from the eye down into the forest */
+    .track { position: relative; height: 520vh; }
+    .hero-copy { position: fixed; left: 0; right: 0; bottom: 7vh; z-index: 1; padding: 0 16px; text-align: center; color: var(--on-dark); }
+    .hero-copy .eyebrow { justify-content: center; color: var(--rose); font-size: 13px; }
+    .hero-copy h1 { font-size: clamp(38px, 5.6vw, 72px); letter-spacing: -0.015em; line-height: 1.04; margin-bottom: 14px; }
+    .hero-copy h1 em { color: var(--rose); }
+    .hero-copy .note { color: var(--rose); }
+
+    /* ---------- the page, over the forest ---------- */
+    .over { position: relative; z-index: 2; }
+    .over .edge { display: none; }
+    /* arriving in the forest: the rest of the hero, straight on the scene */
+    .arrive { min-height: 100vh; display: grid; place-items: center; padding: 96px 16px; text-align: center; }
+    .arrive__inner { max-width: 820px; padding: 56px 48px 52px; background: radial-gradient(closest-side, rgba(251, 247, 238, .92), rgba(251, 247, 238, .8) 62%, rgba(251, 247, 238, 0)); }
+    .arrive .hero__tagline { font-family: var(--serif); font-size: clamp(34px, 4.4vw, 58px); line-height: 1.08; color: var(--ink); font-style: normal; margin: 0; }
+    .arrive .hero__tagline em { color: var(--plum); }
+    .arrive .hero__sub { color: var(--ink-2); font-size: 1.1em; margin: 20px auto 0; max-width: 30em; }
+    .arrive .hero__ctas { justify-content: center; }
+    .arrive .btn--ghost { color: var(--ink); border-color: var(--ink); background: rgba(251, 247, 238, .6); }
+    .arrive .btn--ghost:hover { color: var(--plum); border-color: var(--plum); }
+    .arrive .hero__pron { justify-content: center; color: var(--ink-2); }
+    .arrive .hero__pron .note { color: var(--plum); }
+    /* every section a sheet of paper laid over the scene, with the forest showing between them */
+    .over .section { background: none; padding: 0 0 18vh; }
+    .over .section > .wrap { padding-top: 64px; padding-bottom: 64px; border-radius: 24px; background: rgba(246, 240, 227, .93);
+      box-shadow: 0 1px 0 rgba(59, 42, 30, .08), 0 34px 70px -34px rgba(40, 16, 10, .7); }
+    .over .section--tight-top > .wrap { padding-top: 64px; }
+    .over .section--dark-left > .wrap { background: rgba(10, 17, 29, .9); }
+    .over .section--plum > .wrap { background: rgba(110, 42, 71, .93); }
+    .over .evidence, .over .contact { padding-top: 0; }
+    .site-footer-wrap { position: relative; z-index: 2; padding-bottom: 34vh; }   /* room at the end for the river, and whoever is on it */
+    .site-footer-wrap .footer { background: none; padding: 0; }
+    .site-footer-wrap .footer > .wrap { padding-top: 56px; padding-bottom: 56px; border-radius: 24px; background: rgba(10, 17, 29, .9); }
+    .footer .credits { max-width: 40em; margin: 24px auto 0; font-family: var(--label); font-style: italic; text-transform: none; letter-spacing: 0; font-size: 17px; line-height: 1.5; color: var(--on-dark-2); }
+    .footer .credits a { color: var(--on-dark); }
+    /* past the footer, the plate's lower margin: the forest fades into paper, and a folded explanation of the plate */
+    .plate-legend { position: relative; z-index: 2; padding: 9vh 16px 28px; color: #1E1612;
+      background: linear-gradient(to bottom, rgba(244, 236, 217, 0), rgba(244, 236, 217, .88) 8vh, rgba(244, 236, 217, .96)); }
+    .plate-legend > * { max-width: 1120px; margin-left: auto; margin-right: auto; }
+    .plate-legend summary { list-style: none; cursor: pointer; text-align: center; padding: 6px 0; }
+    .plate-legend summary::-webkit-details-marker { display: none; }
+    .plate-legend summary b { font: 400 21px/1.3 "Old Standard TT", serif; letter-spacing: .14em; }
+    .plate-legend summary b::after { content: " ›"; display: inline-block; letter-spacing: 0; transition: transform .2s ease; }
+    .plate-legend[open] summary b::after { transform: rotate(90deg); }
+    .plate-legend summary span { display: block; font: italic 400 15px/1.4 "Old Standard TT", serif; color: #4A3A30; margin-top: 2px; }
+    .plate-legend summary:focus-visible { outline: 2px solid var(--plum); outline-offset: 4px; border-radius: 6px; }
+    .plate-legend .why { font: italic 400 17px/1.45 "Old Standard TT", serif; text-align: center; color: #4A3A30; max-width: 46em; margin: 18px auto 14px; }
+    .plate-legend .layers { text-align: center; font-size: 15px; line-height: 1.7; color: #3E342D; max-width: 60em; margin: 0 auto 22px; }
+    .plate-legend .layers b { font: 400 17px "Old Standard TT", serif; color: #1E1612; }
+    .plate-legend .layers span { white-space: nowrap; }
+    .plate-legend .layers span + span::before { content: "·"; margin: 0 .55em 0 .2em; color: #9A8A78; }
+    .plate-legend dl { margin: 0 auto; display: grid; gap: 2px 28px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+    .plate-legend dl > div { display: grid; grid-template-columns: 2.6em 1fr; gap: 0 8px; padding: 5px 8px; border-radius: 8px; cursor: default; }
+    .plate-legend dl > div:hover, .plate-legend dl > div:focus, .plate-legend dl > div.is-on { background: rgba(231, 161, 182, .22); outline: none; }
+    .plate-legend dt { font: 400 18px/1.4 "Old Standard TT", serif; }
+    .plate-legend dd { margin: 0; font-size: 14px; line-height: 1.4; color: #3E342D; }
+    .plate-legend dd i { font: italic 400 17px/1.35 "Old Standard TT", serif; color: #1E1612; display: block; }
+    /* a cell named from the legend: its label in the forest, in plum */
+    .plate g.is-focus text { fill: #8E2F55; }
+    .plate g.is-focus .lead { stroke: #8E2F55; stroke-width: 3.2; }
+    @media (max-width: 720px) {
+      .over .section > .wrap, .site-footer-wrap .footer > .wrap { margin: 0 8px; padding-left: 20px; padding-right: 20px; padding-top: 44px; padding-bottom: 44px; }
+      .over .section { padding-bottom: 12vh; }
+    }
+
+    /* the cookie question, up beside the eye, clear of the headline below it (nothing is counted before it is answered) */
+    @media (min-width: 721px) { .consent { top: calc(var(--header-h) + 16px); bottom: auto; } }
+    /* on a phone there is no room beside the eye: it asks once the dive begins and the headline has gone */
+    @media (max-width: 720px) { html:not(.diving) .consent { visibility: hidden; } }
+
+    /* the multiplane switch, once we are in the forest */
+    .dive-flat { position: fixed; right: 16px; bottom: 16px; z-index: 40; display: flex; align-items: center; gap: 10px; padding: 4px 14px 4px 6px;
+      border-radius: 99px; background: rgba(10, 17, 29, .78); color: var(--on-dark); font-size: 14px; opacity: 0; visibility: hidden; transition: opacity .3s ease; }
+    .dive-flat .switch { color: var(--on-dark); font-size: 14px; }
+    .dive-flat .switch__track { border-color: var(--on-dark-2); background: var(--night-line); }
+    .dive-flat .switch__track::after { border-color: var(--on-dark-2); background: var(--on-dark); }
+    .dive-flat .switch[aria-pressed="true"] .switch__track { background: var(--rose); }
+
+    .hud { position: fixed; top: 76px; left: 8px; z-index: 60; margin: 0; padding: 6px 8px; font: 12px/1.35 ui-monospace, monospace; color: #CFE; background: rgba(0, 0, 0, .55); border-radius: 6px; pointer-events: none; }
+  </style>
   <script>document.documentElement.classList.add('js');</script>
   <script src="main.js" defer></script>
   <script src="analytics.js" defer></script>
+  <script src="dive.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -37,7 +146,7 @@
   <!-- shared drawings: the hand-drawn arrow for notes, and the line puzzle -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <defs>
-      <g id="arrow"><path d="M4,6 Q22,2 34,18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M26,18 L35,20 L36,11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g id="arrow"><path d="M4,6 L37,19" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="0 6"/></g>
       <g id="puz">
         <path d="M6,4 Q240,0 474,5 Q479,150 476,296 Q240,300 5,295 Q1,150 6,4 Z" fill="#F3E3C6"/>
         <g fill="none" stroke="#3B2A1E" stroke-width="3.5" stroke-linecap="round">
@@ -70,29 +179,39 @@
     </div>
   </header>
 
-  <main id="main">
 
-    <!-- Hero -->
-    <section class="section section--dark hero" id="top" aria-labelledby="hero-title">
-      <div class="wrap hero__grid">
-        <div class="hero__text">
-          <p class="eyebrow">Visual-spatial perception for AI agents</p>
-          <h1 id="hero-title">Agents want to <em>see</em> like we&nbsp;do.</h1>
-          <p class="hero__sub">Giving AI a sense of shape, distance and how things fit together.</p>
-          <p class="hero__tagline">Every AI that sees should see like we do.</p>
-          <div class="hero__ctas">
-            <a class="btn btn--rose" href="#contact">Get an API key</a>
-            <a class="btn btn--ghost" href="#problem">Try the puzzle ↓</a>
-          </div>
-          <p class="hero__pron"><span class="note">sehn = “to see” · say “zane”</span></p>
-        </div>
+  <div class="stage" aria-hidden="true">
+    <canvas id="stage"></canvas>
+    <svg class="plate" id="plate"></svg>
+    <div class="paper"></div>
+    <div class="grain"></div>
+    <div class="vignette"></div>
+  </div>
 
-        <div class="hero__art">
-          <svg class="hero__logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 260" width="580" height="377" role="img" aria-label="sehn.ai logo: a friendly eye with a rose iris, a sparkle of light and a trail of magic dust turning into pixels"><defs><radialGradient id="irisA" cx="0.42" cy="0.38"><stop offset="0" stop-color="#F7D3DE"/><stop offset="0.65" stop-color="#E7A1B6"/><stop offset="1" stop-color="#8E2F55"/></radialGradient><clipPath id="eyeOpening"><path d="M104,146 Q200,58 296,146 L282,152 Q200,196 118,152 Z"/></clipPath></defs><ellipse cx="200" cy="140" rx="140" ry="86" fill="#E7A1B6" opacity="0.08"/><g clip-path="url(#eyeOpening)"><g class="iris"><circle cx="200" cy="138" r="34" fill="url(#irisA)"/><circle cx="200" cy="138" r="13" fill="#0E1726"/><path d="M188,118 Q190,126 197,128 Q190,130 188,138 Q186,130 179,128 Q186,126 188,118 Z" fill="#FFF8EC"/><circle cx="211" cy="148" r="3" fill="#FFF8EC"/></g></g><path d="M104,146 Q200,58 296,146" fill="none" stroke="#F5F2EA" stroke-width="6" stroke-linecap="round"/><path d="M118,152 Q200,196 282,152" fill="none" stroke="#F5F2EA" stroke-width="3.5" stroke-linecap="round" opacity="0.7"/><g fill="none" stroke="#F5F2EA" stroke-width="4" stroke-linecap="round"><path d="M238,109 Q243,90 256,82"/><path d="M258,118 Q266,100 280,96"/><path d="M277,130 Q288,116 302,114"/></g><g class="logo-dust"><g fill="#F7DDE5"><circle cx="50" cy="200" r="2.5" style="--i:0"/><circle cx="110" cy="218" r="3.5" style="--i:2"/><circle cx="170" cy="224" r="5" style="--i:4"/></g><g fill="#E7A1B6"><circle cx="80" cy="210.5" r="3" style="--i:1"/><circle cx="140" cy="222.5" r="4.5" style="--i:3"/><circle cx="200" cy="222.5" r="5.5" style="--i:5"/><rect x="225" y="213" width="10" height="10" rx="1.5" style="--i:6"/><rect x="285.5" y="195.5" width="8" height="8" rx="1.5" style="--i:8"/></g><g fill="#F7DDE5"><rect x="255.5" y="206" width="9" height="9" rx="1.5" style="--i:7"/><rect x="316.5" y="183" width="7" height="7" rx="1.5" style="--i:9"/></g></g><path class="logo-star s1" d="M350,156 Q352,166 362,168 Q352,170 350,180 Q348,170 338,168 Q348,166 350,156 Z" fill="#E7A1B6"/><path class="logo-star s2" d="M330,40 Q333,57 350,60 Q333,63 330,80 Q327,63 310,60 Q327,57 330,40 Z" fill="#E7A1B6"/><path class="logo-star s3" d="M78,72 Q80,82 90,84 Q80,86 78,96 Q76,86 66,84 Q76,82 78,72 Z" fill="#F5F2EA"/><circle class="logo-star s4" cx="112" cy="48" r="2.5" fill="#F5F2EA"/><circle class="logo-star s5" cx="296" cy="96" r="2" fill="#F7DDE5"/></svg>
-          <p class="note" aria-hidden="true">it follows you around<svg viewBox="0 0 46 30"><use href="#arrow"/></svg></p>
+  <header class="hero-copy" id="hero-copy">
+    <p class="eyebrow">Visual-spatial perception for AI agents</p>
+    <h1 id="hero-title">Agents want to <em>see</em> like we&nbsp;do.</h1>
+    <p class="note">scroll to look inside ↓</p>
+  </header>
+
+  <!-- the dive: scrolling through this flies the camera into the eye -->
+  <div class="track" id="top">
+    <p class="visually-hidden">Scrolling flies the camera into the eye’s pupil and through the dark inside, then down onto the glowing retina, past red vessels and down through its see-through layers of cells, into a canopy of cell bodies. We drop out of the canopy inside the retina: a watercolour forest of strange layered trees made of neurons, on a yellow floor of rods and cones, with light slanting down from above and a red river of blood, where a small eye rows a boat made of a red blood cell.</p>
+  </div>
+
+  <main id="main" class="over">
+
+    <!-- Arriving in the forest: the rest of the hero -->
+    <section class="arrive" aria-labelledby="arrive-title">
+      <div class="arrive__inner">
+        <p class="hero__tagline" id="arrive-title">Every AI that sees should <em>see</em> like we do.</p>
+        <p class="hero__sub">Giving AI a sense of shape, distance and how things fit together.</p>
+        <div class="hero__ctas">
+          <a class="btn btn--rose" href="#contact">Get an API key</a>
+          <a class="btn btn--ghost" href="#problem">Try the puzzle ↓</a>
         </div>
+        <p class="hero__pron"><span class="note">sehn = “to see” · say “zane”</span></p>
       </div>
-      <div class="edge edge--bottom" aria-hidden="true"></div>
     </section>
 
     <!-- The problem -->
@@ -100,7 +219,7 @@
       <div class="wrap">
         <div class="split-head reveal">
           <div>
-            <p class="eyebrow">The problem</p>
+            <p class="eyebrow" data-n="I">The problem</p>
             <h2 id="problem-title">An LLM doesn’t see an image. It reads a list of patches.</h2>
           </div>
           <p class="lead">Today’s models talk brilliantly about pictures. Yet they stumble on spatial tasks a small child solves at a glance. Try one yourself.</p>
@@ -156,7 +275,7 @@
       <div class="wrap">
         <div class="split-head reveal">
           <div>
-            <p class="eyebrow">How it works</p>
+            <p class="eyebrow" data-n="II">How it works</p>
             <h2 id="how-title">One sentence, and your agent can see.</h2>
           </div>
           <p class="lead">sehn.ai is an MCP service. Tell your agent to use the tools at sehn.ai, and it gains a sense of space it did not have before.</p>
@@ -165,7 +284,7 @@
         <div class="how">
           <ol class="steps-v reveal">
             <li>
-              <span class="num">01</span>
+              <span class="num">I.</span>
               <div>
                 <h3>Any agent</h3>
                 <p>Bring the agent you already use.</p>
@@ -173,7 +292,7 @@
               </div>
             </li>
             <li>
-              <span class="num">02</span>
+              <span class="num">II.</span>
               <div>
                 <h3>The sehn.ai MCP server</h3>
                 <p class="quote">“use the tools at sehn.ai”</p>
@@ -181,7 +300,7 @@
               </div>
             </li>
             <li>
-              <span class="num">03</span>
+              <span class="num">III.</span>
               <div>
                 <h3>New answers</h3>
                 <p>About shape, position and connection, that it could not give before.</p>
@@ -219,7 +338,7 @@
       <div class="wrap">
         <div class="split-head reveal">
           <div>
-            <p class="eyebrow">Grounded in neuroscience</p>
+            <p class="eyebrow" data-n="III">Grounded in neuroscience</p>
             <h2 id="model-title">Built on how the brain sees space</h2>
           </div>
           <p class="lead">Our tools draw on decades of vision neuroscience, and give an LLM the sense of space it can’t get from a list of patches.</p>
@@ -237,7 +356,7 @@
       <div class="wrap">
         <div class="split-head reveal">
           <div>
-            <p class="eyebrow">First evidence</p>
+            <p class="eyebrow" data-n="IV">First evidence</p>
             <h2 id="evidence-title">With sehn.ai, agents trace paths they couldn’t before.</h2>
           </div>
           <p class="lead">200 new mazes: which entrance reaches the exit? None of them were used to build or tune the tools, and the analysis was written down before the run.</p>
@@ -273,7 +392,7 @@
       <div class="wrap">
         <div class="split-head reveal">
           <div>
-            <p class="eyebrow">Where it matters</p>
+            <p class="eyebrow" data-n="V">Where it matters</p>
             <h2 id="markets-title">One way of seeing, many markets</h2>
           </div>
           <p class="lead">The same sense of space helps wherever a machine has to understand a room, a drawing, a face or a screen.</p>
@@ -381,7 +500,7 @@
       <div class="wrap">
         <div class="name-grid reveal">
           <div class="name-text">
-            <p class="eyebrow">The name</p>
+            <p class="eyebrow" data-n="VI">The name</p>
             <h2 id="name-title">Why we call it sehn</h2>
           </div>
           <div class="name-text">
@@ -420,7 +539,7 @@
       <div class="wrap">
         <div class="split-head reveal">
           <div>
-            <p class="eyebrow">Team</p>
+            <p class="eyebrow" data-n="VII">Team</p>
             <h2 id="team-title">The two people behind sehn</h2>
           </div>
           <p class="lead">A clinical psychologist with a computer-science background, and an engineer who builds brain-inspired vision systems.</p>
@@ -456,10 +575,10 @@
         <div class="story">
           <h3 class="reveal">How we got here</h3>
           <ol class="timeline">
-            <li class="reveal"><span class="num">01</span>People reason in pictures: we follow, fit and compare shapes without a word.</li>
-            <li class="reveal d1"><span class="num">02</span>LLMs describe images brilliantly, then get the space in them wrong.</li>
-            <li class="reveal d2"><span class="num">03</span>Anton had met the same blind spot throughout his years in computer vision.</li>
-            <li class="reveal d3"><span class="num">04</span>sehn.ai: give AI the non-verbal reasoning it is missing.</li>
+            <li class="reveal"><span class="num">I.</span>People reason in pictures: we follow, fit and compare shapes without a word.</li>
+            <li class="reveal d1"><span class="num">II.</span>LLMs describe images brilliantly, then get the space in them wrong.</li>
+            <li class="reveal d2"><span class="num">III.</span>Anton had met the same blind spot throughout his years in computer vision.</li>
+            <li class="reveal d3"><span class="num">IV.</span>sehn.ai: give AI the non-verbal reasoning it is missing.</li>
           </ol>
         </div>
       </div>
@@ -470,7 +589,7 @@
       <div class="edge edge--top" aria-hidden="true"></div>
       <div class="wrap contact__grid">
         <div class="reveal">
-          <p class="eyebrow">Early access</p>
+          <p class="eyebrow" data-n="VIII">Early access</p>
           <h2 id="contact-title">Every AI that sees should see like we do.</h2>
           <p class="lead">sehn.ai is in early access. Tell us what your agent should see, and we’ll send you an API key to try it.</p>
           <p class="contact__direct"><a href="mailto:anton@mindsprings.ai">anton@mindsprings.ai</a> <a href="mailto:diana@mindsprings.ai">diana@mindsprings.ai</a></p>
@@ -513,13 +632,40 @@
 
   </main>
 
+  <div class="site-footer-wrap">
   <footer class="section section--dark footer">
-    <div class="wrap">
-      <img src="assets/brand/logo.svg" width="160" height="104" alt="sehn.ai logo">
-      <p>sehn.ai is a product of <a href="https://mindsprings.ai">Mindsprings</a></p><p>Mindsprings LLC · sehn.ai · <a href="https://mindsprings.ai">mindsprings.ai</a></p>
-      <p><a href="imprint.html">Imprint &amp; privacy</a> <button class="footer__link" type="button" data-consent-open hidden>· Cookie settings</button></p>
-      <p class="tm">Magic Eye® is a trademark of Magic Eye Inc.</p>
-    </div>
-  </footer>
+      <div class="wrap">
+        <img src="assets/brand/logo.svg" width="160" height="104" alt="sehn.ai logo">
+        <p>sehn.ai is a product of <a href="https://mindsprings.ai">Mindsprings</a></p><p>Mindsprings LLC · sehn.ai · <a href="https://mindsprings.ai">mindsprings.ai</a></p>
+        <p><a href="imprint.html">Imprint &amp; privacy</a> <button class="footer__link" type="button" data-consent-open hidden>· Cookie settings</button></p>
+        <p class="credits">The dive into the eye is inspired by <a href="https://en.wikipedia.org/wiki/Santiago_Ram%C3%B3n_y_Cajal">Santiago Ramón y Cajal</a>’s drawings of the retina, Disney’s <a href="https://en.wikipedia.org/wiki/Multiplane_camera">multiplane camera</a>, and the films of <a href="https://www.youtube.com/watch?v=n11j73OYqOY">McBess</a>.</p>
+        <p class="tm">Magic Eye® is a trademark of Magic Eye Inc.</p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- the plate's legend, folded, past the end of the page: open it, point at a line, and its cell is named in the forest -->
+  <details class="plate-legend">
+    <summary><b>Explanation of Plate I</b><span>sehn.ai dib., after the plates of S. Ramón y Cajal</span></summary>
+    <p class="why">The retina, from the inside. Light comes down from above and passes through every layer before it reaches the rods and cones; on its way back, the picture is taken apart and analysed, layer by layer, before the brain ever sees it.</p>
+    <p class="layers"><span><b>I.</b> ganglion cells, the roof</span> <span><b>II.</b> inner plexiform, the canopy</span> <span><b>III.</b> inner nuclear, the upper trunks</span> <span><b>IV.</b> outer plexiform, the lower branches</span> <span><b>V.</b> outer nuclear, the nuclei of rods and cones</span> <span><b>VI.</b> rods and cones, the trunks</span></p>
+    <dl>
+      <div data-k="Gc" tabindex="0"><dt>Gc</dt><dd><i>ganglion cell</i>the retina’s output: their fibres make the optic nerve, carrying a picture already analysed</dd></div>
+      <div data-k="Ac" tabindex="0"><dt>Ac</dt><dd><i>amacrine cell</i>compares neighbours across space and time; some detect the direction of motion</dd></div>
+      <div data-k="Bc" tabindex="0"><dt>Bc</dt><dd><i>bipolar cell</i>carries the signal inward, split into “lighter than around” and “darker than around”</dd></div>
+      <div data-k="Hc" tabindex="0"><dt>Hc</dt><dd><i>horizontal cell</i>holds back each cell’s neighbours, so that edges stand out</dd></div>
+      <div data-k="Mg" tabindex="0"><dt>Mg</dt><dd><i>Müller glia</i>span the whole retina, and guide light down through it like optical fibres</dd></div>
+      <div data-k="R" tabindex="0"><dt>R</dt><dd><i>rods</i>see in dim light</dd></div>
+      <div data-k="C" tabindex="0"><dt>C</dt><dd><i>cones</i>see colour and fine detail</dd></div>
+      <div data-k="Cap" tabindex="0"><dt>Cap</dt><dd><i>capillary</i>feeds the inner layers</dd></div>
+      <div data-k="Rbc" tabindex="0"><dt>Rbc</dt><dd><i>red blood cell</i>darker than the plasma it floats in</dd></div>
+      <div data-k="S" tabindex="0"><dt>S</dt><dd><i>sehn</i>learning to see the same way</dd></div>
+    </dl>
+  </details>
+
+  <div class="dive-flat" id="dive-flat">
+    <button class="switch" type="button" id="flat" aria-pressed="false" aria-describedby="flat-note"><span class="switch__track" aria-hidden="true"></span>Flatten the layers</button>
+    <span class="visually-hidden" id="flat-note">Each layer of the scene is flat; the depth you see comes only from how they move against each other. Flattened, they all move alike.</span>
+  </div>
 </body>
 </html>
