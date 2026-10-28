@@ -105,6 +105,11 @@
       .over .section { padding-bottom: 12vh; }
     }
 
+    /* the cookie question, up beside the eye, clear of the headline below it (nothing is counted before it is answered) */
+    @media (min-width: 721px) { .consent { top: calc(var(--header-h) + 16px); bottom: auto; } }
+    /* on a phone there is no room beside the eye: it asks once the dive begins and the headline has gone */
+    @media (max-width: 720px) { html:not(.diving) .consent { visibility: hidden; } }
+
     /* the multiplane switch, once we are in the forest */
     .dive-flat { position: fixed; right: 16px; bottom: 16px; z-index: 40; display: flex; align-items: center; gap: 10px; padding: 4px 14px 4px 6px;
       border-radius: 99px; background: rgba(10, 17, 29, .78); color: var(--on-dark); font-size: 14px; opacity: 0; visibility: hidden; transition: opacity .3s ease; }
@@ -117,7 +122,7 @@
   </style>
   <script>document.documentElement.classList.add('js');</script>
   <script src="../../public/main.js" defer></script>
-  <script src="dive.js" defer></script>
+  <script src="../../public/dive.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>

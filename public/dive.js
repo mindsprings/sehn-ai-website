@@ -1833,7 +1833,7 @@
   }
 
   // ---------- update: scroll, pointer, the eye's own life ----------
-  var heroCopy = document.getElementById('hero-copy'), flatBox = document.getElementById('dive-flat'), paperEl = document.querySelector('.paper');
+  var root = {}, heroCopy = document.getElementById('hero-copy'), flatBox = document.getElementById('dive-flat'), paperEl = document.querySelector('.paper');
   var track = document.querySelector('.track');
   var flatBtn = document.getElementById('flat');
   function fade(el, v) {
@@ -1902,6 +1902,8 @@
     blink.v = bt >= 0 && bt <= 1 ? Math.sin(Math.PI * bt) : 0;
 
     fade(heroCopy, 1 - smooth(0.008, 0.045, p));
+    var diving = p > 0.045;   // the headline has gone (a phone asks about cookies only then)
+    if (diving !== root.diving) { root.diving = diving; document.documentElement.classList.toggle('diving', diving); }
     fade(paperEl, smooth(P_PUPIL, P_GLOW + 0.03, p));
     fade(flatBox, smooth(P_CUT + 0.04, P_CUT + 0.1, p) * (1 - smooth(P_REST + 0.008, P_REST + 0.02, p)));   // only while the forest is in full view
   }
