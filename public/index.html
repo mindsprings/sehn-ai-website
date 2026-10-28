@@ -23,9 +23,10 @@
   <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- the fonts are served from here: see public/assets/fonts -->
+  <link rel="preload" href="assets/fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/plex-sans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/old-standard.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="styles.css">
   <script>document.documentElement.classList.add('js');</script>
   <script src="main.js" defer></script>
@@ -37,7 +38,7 @@
   <!-- shared drawings: the hand-drawn arrow for notes, and the line puzzle -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <defs>
-      <g id="arrow"><path d="M4,6 Q22,2 34,18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M26,18 L35,20 L36,11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g id="arrow"><path d="M4,6 L37,19" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="0 6"/></g>
       <g id="puz">
         <path d="M6,4 Q240,0 474,5 Q479,150 476,296 Q240,300 5,295 Q1,150 6,4 Z" fill="#F3E3C6"/>
         <g fill="none" stroke="#3B2A1E" stroke-width="3.5" stroke-linecap="round">
@@ -100,7 +101,7 @@
       <div class="wrap">
         <div class="split-head reveal">
           <div>
-            <p class="eyebrow">The problem</p>
+            <p class="eyebrow" data-n="I">The problem</p>
             <h2 id="problem-title">An LLM doesn’t see an image. It reads a list of patches.</h2>
           </div>
           <p class="lead">Today’s models talk brilliantly about pictures. Yet they stumble on spatial tasks a small child solves at a glance. Try one yourself.</p>
@@ -156,7 +157,7 @@
       <div class="wrap">
         <div class="split-head reveal">
           <div>
-            <p class="eyebrow">How it works</p>
+            <p class="eyebrow" data-n="II">How it works</p>
             <h2 id="how-title">One sentence, and your agent can see.</h2>
           </div>
           <p class="lead">sehn.ai is an MCP service. Tell your agent to use the tools at sehn.ai, and it gains a sense of space it did not have before.</p>
@@ -165,7 +166,7 @@
         <div class="how">
           <ol class="steps-v reveal">
             <li>
-              <span class="num">01</span>
+              <span class="num">I.</span>
               <div>
                 <h3>Any agent</h3>
                 <p>Bring the agent you already use.</p>
@@ -173,7 +174,7 @@
               </div>
             </li>
             <li>
-              <span class="num">02</span>
+              <span class="num">II.</span>
               <div>
                 <h3>The sehn.ai MCP server</h3>
                 <p class="quote">“use the tools at sehn.ai”</p>
@@ -181,7 +182,7 @@
               </div>
             </li>
             <li>
-              <span class="num">03</span>
+              <span class="num">III.</span>
               <div>
                 <h3>New answers</h3>
                 <p>About shape, position and connection, that it could not give before.</p>
@@ -219,7 +220,7 @@
       <div class="wrap">
         <div class="split-head reveal">
           <div>
-            <p class="eyebrow">Grounded in neuroscience</p>
+            <p class="eyebrow" data-n="III">Grounded in neuroscience</p>
             <h2 id="model-title">Built on how the brain sees space</h2>
           </div>
           <p class="lead">Our tools draw on decades of vision neuroscience, and give an LLM the sense of space it can’t get from a list of patches.</p>
@@ -237,7 +238,7 @@
       <div class="wrap">
         <div class="split-head reveal">
           <div>
-            <p class="eyebrow">First evidence</p>
+            <p class="eyebrow" data-n="IV">First evidence</p>
             <h2 id="evidence-title">With sehn.ai, agents trace paths they couldn’t before.</h2>
           </div>
           <p class="lead">200 new mazes: which entrance reaches the exit? None of them were used to build or tune the tools, and the analysis was written down before the run.</p>
@@ -273,7 +274,7 @@
       <div class="wrap">
         <div class="split-head reveal">
           <div>
-            <p class="eyebrow">Where it matters</p>
+            <p class="eyebrow" data-n="V">Where it matters</p>
             <h2 id="markets-title">One way of seeing, many markets</h2>
           </div>
           <p class="lead">The same sense of space helps wherever a machine has to understand a room, a drawing, a face or a screen.</p>
@@ -381,7 +382,7 @@
       <div class="wrap">
         <div class="name-grid reveal">
           <div class="name-text">
-            <p class="eyebrow">The name</p>
+            <p class="eyebrow" data-n="VI">The name</p>
             <h2 id="name-title">Why we call it sehn</h2>
           </div>
           <div class="name-text">
@@ -420,7 +421,7 @@
       <div class="wrap">
         <div class="split-head reveal">
           <div>
-            <p class="eyebrow">Team</p>
+            <p class="eyebrow" data-n="VII">Team</p>
             <h2 id="team-title">The two people behind sehn</h2>
           </div>
           <p class="lead">A clinical psychologist with a computer-science background, and an engineer who builds brain-inspired vision systems.</p>
@@ -456,10 +457,10 @@
         <div class="story">
           <h3 class="reveal">How we got here</h3>
           <ol class="timeline">
-            <li class="reveal"><span class="num">01</span>People reason in pictures: we follow, fit and compare shapes without a word.</li>
-            <li class="reveal d1"><span class="num">02</span>LLMs describe images brilliantly, then get the space in them wrong.</li>
-            <li class="reveal d2"><span class="num">03</span>Anton had met the same blind spot throughout his years in computer vision.</li>
-            <li class="reveal d3"><span class="num">04</span>sehn.ai: give AI the non-verbal reasoning it is missing.</li>
+            <li class="reveal"><span class="num">I.</span>People reason in pictures: we follow, fit and compare shapes without a word.</li>
+            <li class="reveal d1"><span class="num">II.</span>LLMs describe images brilliantly, then get the space in them wrong.</li>
+            <li class="reveal d2"><span class="num">III.</span>Anton had met the same blind spot throughout his years in computer vision.</li>
+            <li class="reveal d3"><span class="num">IV.</span>sehn.ai: give AI the non-verbal reasoning it is missing.</li>
           </ol>
         </div>
       </div>
@@ -470,7 +471,7 @@
       <div class="edge edge--top" aria-hidden="true"></div>
       <div class="wrap contact__grid">
         <div class="reveal">
-          <p class="eyebrow">Early access</p>
+          <p class="eyebrow" data-n="VIII">Early access</p>
           <h2 id="contact-title">Every AI that sees should see like we do.</h2>
           <p class="lead">sehn.ai is in early access. Tell us what your agent should see, and we’ll send you an API key to try it.</p>
           <p class="contact__direct"><a href="mailto:anton@mindsprings.ai">anton@mindsprings.ai</a> <a href="mailto:diana@mindsprings.ai">diana@mindsprings.ai</a></p>
