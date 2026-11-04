@@ -19,9 +19,10 @@ Static site, no build step. Everything that gets deployed is in `public/`.
 - `public/favicon.svg`, `favicon-32.png`, `apple-touch-icon.png`, `og-image.png`
 - `assets-source/`: the full asset library from the deck. **Not deployed**, because it contains images with unclear licenses (see its README)
 - `tools/og.html`: source of the Open Graph image (screenshot at 1200×630)
-- `lab/`: experiments, not deployed. `lab/dive/index.html` is a working copy of the page (loading `public/dive.js`, `styles.css` and `main.js`) whose API key form never sends anything; `lab/dive/keyframes/` holds the keyframe sheet.
+- `lab/`: experiments, not deployed. `lab/dive/index.html` is a working copy of the page (loading `public/dive.js`, `styles.css` and `main.js`) whose API key form never sends anything; `lab/dive/keyframes/` holds the keyframe sheets (the dive, and the cortex beyond it).
 - `lab/type/`: type specimen: the current fonts (A), Fraunces sharpened with Old Standard TT for every label (B, the chosen direction), and Old Standard TT throughout (C), on the faces, on real sections, and on a forest frame labelled like a Cajal plate (`?set=a|b|c`)
 - `tools/make_keyframe_template.py`: writes the blank keyframe sheet `lab/dive/keyframes/keyframe-sheet.ora` (layered, opens in Krita) and a PNG preview
+- `tools/make_cortex_sheet.py`: writes `lab/dive/keyframes/cortex-sheet.ora`, the cortex beats (nerve, chiasm, LGN, V1, V2, V4) with draft sketches and notes, to paint over (run it from `tools/`)
 - `tools/artcraft.sh`: starts PhotoCraft, VectorCraft, DesignCraft and EffectCraft with their control servers, for the MCP bridges in `.mcp.json` (`stop` and `status` too)
 - `screenshots/`: desktop and phone previews (of the first version)
 - `archive/v1-deck-style/`: the first, slide-like version of the page, kept for comparison
