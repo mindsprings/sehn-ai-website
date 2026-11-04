@@ -2937,9 +2937,10 @@
   };
 
   // ---------- the panels of the page's second half: Kanizsa squares ----------
-  // From V2 on, where boundaries are completed and surfaces filled in, each panel arrives as a Kanizsa square: four
-  // pac-men, mouths in, around where it will be; the boundary completing between them dot by dot, inward from each;
-  // the paper filling in from their mouths until the boundary holds it (in the page's CSS); then what is written on it.
+  // From V2 on, where boundaries are completed and surfaces filled in, each panel arrives as a Kanizsa square, with the
+  // pair Grossberg calls complementary: boundaries complete inward, surfaces fill in outward. Four pac-men, mouths in,
+  // around where it will be; the boundary completing between them dot by dot, inward from each; then the paper filling
+  // in from inside, outward, unoriented, until the boundary holds it (in the page's CSS); then what is written on it.
   (function () {
     var NS = 'http://www.w3.org/2000/svg', panels = [];
     ['model', 'evidence', 'markets', 'name', 'team', 'contact'].forEach(function (id) {

@@ -46,9 +46,9 @@ NOTES = [
     "Rest view under the footer: V1 near, V2 and V4 terraced behind it, each larger, V4's coloured surface far off. The little eye "
     "comes back into the scene the way it left: on a capillary, a narrow canal with high banks across the front (see 11). Labels as "
     "Plate II (after Cajal) and Plate III (after Grossberg); the folded legend explains both.",
-    "Anton's idea: from V2 on, each content panel arrives as a Kanizsa square. (a) Four pac-men, mouths in, around where the panel "
-    "will be. (b) The boundary completes between them. (c) Paper colour fills in from the corners (where the mouths make contrast) and "
-    "floods inward until the boundary holds it. (d) The panel, pac-men left as corner marks. A boundary with a gap leaks (2016, fig. 7).",
+    "Anton's idea: from V2 on, each content panel arrives as a Kanizsa square, with Grossberg's complementary pair: boundaries "
+    "complete inward, surfaces fill outward. (a) Four pac-men, mouths in. (b) The boundary completes inward between them. (c) The paper "
+    "fills in from inside, outward, until the boundary holds it. (d) The panel, pac-men left as corner marks. A gap would leak (2016, fig. 7).",
     "Brain capillaries are walled: endothelial cells sealed by tight junctions (the blood-brain barrier), pericytes clinging to the "
     "wall, astrocyte end-feet gripping it like roots (a rhyme with the retina's Müller mangroves). The channel is so narrow the "
     "red-cell boat squeezes into a bell shape (moodboard/cortex/cap_Microvessel). Grey matter has far more of them than white.",
@@ -491,10 +491,11 @@ def panel_reveal(f):
                 f.brush("near", [(cx - hx + 40, cy - hy + 50 + j * 40), (cx - hx + 40 + w, cy - hy + 50 + j * 40)], 12 if j else 18, grey(150))
             kanizsa(f, cx, cy, hx, "fg", 18, hy=hy)
         else:
-            if k == 2:   # (c) paper colour fills in from the mouths, inward, until the boundary holds it
-                kanizsa(f, cx, cy, hx, "near", 92, PAPER, hy, mouths=True)
-                for sx, sy in ((-1, -1), (1, -1), (-1, 1), (1, 1)):
-                    f.arrow([(cx + sx * (hx - 50), cy + sy * (hy - 40)), (cx + sx * (hx - 140), cy + sy * (hy - 85))], 4)
+            if k == 2:   # (c) the surface fills in from inside, outward, until the boundary holds it
+                f.d["near"].ellipse([cx - hx * 0.62, cy - hy * 0.6, cx + hx * 0.62, cy + hy * 0.6], fill=PAPER)
+                for a in (0, 45, 135, 180, 225, 315):
+                    t = math.radians(a)
+                    f.arrow([(cx + math.cos(t) * hx * 0.2, cy + math.sin(t) * hy * 0.2), (cx + math.cos(t) * hx * 0.55, cy + math.sin(t) * hy * 0.55)], 4)
             if k >= 1:   # (b) the boundary completes between them
                 boundary(f, cx, cy, hx, hy, r, w=9)
             kanizsa(f, cx, cy, hx, "fg", r, hy=hy)   # (a) four pac-men, mouths in
