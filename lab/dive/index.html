@@ -77,6 +77,8 @@
     .footer .credits a { color: var(--on-dark); }
     /* the way on from the retina to the cortex: no page over it, just the scroll that carries the camera */
     .journey { position: relative; height: 380vh; }
+    /* a pause in the page, for Plate III to be drawn */
+    .breath { position: relative; height: 150vh; }
 
     /* at the end of each part, its plate's lower margin: the scene fades into paper, and a folded explanation of the plate */
     .plate-legend { position: relative; z-index: 2; padding: 9vh 16px 28px; color: #1E1612;
@@ -157,6 +159,21 @@
     @media (max-width: 720px) { .kz > .wrap { --kzi: 9px; } }
     @media (prefers-reduced-motion: reduce) { .kz-marks { display: none; } .js .kz:not(.kz-in) > .wrap { --kz: 1; } .js .kz:not(.kz-in) > .wrap > * { opacity: 1; } }
 
+    /* Plate III: Grossberg's circuit over the wood, in his notation: arrows excite, round ends inhibit */
+    .plate3 .halo3 { fill: none; stroke: rgba(246, 236, 214, .7); stroke-width: 6.5; stroke-linecap: round; }
+    .plate3 .ex, .plate3 .inh { fill: none; stroke-width: 2.3; stroke-linecap: round; }
+    .plate3 .ex { stroke: #8E2F55; }
+    .plate3 .inh { stroke: #3F5170; }
+    .plate3 .head { fill: #8E2F55; }
+    .plate3 .disc { fill: #3F5170; stroke: rgba(246, 236, 214, .8); stroke-width: 2; }
+    .plate3 .rf { fill: none; stroke: #8E2F55; stroke-width: 2.6; stroke-dasharray: .1 7; stroke-linecap: round; }
+    .plate3 .lab { font-size: 15px; font-style: italic; }
+    .plate3 .lab .k { font-style: normal; font-size: 17px; }
+    .plate3 .ttl { font-size: 17px; }
+    .plate3 g.is-focus .ex, .plate3 g.is-focus .rf { stroke: #C9587C; }
+    .plate3 g.is-focus .head { fill: #C9587C; }
+    .plate3 g.is-focus text { fill: #8E2F55; }
+
     .hud { position: fixed; top: 76px; left: 8px; z-index: 60; margin: 0; padding: 6px 8px; font: 12px/1.35 ui-monospace, monospace; color: #CFE; background: rgba(0, 0, 0, .55); border-radius: 6px; pointer-events: none; }
   </style>
   <script>document.documentElement.classList.add('js');</script>
@@ -206,6 +223,7 @@
   <div class="stage" aria-hidden="true">
     <canvas id="stage"></canvas>
     <svg class="plate" id="plate"></svg>
+    <svg class="plate plate3" id="plate3"></svg>
     <div class="paper"></div>
     <div class="grain"></div>
     <div class="vignette"></div>
@@ -396,6 +414,11 @@
         </div>
       </div>
     </section>
+
+    <!-- a pause: Plate III, Grossberg's circuit, is drawn over the wood -->
+    <div class="breath" id="circuit">
+      <p class="visually-hidden">Plate III, after Stephen Grossberg: over the birches of V2, his laminar circuit is drawn in, one connection at a time. Input comes in from below to layer IV and layer VI; layer VI primes the cells of IV it lines up with and quiets their neighbours; IV passes the signal up to layers II and III, where long horizontal fibres complete a boundary inward between two cells that see the same line; the chosen grouping feeds back down through VI to IV; and the result goes on to the next area, V4.</p>
+    </div>
 
     <!-- First evidence -->
     <section class="section section--dark-left evidence" id="evidence" aria-labelledby="evidence-title">
@@ -720,6 +743,22 @@
       <div data-k="S" tabindex="0"><dt>S</dt><dd><i>sehn</i>on its way back from the eye</dd></div>
     </dl>
     <p class="why">After S. Grossberg, <a href="https://doi.org/10.3389/fnsys.2021.650263">A canonical laminar neocortical circuit</a> (2021) and <a href="https://doi.org/10.3389/fpsyg.2015.02054">Cortical dynamics of figure-ground separation</a> (2016), and the plates of Cajal’s <i>Estudios sobre la corteza cerebral humana</i> (1899).</p>
+  </details>
+
+  <!-- Plate III, folded: point at a line and its part of the circuit is picked out in the wood -->
+  <details class="plate-legend">
+    <summary><b>Explanation of Plate III</b><span>after the laminar models of S. Grossberg</span></summary>
+    <p class="why">The circuit that repeats through every area of the cortex, in the same few layers, wired the same way, and doing grouping, attention and learning at once: not stacked filters, but a loop that settles on a reading of the picture and holds it. Drawn over V2, where it repeats V1’s circuit at a larger scale; in V4, the surfaces fill in. These are the models that started sehn.</p>
+    <dl>
+      <div data-k="a" tabindex="0"><dt>a</dt><dd><i>input</i>the picture arrives from below, from the LGN into V1 and from V1 into V2, and drives layers IV and VI</dd></div>
+      <div data-k="b" tabindex="0"><dt>b</dt><dd><i>on-centre, off-surround</i>layer VI primes the cells of IV it lines up with and quiets their neighbours: contrast is normalised, and attention acts here</dd></div>
+      <div data-k="c" tabindex="0"><dt>c</dt><dd><i>up to II–III</i>layer IV hands the signal up to the cells that group</dd></div>
+      <div data-k="d" tabindex="0"><dt>d</dt><dd><i>bipole</i>a cell between two others that see the same line fires when both do, though nothing is in front of it, so a boundary completes inward across a gap; one alone is held back, two against one</dd></div>
+      <div data-k="e" tabindex="0"><dt>e</dt><dd><i>folded feedback</i>the grouping chosen in II–III reaches back down to VI and so to IV, holding its own inputs steady: how the cortex learns without forgetting</dd></div>
+      <div data-k="f" tabindex="0"><dt>f</dt><dd><i>on to V4</i>and up to the next area, which repeats the circuit larger again</dd></div>
+      <div data-k="g" tabindex="0"><dt>g</dt><dd><i>filling-in</i>in V4, colour spreads from where it starts, outward and every way, until a boundary holds it: a surface is seen, and a figure stands out from its ground</dd></div>
+    </dl>
+    <p class="why">After S. Grossberg, <a href="https://doi.org/10.3389/fnsys.2021.650263">A canonical laminar neocortical circuit</a> (2021), figs. 4–6, and <a href="https://doi.org/10.3389/fpsyg.2015.02054">Cortical dynamics of figure-ground separation</a> (2016), figs. 6–7.</p>
   </details>
 
   <div class="dive-ctl">
