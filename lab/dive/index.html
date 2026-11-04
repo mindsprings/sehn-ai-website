@@ -110,13 +110,17 @@
     /* on a phone there is no room beside the eye: it asks once the dive begins and the headline has gone */
     @media (max-width: 720px) { html:not(.diving) .consent { visibility: hidden; } }
 
-    /* the multiplane switch, once we are in the forest */
-    .dive-flat { position: fixed; right: 16px; bottom: 16px; z-index: 40; display: flex; align-items: center; gap: 10px; padding: 4px 14px 4px 6px;
+    /* the switches, once we are in the forest: the page lifted off it (all the way down), and the multiplane (while it is in full view) */
+    .dive-ctl { position: fixed; right: 16px; bottom: 16px; z-index: 40; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
+    .dive-flat, .dive-bare { display: flex; align-items: center; gap: 10px; padding: 4px 14px 4px 6px; pointer-events: auto;
       border-radius: 99px; background: rgba(10, 17, 29, .78); color: var(--on-dark); font-size: 14px; opacity: 0; visibility: hidden; transition: opacity .3s ease; }
-    .dive-flat .switch { color: var(--on-dark); font-size: 14px; }
-    .dive-flat .switch__track { border-color: var(--on-dark-2); background: var(--night-line); }
-    .dive-flat .switch__track::after { border-color: var(--on-dark-2); background: var(--on-dark); }
-    .dive-flat .switch[aria-pressed="true"] .switch__track { background: var(--rose); }
+    .dive-ctl .switch { color: var(--on-dark); font-size: 14px; }
+    .dive-ctl .switch__track { border-color: var(--on-dark-2); background: var(--night-line); }
+    .dive-ctl .switch__track::after { border-color: var(--on-dark-2); background: var(--on-dark); }
+    .dive-ctl .switch[aria-pressed="true"] .switch__track { background: var(--rose); }
+    /* just the forest: everything over it fades away, and scrolling still flies through it */
+    .site-header, .over, .site-footer-wrap, .plate-legend { transition: opacity .4s ease, visibility .4s; }
+    html.bare :is(.site-header, .hero-copy, .over, .site-footer-wrap, .plate-legend, .plate) { opacity: 0 !important; visibility: hidden !important; }
 
     .hud { position: fixed; top: 76px; left: 8px; z-index: 60; margin: 0; padding: 6px 8px; font: 12px/1.35 ui-monospace, monospace; color: #CFE; background: rgba(0, 0, 0, .55); border-radius: 6px; pointer-events: none; }
   </style>
@@ -657,9 +661,15 @@
     }, true);
   </script>
 
-  <div class="dive-flat" id="dive-flat">
-    <button class="switch" type="button" id="flat" aria-pressed="false" aria-describedby="flat-note"><span class="switch__track" aria-hidden="true"></span>Flatten the layers</button>
-    <span class="visually-hidden" id="flat-note">Each layer of the scene is flat; the depth you see comes only from how they move against each other. Flattened, they all move alike.</span>
+  <div class="dive-ctl">
+    <div class="dive-flat" id="dive-flat">
+      <button class="switch" type="button" id="flat" aria-pressed="false" aria-describedby="flat-note"><span class="switch__track" aria-hidden="true"></span>Flatten the layers</button>
+      <span class="visually-hidden" id="flat-note">Each layer of the scene is flat; the depth you see comes only from how they move against each other. Flattened, they all move alike.</span>
+    </div>
+    <div class="dive-bare" id="dive-bare">
+      <button class="switch" type="button" id="bare" aria-pressed="false" aria-describedby="bare-note"><span class="switch__track" aria-hidden="true"></span>Just the forest</button>
+      <span class="visually-hidden" id="bare-note">Hides the page, so only the painting of the retina is left. Scrolling still moves through it; Escape brings the page back.</span>
+    </div>
   </div>
 </body>
 </html>

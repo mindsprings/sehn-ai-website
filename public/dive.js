@@ -1835,7 +1835,7 @@
   // ---------- update: scroll, pointer, the eye's own life ----------
   var root = {}, heroCopy = document.getElementById('hero-copy'), flatBox = document.getElementById('dive-flat'), paperEl = document.querySelector('.paper');
   var track = document.querySelector('.track');
-  var flatBtn = document.getElementById('flat');
+  var flatBtn = document.getElementById('flat'), bareBox = document.getElementById('dive-bare'), bareBtn = document.getElementById('bare'), bare = false;
   function fade(el, v) {
     v = Math.round(v * 100) / 100;
     if (el._o === v) return;
@@ -1905,7 +1905,10 @@
     var diving = p > 0.045;   // the headline has gone (a phone asks about cookies only then)
     if (diving !== root.diving) { root.diving = diving; document.documentElement.classList.toggle('diving', diving); }
     fade(paperEl, smooth(P_PUPIL, P_GLOW + 0.03, p));
-    fade(flatBox, smooth(P_CUT + 0.04, P_CUT + 0.1, p) * (1 - smooth(P_REST + 0.008, P_REST + 0.02, p)));   // only while the forest is in full view
+    // once in the forest, the page can be lifted off it; the flattening only while the forest is in full view (or bare)
+    var inForest = smooth(P_CUT + 0.04, P_CUT + 0.1, p);
+    fade(flatBox, inForest * (bare ? 1 : 1 - smooth(P_REST + 0.008, P_REST + 0.02, p)));
+    fade(bareBox, bare ? 1 : inForest);   // bare, it stays wherever we go, so there is always a way back
   }
 
   // ---------- setup ----------
@@ -1986,6 +1989,15 @@
     flatTarget = flatTarget ? 0 : 1;
     flatBtn.setAttribute('aria-pressed', flatTarget ? 'true' : 'false');
   });
+  function setBare(on) {
+    poke();
+    bare = on;
+    bareBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    document.documentElement.classList.toggle('bare', on);
+  }
+  bareBtn.addEventListener('click', function () { setBare(!bare); });
+  window.addEventListener('keydown', function (e) { if (e.key === 'Escape' && bare) setBare(false); });
+  if (q.has('bare')) setBare(true);
   var resizeTimer;
   window.addEventListener('resize', function () { clearTimeout(resizeTimer); resizeTimer = setTimeout(layout, 150); });
 

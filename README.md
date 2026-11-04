@@ -9,7 +9,7 @@ Static site, no build step. Everything that gets deployed is in `public/`.
 ## Files
 - `public/index.html`, `styles.css`, `main.js`: the one-page site
 - `public/dive.js`: the dive behind the page: the eye, a fall through the retina's layers, a cut in the canopy, and a watercolour forest of retinal cells, drawn on one canvas behind the page, with the sections scrolling over it as paper panels, Cajal's labels over the forest (layers numbered down the left, cells named down the right with dotted leaders to cells in view), and the plate's folded legend at the very bottom
-  - `?p=0.66` holds the camera at a point of the scroll, `?px=&py=` holds the pointer (-1..1), `?flat` flattens the layers, `?debug` shows timings and the drawing resolution, `?scale=0.6` fixes the resolution inside the eye (it adapts to the device otherwise), `?skip=slices,planes,veil,rays,river,trunks,boat,plate` leaves parts out
+  - `?p=0.66` holds the camera at a point of the scroll, `?px=&py=` holds the pointer (-1..1), `?flat` flattens the layers, `?bare` hides the page over the forest, `?debug` shows timings and the drawing resolution, `?scale=0.6` fixes the resolution inside the eye (it adapts to the device otherwise), `?skip=slices,planes,veil,rays,river,trunks,boat,plate` leaves parts out
   - in the console: `__dive.bench(p)` times a frame at a point, `__dive.memory()` and `__dive.steps()` show what the painting holds and how long its steps take, `__dive.seek(p, px, py)` moves the camera, `__dive.pause()` and `__dive.frameAt(p, px, py, ms, flat)` draw frames on a fixed clock, for recording
 - `public/auge/`: Diana's interactive eye and vision explainer
 - `public/imprint.html`: imprint & privacy (placeholders marked in pink, still to fill in)
