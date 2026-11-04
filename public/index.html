@@ -146,7 +146,11 @@
        will be; the boundary completing inward between them, dot by dot; then the surface filling in outward, the paper
        spreading from inside until the boundary holds it; then what is written on it */
     @property --kz { syntax: '<number>'; inherits: true; initial-value: 1; }
-    .kz > .wrap { position: relative; isolation: isolate; --kz-paper: rgba(246, 240, 227, .93); --kzi: 14px; transition: --kz 1.7s cubic-bezier(.35, .1, .3, 1) 1.5s; }
+    /* All of it follows one number, --kzt, from 0 to 1, which the script moves on with time once the panel comes up,
+       and faster if you scroll faster, so it is always done by the time you read it: pac-men (0 to .13), the boundary
+       (.1 to .4, inward), the square brightening (.22 to .8), the paper (.36 to .74, outward), the text (.7 to .9). */
+    .kz > .wrap { position: relative; isolation: isolate; --kz-paper: rgba(246, 240, 227, .93); --kzi: 14px; --kzt: 1;
+      --kz: clamp(0, (var(--kzt) - .36) / .38, 1); }
     .kz.section--dark-left > .wrap { --kz-paper: rgba(10, 17, 29, .9); }
     .kz.section--plum > .wrap { --kz-paper: rgba(110, 42, 71, .93); }
     .js .over .kz > .wrap { background: none; box-shadow: none; }
@@ -158,21 +162,15 @@
       mask: radial-gradient(ellipse calc(var(--kz) * 92%) calc(var(--kz) * 92%) at 46% 44%, #000 86%, transparent),
         radial-gradient(ellipse calc(var(--kz) * 80%) calc(var(--kz) * 80%) at 57% 58%, #000 86%, transparent); }
     /* before the paper comes, the square is seen brighter than around it, though nothing is there */
-    .js .kz > .wrap::after { background: rgba(255, 253, 248, .32); opacity: 0; }
-    .kz-in > .wrap::after { animation: kz-glow 3.4s ease both; }
-    .js .kz:not(.kz-in) > .wrap { --kz: 0; }
-    .js .kz > .wrap > :not(.kz-marks) { transition: opacity .8s ease 2.9s; }
-    .js .kz:not(.kz-in) > .wrap > :not(.kz-marks) { opacity: 0; }
+    .js .kz > .wrap::after { background: rgba(255, 253, 248, .32); opacity: calc(clamp(0, (var(--kzt) - .22) / .14, 1) * (1 - clamp(0, (var(--kzt) - .55) / .25, 1))); }
+    .js .kz > .wrap > :not(.kz-marks) { opacity: clamp(0, (var(--kzt) - .7) / .2, 1); }
     .kz-marks { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; z-index: 1; }
-    .kz-pac { fill: #1E1612; stroke: #F6F0E3; stroke-width: 2.5; paint-order: stroke; transform: scale(0); transform-box: fill-box; }
-    .kz-dot { fill: #FBF7EE; stroke: #1E1612; stroke-width: 1.3; opacity: 0; }
-    .kz-in .kz-pac { animation: kz-pac 4.6s cubic-bezier(.3, 1.4, .5, 1) var(--d) both; }
-    .kz-in .kz-dot { animation: kz-dot 3.6s ease calc(.55s + var(--i) * 45ms) both; }
-    @keyframes kz-pac { 0% { transform: scale(0); } 8% { transform: scale(1); } 75% { transform: scale(1); } 100% { transform: scale(.5); } }
-    @keyframes kz-dot { 0% { opacity: 0; } 6% { opacity: 1; } 60% { opacity: 1; } 100% { opacity: 0; } }   /* the boundary was never there */
-    @keyframes kz-glow { 0%, 22% { opacity: 0; } 42%, 62% { opacity: 1; } 100% { opacity: 0; } }
+    .kz-pac { fill: #1E1612; stroke: #F6F0E3; stroke-width: 2.5; paint-order: stroke; transform-box: view-box;
+      transform: scale(calc(clamp(0, (var(--kzt) - var(--d)) / .07, 1) - .5 * clamp(0, (var(--kzt) - .8) / .2, 1))); }
+    .kz-dot { fill: #FBF7EE; stroke: #1E1612; stroke-width: 1.3;   /* inward from each pac-man; then gone: the boundary was never there */
+      opacity: calc(clamp(0, (var(--kzt) - .1 - var(--f) * .28) / .03, 1) * (1 - clamp(0, (var(--kzt) - .62) / .3, 1))); }
     @media (max-width: 720px) { .kz > .wrap { --kzi: 9px; } }
-    @media (prefers-reduced-motion: reduce) { .kz-marks { display: none; } .js .kz:not(.kz-in) > .wrap { --kz: 1; } .js .kz:not(.kz-in) > .wrap > * { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .kz-marks { display: none; } .kz > .wrap { --kzt: 1 !important; } }
 
     /* Plate III: Grossberg's circuit over the wood, in his notation: arrows excite, round ends inhibit */
     .plate3 .halo3 { fill: none; stroke: rgba(246, 236, 214, .7); stroke-width: 6.5; stroke-linecap: round; }

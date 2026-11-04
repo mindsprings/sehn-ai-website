@@ -3193,6 +3193,8 @@
   // pair Grossberg calls complementary: boundaries complete inward, surfaces fill in outward. Four pac-men, mouths in,
   // around where it will be; the boundary completing between them dot by dot, inward from each; then the paper filling
   // in from inside, outward, unoriented, until the boundary holds it (in the page's CSS); then what is written on it.
+  // All of it follows one number (--kzt), moved on with time once the panel comes up the screen, and with the scroll
+  // when that is faster: however quickly we go, it is done by the time the panel reaches the top quarter.
   (function () {
     var NS = 'http://www.w3.org/2000/svg', panels = [];
     ['model', 'evidence', 'markets', 'name', 'team', 'contact'].forEach(function (id) {
@@ -3202,7 +3204,8 @@
       var svg = document.createElementNS(NS, 'svg');
       svg.setAttribute('class', 'kz-marks'); svg.setAttribute('aria-hidden', 'true');
       wrap.insertBefore(svg, wrap.firstChild);
-      panels.push({ sec: sec, wrap: wrap, svg: svg, w: 0, h: 0 });
+      panels.push({ sec: sec, wrap: wrap, svg: svg, w: 0, h: 0, t: 0, t0: null });
+      wrap.style.setProperty('--kzt', reduce ? 1 : 0);
     });
     function draw(pn) {
       // the square is the paper, set in from the panel's edge by --kzi (so the pac-men stay on screen)
@@ -3215,7 +3218,7 @@
       function at(cx, cy, a) { a *= Math.PI / 180; return (cx + r * Math.cos(a)).toFixed(1) + ' ' + (cy + r * Math.sin(a)).toFixed(1); }
       // the pac-men: each missing the quarter that faces the middle
       [[0, 0, 0], [w, 0, 90], [w, h, 180], [0, h, 270]].forEach(function (c, i) {
-        html += '<path class="kz-pac" style="--d:' + (i * 0.07).toFixed(2) + 's" d="M' + c[0] + ' ' + c[1] + 'L' + at(c[0], c[1], c[2] + 90) +
+        html += '<path class="kz-pac" style="--d:' + (i * 0.02).toFixed(2) + ';transform-origin:' + c[0] + 'px ' + c[1] + 'px" d="M' + c[0] + ' ' + c[1] + 'L' + at(c[0], c[1], c[2] + 90) +
           'A' + r + ' ' + r + ' 0 1 1 ' + at(c[0], c[1], c[2] + 360) + 'Z"/>';
       });
       // the boundary between them, completing inward from both ends of each side
@@ -3223,25 +3226,37 @@
         var len = Math.hypot(e[2] - e[0], e[3] - e[1]), ux = (e[2] - e[0]) / len, uy = (e[3] - e[1]) / len, n = Math.floor((len / 2 - gap) / step), i;
         for (i = 0; i <= n; i++) {
           var d = gap + i * step;
-          html += '<circle class="kz-dot" style="--i:' + i + '" r="2.6" cx="' + (e[0] + ux * d).toFixed(1) + '" cy="' + (e[1] + uy * d).toFixed(1) + '"/>';
-          html += '<circle class="kz-dot" style="--i:' + i + '" r="2.6" cx="' + (e[2] - ux * d).toFixed(1) + '" cy="' + (e[3] - uy * d).toFixed(1) + '"/>';
+          var fr = (i / Math.max(1, n)).toFixed(3);   // how far in from its pac-man: when it appears
+          html += '<circle class="kz-dot" style="--f:' + fr + '" r="2.6" cx="' + (e[0] + ux * d).toFixed(1) + '" cy="' + (e[1] + uy * d).toFixed(1) + '"/>';
+          html += '<circle class="kz-dot" style="--f:' + fr + '" r="2.6" cx="' + (e[2] - ux * d).toFixed(1) + '" cy="' + (e[3] - uy * d).toFixed(1) + '"/>';
         }
       });
       pn.svg.innerHTML = html;
     }
     function drawAll() { panels.forEach(draw); }
-    if (reduce || !('IntersectionObserver' in window)) { panels.forEach(function (pn) { pn.sec.classList.add('kz-in'); }); return; }
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (en) {
-        if (!en.isIntersecting) return;
-        var pn = panels.filter(function (x) { return x.wrap === en.target; })[0];
-        draw(pn); pn.sec.classList.add('kz-in'); io.unobserve(en.target);
-      });
-    }, { rootMargin: '0px 0px -38% 0px' });   // once it is well up on the screen, where we are looking
-    panels.forEach(function (pn) { io.observe(pn.wrap); });
     if ('ResizeObserver' in window) new ResizeObserver(drawAll).observe(document.body);
     else window.addEventListener('resize', drawAll);
     drawAll();
+    if (reduce) return;
+    // it starts once the panel's top is three quarters of the way up the screen, takes about three seconds left to
+    // itself, and is done by the time that top reaches a quarter of the way down, however fast we got there
+    var DUR = 3200, running = false;
+    function step() {
+      var vh = window.innerHeight, now = performance.now(), busy = false;
+      panels.forEach(function (pn) {
+        if (pn.t >= 1) return;
+        var top = pn.wrap.getBoundingClientRect().top;
+        if (pn.t0 == null) { if (top > vh * 0.75) return; pn.t0 = now; }
+        var t = clamp(Math.max((now - pn.t0) / DUR, (vh * 0.75 - top) / (vh * 0.5)), pn.t, 1);
+        if (t - pn.t > 0.002 || t === 1) { pn.t = t; pn.wrap.style.setProperty('--kzt', t.toFixed(3)); }
+        if (t < 1) busy = true;
+      });
+      running = busy;
+      if (busy) requestAnimationFrame(step);
+    }
+    function go() { if (!running) { running = true; requestAnimationFrame(step); } }
+    window.addEventListener('scroll', go, { passive: true });
+    go();
   })();
 
   makeTextures();
