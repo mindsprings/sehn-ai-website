@@ -442,10 +442,10 @@
     if (strip) o.restore();
   }
 
-  // Cut a wash into strips of at most about half a million pixels, so each is a short step of painting.
+  // Cut a wash into strips of at most about a quarter of a million pixels, so each is a short step of painting.
   // Returns the strips, in drawing units ([null] when it is small enough as it is).
   function strips(ibox, qpx) {
-    var w = (ibox[2] - ibox[0]) * qpx, h = (ibox[3] - ibox[1]) * qpx, n = Math.ceil(w * h / 5e5);
+    var w = (ibox[2] - ibox[0]) * qpx, h = (ibox[3] - ibox[1]) * qpx, n = Math.ceil(w * h / 2.5e5);
     if (n <= 1) return [null];
     var out = [];
     for (var i = 0; i < n; i++) out.push([lerp(ibox[0], ibox[2], i / n), lerp(ibox[0], ibox[2], (i + 1) / n)]);
@@ -1157,8 +1157,12 @@
 
   // Hand a freshly painted bitmap to the browser to get ready for drawing, in the background, so that the first
   // frame that needs it does not stall while it is uploaded.
+  // (and let the canvas go once the bitmap stands in for it; a cel let go meanwhile lets its bitmap go too)
   function settle(item) {
-    if (window.createImageBitmap) createImageBitmap(item.img).then(function (bm) { item.img = bm; }, function () {});
+    var cv = item.img;
+    if (window.createImageBitmap) createImageBitmap(cv).then(function (bm) {
+      if (item.img === cv) { item.img = bm; cv.width = cv.height = 0; } else bm.close();
+    }, function () {});
     return item;
   }
 
@@ -1567,11 +1571,10 @@
   // paint the slices one at a time, so the page stays smooth while they grow
   var stepStats = { n: 0, max: 0, over30: 0, by: {} }, lastStep = null;
   // one small step of painting; a step that is not done yet says so, and is called again
-  // (the forest first; the way on and the cortex once we are in the forest, in the order we reach them; the way on
-  // not while it is let go, deep in the cortex)
+  // (the forest, unless it is let go; then the parts of the way on that are wanted, nearest first; then the cortex's
+  // chunks around the camera, nearest first: see keep())
   function paintNext() {
-    var on = p > P_CUT || fixedP != null;
-    var Q = forest && forest.steps.length ? forest.steps : on && way && way.steps.length && !way.held ? way.steps : on && cortex && cortex.steps.length ? cortex.steps : null;
+    var Q = forest && forest.steps.length ? forest.steps : wayNext() || cortexNext();
     if (!Q) return false;
     var t0 = performance.now();
     lastStep = Q[0];
@@ -1582,6 +1585,37 @@
     stepStats.by[key] = Math.max(stepStats.by[key] || 0, Math.round(dt));
     return true;
   }
+  // Memory: the painted cels are the bulk of it, so only what is near is kept. The forest stays (it is the page's
+  // first sight, and painting it again would stall a visitor coming back); each part of the way is painted a little
+  // before we reach it and let go once we have left it; the cortex keeps its chunks around the camera and some way ahead.
+  function free(it) {
+    if (!it || !it.img) return;
+    if (it.img.close) it.img.close(); else { it.img.width = 0; it.img.height = 0; }   // let the memory go now, not at the next collection
+    it.img = null;
+  }
+  function keep(u) {
+    var more = false;
+    way.scenes.forEach(function (sc) {
+      var want = u > sc.u0 - (sc.lead || 0.08) && u < sc.u1 + 0.015;   // (the nerve while we are still in the forest's pages)
+      if (want && !sc.steps) { sc.steps = sc.make(); more = true; }
+      else if (!want && sc.steps) { sc.steps = null; sc.clear(); }
+    });
+    // (started in the chiasm, just what we arrive into; once there, just behind us and a screen or so ahead)
+    var on = u > U_CHIASM - 0.03, wx = cortex.wx = wxAt(clamp(u, U_V1, 1)), ahead = u < U_RISE ? 0.2 : 1.8;
+    cortex.planes.forEach(function (pl) {
+      var half = A * (pl.D - CZ) * 0.5 + 0.35, a = wx - half - 0.1, b = wx + half + ahead;
+      pl.chunks.forEach(function (ch) {
+        var want = on && ch.x1 > a && ch.x0 < b;
+        if (want && !ch.want && ch.steps.length) more = true;
+        ch.want = want;
+        if (!want && !ch.fresh) dropChunk(ch);
+      });
+    });
+    if (more) paintSoon();
+  }
+
+  paintNext.peek = function () { return !!(forest && forest.steps.length || wayNext() || cortexNext()); };
+
   // paint in the gaps between frames (one painter at a time, however often the forest is built again)
   var idle = window.requestIdleCallback ? function (f) { requestIdleCallback(f, { timeout: 200 }); } : function (f) { setTimeout(f, 16); };
   var painting = false;
@@ -1591,7 +1625,8 @@
   // where things are in the forest: the slices, and everything that lives between them
   var queue = [];
   function drawForest(cam, now) {
-    while (!forest.veil || forest.planes.length < SLICES.length) paintNext();   // we got here before the slices were painted: finish them now
+    // we got here before the slices were painted: paint for a moment each frame, and show them as they come
+    if (!forest.veil || forest.planes.length < SLICES.length) for (var t0 = performance.now(); performance.now() - t0 < 12 && paintNext();) ;
     rollC = 1; rollS = 0;
     if (SKIP.indexOf('planes') < 0) drawBackdrop(cam);
     var ref = proj(0, FLOOR, cam.z + 2, cam);
@@ -1620,7 +1655,7 @@
       else if (it.k === 3) drawRay(it.r, cam, now);
       else if (it.k === 4) drawTrunk(it.t, cam, now);
       else {
-        var v = forest.veil, vd = v.z - cam.z;
+        var v = forest.veil, vd = v ? v.z - cam.z : 0;
         if (vd > 0.05) {
           var vs = sway(vd);
           T.s = F / vd; T.tx = C.x - cam.x * vs; T.ty = C.y - cam.by * T.s - cam.py * vs;
@@ -1907,8 +1942,8 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.globalAlpha = Math.min(1, a); ctx.fillStyle = col; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
   }
-  // paint whatever is still to be painted until ok() (we got somewhere before its cels were ready)
-  function ensure(ok) { for (var n = 0; !ok() && n < 4000 && paintNext(); n++); }
+  // we got somewhere before its cels were ready: paint for a moment each frame (they show as they come)
+  function ensure(ok) { for (var t0 = performance.now(); !ok() && performance.now() - t0 < 12 && paintNext();) ; }
 
   // A cel: inks washed onto a canvas over box (world units) at qpx pixels a unit, as steps on a queue. make(qpx) gives
   // the washes, back to front: [ink, colour, dry, edge colour]; done(item) gets the cel.
@@ -1988,7 +2023,7 @@
     NERVE.forEach(function (D, i) {
       var near = i === NERVE.length - 1, den = D + 0.12, r = near ? 0.04 : 0.008 + 0.0045 * D, hz = clamp((D - 1.2) / 12, 0, 0.6);
       var per = Math.ceil(A * den * 11) / 10 + 0.4, hh = den * 0.6 + 0.12, box = [0, -hh, per, hh];
-      steps.push.apply(steps, celSteps(box, F / den * paintScale * (near ? 0.35 : 0.8), function () {
+      steps.push.apply(steps, celSteps(box, F / den * paintScale * (near ? 0.3 : 0.62), function () {
         var rnd = rng(SEED + 40 + i), sheath = new Ink(), axon = new Ink(), shine = new Ink(), y, k, j;
         for (y = -hh + rnd() * r * 2; y < hh; y += r * (near ? 16 + rnd() * 14 : 3.2 + rnd() * 2.6)) {
           var m = 1 + Math.floor(rnd() * 2), ph = rnd() * TAU, amp = r * (0.4 + rnd() * 1.6), y0 = y, pts = [];
@@ -2044,8 +2079,9 @@
       [[-0.9, 0.0, Math.PI + 0.4], [0.9, 0.0, -0.4], [-0.6, -1.5, Math.PI + 1.2], [0.6, -1.5, -1.2], [0, 0.25, Math.PI / 2]].forEach(function (v) { grow(blood, o, rnd, v[0], v[1], v[2], 1.1, 0.02, 0); });
       return [[ground, '#D6D2CB', 0.15, '#C4BEB6'], [marks2, '#BDB7AF', 0.3], [blood, '#A44A4E', 0.2]];
     }, function (cel) { way.chiasm.ground = cel; }));
-    // the nerves, the crossing and the tracts
-    steps.push.apply(steps, celSteps([-4.7, -4.4, 4.7, 4.2], F / 1.6 * paintScale * 0.75, function () {
+    // the nerves, the crossing and the tracts: painted twice, coarse where they are only seen from high up, fine around
+    // the crossing and our way out of it, where we come close
+    function tract() {
       var rnd = rng(SEED + 60), sheath = new Ink(), inks = { rose: [new Ink(), new Ink()], teal: [new Ink(), new Ink()] }, i;
       [[CHI.rose, CHI.c], [CHI.teal, CHI.c], [CHI.c, CHI.L], [CHI.c, CHI.R]].forEach(function (s) {
         sheath.taper(makeRiver([s[0], [lerp(s[0][0], s[1][0], 0.5) + 0.06, lerp(s[0][1], s[1][1], 0.5) + 0.05], s[1]]).map(function (q) { return [q[0], q[1], 0.16]; }));
@@ -2065,21 +2101,21 @@
         }
       });
       return [[sheath, '#E9E5DF', 0.1, '#B9B2A9'], [inks.teal[0], TEAL, 0.15], [inks.rose[0], ROSE, 0.15], [inks.teal[1], TEAL, 0.15], [inks.rose[1], ROSE, 0.15]];
-    }, function (cel) { way.chiasm.tract = cel; }));
+    }
+    steps.push.apply(steps, celSteps([-4.7, -4.4, 4.7, 4.2], F / 2.8 * paintScale * 0.6, tract, function (cel) { way.chiasm.tract = cel; }));
+    steps.push.apply(steps, celSteps([-1.8, -2.5, 2.8, 1.6], F / 1.6 * paintScale * 0.72, tract, function (cel) { way.chiasm.near = cel; }));
     return steps;
   }
   // our path over it: along this eye's nerve, into the crossing, out along the other side's tract
   var CHI_PATH = [[-1.5, 1.6], [-0.75, 0.9], [0, 0.2], [0.6, -0.55], [1.15, -1.3]];
   function drawChiasm(u, now) {
     var e = clamp((u - U_NERVE) / (U_CHIASM - U_NERVE), 0, 1), at = riverAt(way.chiasm.path, e), cam = wayCam(at[0], at[1], lerp(0.4, 1.6, easeInOut(e))), T = PT;
-    ensure(function () { return way.chiasm.tract && way.chiasm.ground; });
+    ensure(function () { return way.chiasm.tract && way.chiasm.ground && way.chiasm.near; });
     rollC = Math.cos(0.12 * (e - 0.5)); rollS = Math.sin(0.12 * (e - 0.5));   // a little turn as we go: the X stays an X, as Cajal drew it
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = '#CEC9C2'; ctx.fillRect(0, 0, W, H);
-    [[4.6, way.chiasm.ground], [3.2, way.chiasm.tract]].forEach(function (pl) {
-      if (view(pl[0], cam, T) < 0.05) return;
-      setT(T.s, T.tx, T.ty); drawItems([pl[1]], T, 1);
-    });
+    if (view(4.6, cam, T) > 0.05) { setT(T.s, T.tx, T.ty); drawItems([way.chiasm.ground].filter(Boolean), T, 1); }
+    if (view(3.2, cam, T) > 0.05) { setT(T.s, T.tx, T.ty); drawItems([way.chiasm.tract, way.chiasm.near].filter(Boolean), T, 1); }
     if (view(2.3, cam, T) > 0.05) { setT(T.s, T.tx, T.ty); drawItems(way.chiasm.motes, T, smooth(0.15, 0.5, 2.3 - cam.z)); }
     rollC = 1; rollS = 0;
     cover(CHAZE, 1 - smooth(U_NERVE, U_NERVE + 0.01, u));
@@ -2108,7 +2144,7 @@
       for (i = 0; i <= n; i++) { var x = lerp(x1, x0, i / n); P.lineTo(x, y + 0.08 * Math.sin(x * 2.3) + 0.04 * Math.sin(x * 7.1)); }
       P.lineTo(x0, y - 3); P.closePath(); ink.fit(x0, y - 3, 0); ink.fit(x1, y + 0.15, 0);
     }
-    steps.push.apply(steps, celSteps([-2.5, -3.8, 2.5, 2.7], F / 2 * paintScale * 0.8, function () {
+    steps.push.apply(steps, celSteps([-2.5, -3.8, 2.5, 2.7], F / 2 * paintScale * 0.68, function () {
       var rnd = rng(SEED + 70), band = [new Ink(), new Ink()], cells = new Ink(), fin = [new Ink(), new Ink()], rad = new Ink(), wm = new Ink(), i, j;
       for (i = 0; i < 6; i++) {
         var arc = [];
@@ -2145,7 +2181,7 @@
       white(wm, -5.1, 5.1, -4.1);
       return [[rad, mix('#7E7873', CHAZE, 0.5), 0.3], [wm, MYELIN, 0.05, '#D6D1C9']];
     }, function (cel) { way.rise.far = cel; }));
-    steps.push.apply(steps, celSteps([-1.7, -3.8, 1.7, 2.7], F / 1.15 * paintScale * 0.4, function () {
+    steps.push.apply(steps, celSteps([-1.7, -3.8, 1.7, 2.7], F / 1.15 * paintScale * 0.3, function () {
       var rnd = rng(SEED + 72), rad = new Ink(), i;
       for (i = 0; i < 9; i++) {
         var x = lerp(-1.5, 1.5, (i + rnd()) / 9), rp = makeRiver([[x + 0.2, 2.8], [x, 1], [x + (rnd() - 0.5) * 0.4, -0.8], [x * 1.3, -2.4], [x * 1.4, -3.8]]);
@@ -2163,7 +2199,7 @@
     var g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, mix('#D9D5CF', MYELIN, smooth(0.5, 1, e))); g.addColorStop(1, '#C3BEB7');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    [[4.5, R.far], [2, R.main]].forEach(function (pl) { if (view(pl[0], cam, T) > 0.05) { setT(T.s, T.tx, T.ty); drawItems([pl[1]], T, 1); } });
+    [[4.5, R.far], [2, R.main]].forEach(function (pl) { if (pl[1] && view(pl[0], cam, T) > 0.05) { setT(T.s, T.tx, T.ty); drawItems([pl[1]], T, 1); } });
     // the signals, rising along the fibres
     if (!reduce && R.paths) {
       view(2, cam, T); setT(T.s, T.tx, T.ty);
@@ -2173,14 +2209,19 @@
         ctx.beginPath(); ctx.arc(q[0], q[1], 0.007, 0, TAU); ctx.fill();
       }
     }
-    if (view(1.15, cam, T) > 0.05) { setT(T.s, T.tx, T.ty); drawItems([R.near], T, 1); }
+    if (R.near && view(1.15, cam, T) > 0.05) { setT(T.s, T.tx, T.ty); drawItems([R.near], T, 1); }
     cover('#17151A', 1 - smooth(U_CHIASM, U_CHIASM + 0.008, u));
     cover(MYELIN, smooth(U_RISE - 0.014, U_RISE, u));   // into the white matter
   }
 
   function buildWay() {
     var rnd = rng(SEED + 59), motes = new Ink(), i, k;
-    way = { steps: [], nerve: [], chiasm: { path: makeRiver(CHI_PATH) }, rise: {} };
+    way = { nerve: [], chiasm: { path: makeRiver(CHI_PATH) }, rise: {} };
+    way.scenes = [
+      { u0: U_LAKE, u1: U_NERVE, lead: 0.25, make: nerveSteps, steps: null, clear: function () { way.nerve.forEach(free); way.nerve = []; } },
+      { u0: U_NERVE, u1: U_CHIASM, make: chiasmSteps, steps: null, clear: function () { free(way.chiasm.ground); free(way.chiasm.tract); free(way.chiasm.near); way.chiasm.ground = way.chiasm.tract = way.chiasm.near = null; } },
+      { u0: U_CHIASM, u1: U_RISE, make: riseSteps, steps: null, clear: function () { free(way.rise.main); free(way.rise.far); free(way.rise.near); way.rise = {}; } }
+    ];
     // loose strands drifting just under us over the chiasm
     for (i = 0; i < 26; i++) {
       var x = (rnd() - 0.5) * 6, y = (rnd() - 0.5) * 6, a = rnd() * TAU, pts = [];
@@ -2188,9 +2229,10 @@
       motes.taper(pts);
     }
     way.chiasm.motes = [{ path: motes.path, fill: 'rgba(90,84,80,.3)', box: motes.box }];
-    way.steps.push.apply(way.steps, nerveSteps());
-    way.steps.push.apply(way.steps, chiasmSteps());
-    way.steps.push.apply(way.steps, riseSteps());
+  }
+  function wayNext() {
+    for (var i = 0; way && i < way.scenes.length; i++) if (way.scenes[i].steps && way.scenes[i].steps.length) return way.scenes[i].steps;
+    return null;
   }
   function drawWay(u, now) {
     if (u < U_LAKE) drawLake(u);
@@ -2373,7 +2415,7 @@
     CPLANES.forEach(function (D, pi) {
       var den = D - CZ, frame = pi === CPLANES.length - 1, lod = frame ? 1 : D < 3.5 ? 2 : D < 9 ? 1 : 0, x, i, j;
       var hw = view2 * den + 0.35, x0 = -hw, x1 = CX_END + hw;
-      var pl = { D: D, lod: lod, frame: frame, items: [], chunks: [], qpx: F / den * paintScale * (frame ? 0.45 : D > 6 ? 0.75 : 0.9) };
+      var pl = { D: D, lod: lod, frame: frame, items: [], chunks: [], qpx: F / den * paintScale * (frame ? 0.45 : D > 6 ? 0.72 : 0.8) };
       function add(cx, reach, draw) { pl.items.push({ x0: cx - reach, x1: cx + reach, seed: (rnd() * 1e9) | 0, draw: draw }); }
       // the trees: layer V's big pyramids, II and III's smaller ones, VI's (their trunks only up to IV)
       for (x = x0; x < x1; x += 0.42 * scaleAt(x) * (0.55 + 0.45 * ageAt(x)) * (frame ? 3.5 : 1) * (0.45 + rnd() * 1.1)) add(x, 0.44 * scaleAt(x), P5(x, lerp(L_V, L_VI, 0.3 + rnd() * 0.3), scaleAt(x), lod, PIA + 0.03, true));
@@ -2394,9 +2436,9 @@
         }
       }
       // chunks, each at most about 1800 pixels across
-      var cw = Math.min(1800 / pl.qpx, x1 - x0), n = Math.ceil((x1 - x0) / cw);
+      var cw = Math.min(1000 / pl.qpx, x1 - x0), n = Math.ceil((x1 - x0) / cw);   // (small enough to keep only those near us)
       for (i = 0; i < n; i++) {
-        var ch = { pl: pl, x0: x0 + i * cw, x1: x0 + (i + 1) * cw, cel: null, col: null };
+        var ch = { pl: pl, x0: x0 + i * cw, x1: x0 + (i + 1) * cw, cel: null, col: null, want: false, fresh: true, marks: null };
         ch.steps = chunkSteps(pl, ch);
         pl.chunks.push(ch); cortex.chunks.push(ch);
       }
@@ -2404,7 +2446,7 @@
     });
     // painted in the order the camera reaches them, near ones first where they start together
     cortex.chunks.sort(function (a, b) { return Math.max(a.x0, -1) - Math.max(b.x0, -1) || a.pl.D - b.pl.D; });
-    cortex.chunks.forEach(function (ch) { cortex.steps.push(function chunk() { return paintChunk(ch, 1); }); });
+
     // the capillary in the bottom layer, winding off into the distance, single file, and the boat coming back on it
     var cap = makeRiver([[7.95, -0.25], [7.85, 0.25], [7.75, 0.6], [7.55, 0.95], [7.25, 1.25],   // from past us on the right, where it runs off the screen
        [7.05, 1.7], [7.45, 2.4], [7.7, 3.3], [7.15, 4.8], [6.75, 7.2], [7.4, 10.5], [7.9, 15], [7.3, 22]]), cells = [];
@@ -2413,9 +2455,12 @@
     cortex.runs = split(cap.map(function (r) { return r[1]; }), CPLANES);
     cortex.snow = [];
     for (i = 0; i < 140; i++) cortex.snow.push({ D: lerp(0.9, 7, Math.pow(rnd(), 1.6)), x: rnd() * 40, y: rnd() * 20, v: 0.05 + rnd() * 0.06, w: 0.4 + rnd() * 0.6, ph: rnd() * TAU, r: 0.0022 + rnd() * 0.0018 });
-    for (i = 0; i < cap.length; i += 4) addMark('Cap', { x: cap[i][0], Y: WM, D: cap[i][1] }, cortex);
-    cells.forEach(function (c) { addMark('Rbc', { cell: c }, cortex); });
-    addMark('S', { boat: true }, cortex);
+    // what the plate may name that is not painted into the chunks (theirs come and go with them: see marks3)
+    cortex.fixed = [];
+    for (i = 0; i < cap.length; i += 4) cortex.fixed.push(['Cap', { x: cap[i][0], Y: WM, D: cap[i][1] }]);
+    cells.forEach(function (c) { cortex.fixed.push(['Rbc', { cell: c }]); });
+    cortex.fixed.push(['S', { boat: true }]);
+    cortex.dirty = true;
   }
   // (each tree's drawing, kept for every chunk it reaches into)
   function P5(x, y, sc, lod, top, big) { return function (g, r) { pyramidal(g, r, x, y, top, sc, lod, big); }; }
@@ -2490,15 +2535,43 @@
         ch.cel = settle({ img: S.cv, box: S.box });
         if (S.cc) ch.col = { img: S.cc, box: S.box, w: S.cv.width, h: S.cv.height, qpx: S.qpx, u: -1,
           seeds: S.g.seeds.map(function (s) { return [s[0], s[1], s[2], U_V4 - 0.05 + (s[0] - V4_AT) * 0.045 + Math.random() * 0.03]; }) };
-        if (!pl.frame && pl.D < 5) S.marks.forEach(function (m) { addMark(m.k, { x: m.x, Y: m.y, D: pl.D }, cortex); });
+        ch.marks = !pl.frame && pl.D < 5 ? S.marks.map(function (m) { return [m.k, { x: m.x, Y: m.y, D: pl.D }]; }) : [];
+        cortex.dirty = true;
         S = {};
       }
     ];
   }
   // paint a chunk: a step at a time from the queue, or all of it now (n = Infinity) when the camera needs it
   function paintChunk(ch, n) {
+    ch.fresh = false;
     while (ch.steps.length && n-- > 0) if (ch.steps[0]() !== false) ch.steps.shift();
     return !ch.steps.length;
+  }
+  // the next chunk to paint: of those wanted, the one nearest where the camera is (a little ahead counts as near)
+  function cortexNext() {
+    if (!cortex) return null;
+    var best = null, bk = Infinity, wx = cortex.wx || 0;
+    cortex.chunks.forEach(function (ch) {
+      if (!ch.want || !ch.steps.length) return;
+      var k = Math.max(0, ch.x0 - wx) + Math.max(0, wx - ch.x1) * 1.5 + ch.pl.D * 0.01;
+      if (k < bk) { bk = k; best = ch; }
+    });
+    return best ? [function chunk() { return paintChunk(best, 1); }] : null;   // (a queue of one, for paintNext)
+  }
+  function dropChunk(ch) {
+    free(ch.cel); if (ch.col) { free(ch.col); free(ch.col.rev); }
+    ch.cel = ch.col = null; ch.marks = null; ch.fresh = true;
+    ch.steps = chunkSteps(ch.pl, ch);
+    cortex.dirty = true;
+  }
+  // the cortex's marks, gathered from the chunks painted now
+  function marks3() {
+    if (!cortex.dirty) return;
+    cortex.dirty = false;
+    var by = cortex.markBy = {};
+    function put(km) { (by[km[0]] = by[km[0]] || []).push(km[1]); }
+    cortex.fixed.forEach(put);
+    cortex.chunks.forEach(function (ch) { if (ch.marks) ch.marks.forEach(put); });
   }
 
   // the colour of V4, filling in: from each place it starts it spreads out, until the shape it is in holds it
@@ -2507,9 +2580,9 @@
     for (i = 0; i < c.seeds.length; i++) { t = (u - c.seeds[i][3]) / 0.05; if (t < 1) all = false; if (t > 0) any = true; }
     if (!any) return;
     if (all || reduce) { drawItems([c], T, 1); return; }
-    if (Math.abs(c.u - u) > 0.0008) {
+    if (Math.abs(c.u - u) > 0.0018) {   // (soft colour, slowly spreading: a third of the resolution, and not every frame)
       c.u = u;
-      var w = Math.ceil(c.w / 2), h = Math.ceil(c.h / 2), rc = c.rev || (c.rev = { img: document.createElement('canvas'), box: c.box }), g = rc.img.getContext('2d'), k = c.qpx / 2;
+      var w = Math.ceil(c.w / 3), h = Math.ceil(c.h / 3), rc = c.rev || (c.rev = { img: document.createElement('canvas'), box: c.box }), g = rc.img.getContext('2d'), k = c.qpx / 3;
       if (rc.img.width !== w || rc.img.height !== h) { rc.img.width = w; rc.img.height = h; } else g.clearRect(0, 0, w, h);
       g.globalCompositeOperation = 'source-over';
       for (i = 0; i < c.seeds.length; i++) {
@@ -2527,10 +2600,33 @@
   }
 
   // the banks of the capillary: its wall of endothelial cells, sealed by tight junctions, standing up along each side,
-  // as rocks along a stream in snow: each its own shape, shadowed below, snow on top
+  // as rocks along a stream in snow. A few rocks are painted once, each its own lumpy shape, shadowed below, most with
+  // snow on top; along the banks they are set turned and stretched, pebbles to the odd boulder.
   function hash(n) { var h = Math.sin(n * 12.9898) * 43758.5453; return h - Math.floor(h); }
+  var ROCKS = null;
+  function makeRocks() {
+    var rnd = rng(SEED + 120);
+    ROCKS = [];
+    for (var k = 0; k < 10; k++) ROCKS.push(texCanvas(96, 64, function (g) {
+      var P = [], m = 9, j, path = new Path2D();
+      for (j = 0; j < m; j++) {
+        var a = j / m * TAU, rr = 0.78 + 0.3 * rnd(), sa = Math.sin(a) * (Math.sin(a) > 0 ? 0.72 : 1);
+        P.push([48 + Math.cos(a) * 42 * rr, 36 + sa * 26 * rr]);
+      }
+      path.moveTo((P[m - 1][0] + P[0][0]) / 2, (P[m - 1][1] + P[0][1]) / 2);
+      for (j = 0; j < m; j++) { var q = P[(j + 1) % m]; path.quadraticCurveTo(P[j][0], P[j][1], (P[j][0] + q[0]) / 2, (P[j][1] + q[1]) / 2); }
+      g.fillStyle = ['#8E8A86', '#7F7B78', '#9A9691'][k % 3]; g.fill(path);
+      g.save(); g.clip(path);
+      g.globalAlpha = 0.3; g.fillStyle = pattern(g, TEX.mottleCool, 0.6, k * 17, k * 5); g.fillRect(0, 0, 96, 64); g.globalAlpha = 1;
+      g.fillStyle = 'rgba(46,48,60,.38)'; g.beginPath(); g.ellipse(56, 54, 46, 22, 0, 0, TAU); g.fill();   // its shadowed side
+      if (k % 5) { g.fillStyle = '#FBFAF7'; g.beginPath(); g.ellipse(44 + rnd() * 8, 14 + rnd() * 6, 30 + rnd() * 10, 13 + rnd() * 5, (rnd() - 0.5) * 0.3, 0, TAU); g.fill(); }   // snow
+      g.restore();
+      g.strokeStyle = 'rgba(48,46,48,.75)'; g.lineWidth = 2.2; g.stroke(path);
+    }));
+  }
   function drawBanks(sc, n) {
-    var side, i, j, c, prev, P = [], m = 9;
+    if (!ROCKS) makeRocks();
+    var side, i, c, prev;
     for (side = -1; side <= 1; side += 2) {
       prev = null;
       for (i = 0; i < n; i++) {
@@ -2538,27 +2634,14 @@
         var f = hash(i * 7.1 + side * 3.3), g2 = hash(i * 3.7 + side * 9.1), bx = c[0] + c[3] * side * (1.12 + 0.12 * g2), by = c[1] + c[4] * side * (1.12 + 0.12 * g2);
         var h = Math.max(1, c[2] * (0.3 + 0.35 * f) * (g2 > 0.8 ? 1.8 : 1));   // pebbles, stones, the odd boulder
         if (prev && Math.hypot(bx - prev[0], by - prev[1]) < h * (1.1 + 0.9 * g2)) continue;
-        var ang = prev ? Math.atan2(by - prev[1], bx - prev[0]) : 0, len = h * (1.3 + 0.9 * f), cx = bx, cy = by - h * 0.5;
-        // the rock's outline: lumpy, flatter on its underside
-        P.length = 0;
-        for (j = 0; j < m; j++) {
-          var a = j / m * TAU, rr = 0.78 + 0.32 * hash(i * 13.3 + j * 5.7 + side), ca = Math.cos(a), sa = Math.sin(a) * (Math.sin(a) > 0 ? 0.75 : 1);
-          var lx = ca * len * 0.55 * rr, ly = sa * h * 0.62 * rr;
-          P.push(cx + lx * Math.cos(ang) - ly * Math.sin(ang), cy + lx * Math.sin(ang) + ly * Math.cos(ang));
-        }
-        var path = new Path2D();
-        path.moveTo(P[0], P[1]);
-        for (j = 1; j <= m; j++) { var k0 = (j % m) * 2, kp = (j - 1) * 2; path.quadraticCurveTo(P[kp], P[kp + 1], (P[kp] + P[k0]) / 2, (P[kp + 1] + P[k0 + 1]) / 2); }
-        path.closePath();
-        ctx.fillStyle = f < 0.33 ? '#8E8A86' : f < 0.66 ? '#7F7B78' : '#9A9691'; ctx.fill(path);
-        ctx.save(); ctx.clip(path);
-        ctx.fillStyle = 'rgba(52,54,64,.35)'; ctx.beginPath(); ctx.ellipse(cx + len * 0.15, cy + h * 0.45, len * 0.7, h * 0.45, ang, 0, TAU); ctx.fill();   // its shadowed side
-        if (f > 0.22) { ctx.fillStyle = '#FBFAF7'; ctx.beginPath(); ctx.ellipse(cx - len * 0.05, cy - h * (0.55 + 0.25 * g2), len * (0.45 + 0.25 * g2), h * (0.3 + 0.2 * f), ang, 0, TAU); ctx.fill(); }   // snow on most
-        ctx.restore();
-        ctx.strokeStyle = 'rgba(48,46,48,.7)'; ctx.lineWidth = Math.max(0.6, h * 0.06); ctx.stroke(path);
+        var ang = prev ? Math.atan2(by - prev[1], bx - prev[0]) : 0, len = h * (1.3 + 0.9 * f), cs = Math.cos(ang) * dpr, sn = Math.sin(ang) * dpr;
+        if (Math.abs(ang) > Math.PI / 2) { cs = -cs; sn = -sn; }   // the snow stays on top
+        ctx.setTransform(cs, sn, -sn, cs, bx * dpr, (by - h * 0.5) * dpr);
+        ctx.drawImage(ROCKS[Math.floor(hash(i * 1.3 + side) * ROCKS.length)], -len * 0.6, -h * 0.7, len * 1.2, h * 1.3);
         prev = [bx, by];
       }
     }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
   var CC = { wx: 0, by: 0, z: CZ, x: 0, py: 0, y: 0 };
@@ -2589,8 +2672,9 @@
   }
   function drawCortex(cam, now, u) {
     rollC = 1; rollS = 0;
+    marks3();
     if (SKIP.indexOf('planes') < 0) drawBackdrop(cam, paintCortexBack);
-    var ref = proj(cam.wx, WM, cam.z + 2, cam), T = PT, i;
+    var ref = proj(cam.wx, WM, cam.z + 2, cam), T = PT, i, t0 = performance.now();
     cortex.stream.rf = { x: ref.x, y: ref.y, s: ref.s * 0.6 };
     queue.length = 0;
     cortex.planes.forEach(function (pl) { queue.push({ D: pl.D, k: 0, pl: pl }); });
@@ -2602,10 +2686,10 @@
       if (SKIP.indexOf('slices') >= 0) continue;
       var den = view(it.pl.D, cam, T);
       if (den < 0.25) continue;
-      var xa = (-60 - T.tx) / T.s, xb = (W + 60 - T.tx) / T.s, a = smooth(0.25, 0.55, den), forced = 0;
+      var xa = (-60 - T.tx) / T.s, xb = (W + 60 - T.tx) / T.s, a = smooth(0.25, 0.55, den);
       it.pl.chunks.forEach(function (ch) {
         if (ch.x1 < xa || ch.x0 > xb) return;
-        if (!ch.cel && forced++ < 2) paintChunk(ch, Infinity);   // we got here before it was painted: paint it now
+        while (!ch.cel && performance.now() - t0 < 12) paintChunk(ch, 1);   // we got here before it was painted: a moment's painting a frame
         if (!ch.cel) return;
         setT(T.s, T.tx, T.ty);
         drawItems([ch.cel], T, a);
@@ -2801,6 +2885,7 @@
   // ---------- render ----------
   function render(now) {
     if (p < 1 + U_RISE) hidePlate3();
+    if (forest) keep(p - 1);
     useScale(p < P_PUPIL ? dprEye : dprIn);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -2808,9 +2893,6 @@
     if (p < P_PUPIL) { hidePlate(); drawEye(eyeCam(p), now); return; }
     if (p < P_CUT) { hidePlate(); drawFall(fallCam(p)); return; }
     var u = p - 1;
-    // the way on is let go once we are well into the cortex (its cels are a third of all), and painted again if we turn back
-    if (u > U_V1 + 0.05 && !way.held && !way.steps.length) { buildWay(); way.held = true; }
-    if (u < U_RISE + 0.03 && way.held) { way.held = false; paintSoon(); }
     if (u >= U_DARK && u < U_RISE) { hidePlate(); drawWay(u, now); return; }
     if (u >= U_RISE) {
       world = cortex;
@@ -2922,7 +3004,6 @@
     blink.v = bt >= 0 && bt <= 1 ? Math.sin(Math.PI * bt) : 0;
 
     fade(heroCopy, 1 - smooth(0.008, 0.045, p));
-    if (p > P_CUT && !root.later) { root.later = true; paintSoon(); }   // now the way on and the cortex can be painted
     var diving = p > 0.045;   // the headline has gone (a phone asks about cookies only then)
     if (diving !== root.diving) { root.diving = diving; document.documentElement.classList.toggle('diving', diving); }
     fade(paperEl, smooth(P_PUPIL, P_GLOW + 0.03, p));
@@ -3084,7 +3165,7 @@
       function add(it) { if (it && it.img) px += it.img.width * it.img.height; }
       if (forest) { forest.planes.forEach(function (pl) { pl.items.forEach(add); }); add(forest.veil); forest.grove.forEach(function (t) { add(t.cel); }); }
       var fpx = px; px = 0;
-      if (way) { way.nerve.forEach(add); add(way.chiasm.ground); add(way.chiasm.tract); add(way.rise.main); add(way.rise.far); add(way.rise.near); }
+      if (way) { way.nerve.forEach(add); add(way.chiasm.ground); add(way.chiasm.tract); add(way.chiasm.near); add(way.rise.main); add(way.rise.far); add(way.rise.near); }
       wpx = px; px = 0;
       if (cortex) cortex.chunks.forEach(function (ch) { add(ch.cel); add(ch.col); });
       cpx = px; px = fpx;
@@ -3096,7 +3177,7 @@
       if (px != null) { fixedPtr = { x: px, y: py || 0 }; ptr.x = ptr.tx = px; ptr.y = ptr.ty = py || 0; }
     },
     ready: function () { return !!forest && !forest.steps.length; },
-    readyAll: function () { return !!forest && !forest.steps.length && !way.steps.length && !cortex.steps.length; },
+    readyAll: function () { return !paintNext.peek(); },
     // for recording: stop the clock, then draw frames at chosen moments (scroll point, pointer, time in ms, flattening)
     pause: function () { paused = true; },
     frameAt: function (pp, px, py, t, flat) {
