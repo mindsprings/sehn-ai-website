@@ -502,7 +502,10 @@
       ctx.globalAlpha = (it.a == null ? 1 : it.a) * mult;
       if (it.comp) ctx.globalCompositeOperation = it.comp;
       if (it.img) ctx.drawImage(it.img, b[0], b[1], b[2] - b[0], b[3] - b[1]);
-      else {
+      else if (it.under) {   // the outline under the fill: only the outside of the whole shape shows, not where its strokes overlap
+        ctx.strokeStyle = it.stroke; ctx.lineWidth = it.lw * 2; ctx.stroke(it.path);
+        ctx.fillStyle = it.fill; ctx.fill(it.path);
+      } else {
         if (it.fill) { ctx.fillStyle = it.fill; ctx.fill(it.path); }
         if (it.stroke) { ctx.strokeStyle = it.stroke; ctx.lineWidth = it.lw; ctx.stroke(it.path); }
       }
@@ -803,10 +806,14 @@
     [[-0.42, 0.022, 0.015, veins], [-0.56, 0.024, 0.011, arteries], [0.42, -0.022, 0.015, veins], [0.56, -0.024, 0.011, arteries],
       [Math.PI + 0.5, 0, 0.012, veins], [Math.PI - 0.5, 0, 0.011, arteries], [Math.PI + 0.1, 0, 0.009, arteries], [Math.PI - 0.15, 0, 0.009, veins]].forEach(function (v) {
       o.curl = v[1] * o.step / 0.02;   // the curl is per step: keep the same turning per unit of length
-      grow(v[3], o, rnd, BLIND.x + Math.cos(v[0]) * 0.03, BLIND.y + Math.sin(v[0]) * 0.03, v[0], 0.62, v[2], 0);
+      // out of the middle of the disc, swelling from nothing (no cut ends), then on as grown
+      var sx = BLIND.x + Math.cos(v[0]) * 0.03, sy = BLIND.y + Math.sin(v[0]) * 0.03;
+      v[3].taper([[BLIND.x + Math.cos(v[0]) * 0.004, BLIND.y + Math.sin(v[0]) * 0.004, v[2] * 0.6], [sx, sy, v[2]]]);
+      grow(v[3], o, rnd, sx, sy, v[0], 0.62, v[2], 0);
     });
-    L.items.push({ path: veins.path, fill: '#8C1626', stroke: '#4A0A14', lw: 0.003, box: veins.box });
-    L.items.push({ path: arteries.path, fill: '#C3343B', stroke: '#5E0E1C', lw: 0.0025, box: arteries.box });
+    veins.dot(BLIND.x, BLIND.y, 0.016);   // the cup they come out of
+    L.items.push({ path: veins.path, fill: '#8C1626', stroke: '#4A0A14', lw: 0.003, box: veins.box, under: true });
+    L.items.push({ path: arteries.path, fill: '#C3343B', stroke: '#5E0E1C', lw: 0.0025, box: arteries.box, under: true });
     list.push(L);
 
     // floaters in the vitreous: faint threads and beads, the only things in the dark on the way down
@@ -2020,7 +2027,7 @@
   // After Cajal's drawing of 1898: the other eye's nerve comes in, teal. The fibres from the inner half of each retina
   // cross to the other side and the outer half stays, so each tract behind it carries both eyes, side by side: each
   // half of the brain gets one half of the world, from both eyes. We ride with the crossing ones. Map units.
-  var CHI = { c: [0, 0.2], L: [-2.1, -2.6], R: [2.1, -2.6], rose: [-2.5, 2.4], teal: [2.5, 2.4] };
+  var CHI = { c: [0, 0.2], L: [-3.9, -5], R: [3.9, -5], rose: [-4.9, 4.9], teal: [4.9, 4.9] };   // running on well past anything we see
   function chiasmSteps() {
     var steps = [];
     // the floor under it: the brain's underside, pale, with the ring of arteries around the stalk of the pituitary
@@ -2037,10 +2044,10 @@
       return [[ground, '#D6D2CB', 0.15, '#C4BEB6'], [marks2, '#BDB7AF', 0.3], [blood, '#A44A4E', 0.2]];
     }, function (cel) { way.chiasm.ground = cel; }));
     // the nerves, the crossing and the tracts
-    steps.push.apply(steps, celSteps([-3, -2.9, 3, 2.9], F / 2 * paintScale * 0.75, function () {
+    steps.push.apply(steps, celSteps([-4.7, -4.4, 4.7, 4.2], F / 1.6 * paintScale * 0.75, function () {
       var rnd = rng(SEED + 60), sheath = new Ink(), inks = { rose: [new Ink(), new Ink()], teal: [new Ink(), new Ink()] }, i;
       [[CHI.rose, CHI.c], [CHI.teal, CHI.c], [CHI.c, CHI.L], [CHI.c, CHI.R]].forEach(function (s) {
-        sheath.taper(makeRiver([s[0], [lerp(s[0][0], s[1][0], 0.5), lerp(s[0][1], s[1][1], 0.5) + 0.05], s[1]]).map(function (q) { return [q[0], q[1], 0.16]; }));
+        sheath.taper(makeRiver([s[0], [lerp(s[0][0], s[1][0], 0.5) + 0.06, lerp(s[0][1], s[1][1], 0.5) + 0.05], s[1]]).map(function (q) { return [q[0], q[1], 0.16]; }));
       });
       sheath.dot(CHI.c[0], CHI.c[1], 0.27);
       ['rose', 'teal'].forEach(function (eye) {
@@ -2048,11 +2055,12 @@
         for (i = 0; i < 46; i++) {
           var o = (i + rnd()) / 46 * 2 - 1, inner = eye === 'rose' ? o * nx > 0 : o * nx < 0;   // the half towards the midline crosses
           var end = (eye === 'rose') === inner ? CHI.R : CHI.L, tx = end[0] - CHI.c[0], ty = end[1] - CHI.c[1], tl = Math.hypot(tx, ty), lat = (rnd() - 0.5) * 0.26;
-          var way2 = [[s0[0] + nx * o * 0.12, s0[1] + ny * o * 0.12], [lerp(s0[0], CHI.c[0], 0.55) + nx * o * 0.11, lerp(s0[1], CHI.c[1], 0.55) + ny * o * 0.11],
-            [CHI.c[0] + (rnd() - 0.5) * 0.24, CHI.c[1] + (rnd() - 0.5) * 0.16],
-            [CHI.c[0] + tx * 0.45 - ty / tl * lat, CHI.c[1] + ty * 0.45 + tx / tl * lat], [end[0] - ty / tl * lat * 1.1, end[1] + tx / tl * lat * 1.1]];
+          var way2 = [[s0[0] + nx * o * 0.12, s0[1] + ny * o * 0.12], [lerp(s0[0], CHI.c[0], 0.4) + nx * o * 0.12, lerp(s0[1], CHI.c[1], 0.4) + ny * o * 0.12],
+            [lerp(s0[0], CHI.c[0], 0.8) + nx * o * 0.11, lerp(s0[1], CHI.c[1], 0.8) + ny * o * 0.11], [CHI.c[0] + (rnd() - 0.5) * 0.24, CHI.c[1] + (rnd() - 0.5) * 0.16],
+            [CHI.c[0] + tx * 0.25 - ty / tl * lat, CHI.c[1] + ty * 0.25 + tx / tl * lat], [CHI.c[0] + tx * 0.6 - ty / tl * lat * 1.05, CHI.c[1] + ty * 0.6 + tx / tl * lat * 1.05],
+            [end[0] - ty / tl * lat * 1.1, end[1] + tx / tl * lat * 1.1]];
           var fp = makeRiver(way2);
-          inks[eye][i % 2].taper(fp.map(function (q, j) { return [q[0], q[1], 0.0045 * (1 - 0.3 * Math.abs(j / (fp.length - 1) - 0.5))]; }));
+          inks[eye][i % 2].taper(fp.map(function (q, j) { return [q[0], q[1], 0.0065 * (1 - 0.3 * Math.abs(j / (fp.length - 1) - 0.5))]; }));
         }
       });
       return [[sheath, '#E9E5DF', 0.1, '#B9B2A9'], [inks.teal[0], TEAL, 0.15], [inks.rose[0], ROSE, 0.15], [inks.teal[1], TEAL, 0.15], [inks.rose[1], ROSE, 0.15]];
@@ -2060,18 +2068,18 @@
     return steps;
   }
   // our path over it: along this eye's nerve, into the crossing, out along the other side's tract
-  var CHI_PATH = [[-1.75, 1.6], [-0.85, 0.85], [0, 0.2], [0.85, -0.95], [1.5, -1.95]];
+  var CHI_PATH = [[-1.5, 1.6], [-0.75, 0.9], [0, 0.2], [0.6, -0.55], [1.15, -1.3]];
   function drawChiasm(u, now) {
-    var e = clamp((u - U_NERVE) / (U_CHIASM - U_NERVE), 0, 1), at = riverAt(way.chiasm.path, e), cam = wayCam(at[0] * smooth(0, 0.3, e), at[1] * smooth(0, 0.3, e), lerp(0, 2.6, easeInOut(e))), T = PT;
+    var e = clamp((u - U_NERVE) / (U_CHIASM - U_NERVE), 0, 1), at = riverAt(way.chiasm.path, e), cam = wayCam(at[0], at[1], lerp(0.4, 1.6, easeInOut(e))), T = PT;
     ensure(function () { return way.chiasm.tract && way.chiasm.ground; });
     rollC = Math.cos(0.12 * (e - 0.5)); rollS = Math.sin(0.12 * (e - 0.5));   // a little turn as we go: the X stays an X, as Cajal drew it
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = '#CEC9C2'; ctx.fillRect(0, 0, W, H);
-    [[6.5, way.chiasm.ground], [4.6, way.chiasm.tract]].forEach(function (pl) {
+    [[4.6, way.chiasm.ground], [3.2, way.chiasm.tract]].forEach(function (pl) {
       if (view(pl[0], cam, T) < 0.05) return;
       setT(T.s, T.tx, T.ty); drawItems([pl[1]], T, 1);
     });
-    if (view(3.5, cam, T) > 0.05) { setT(T.s, T.tx, T.ty); drawItems(way.chiasm.motes, T, smooth(0.1, 0.5, 3.5 - cam.z)); }
+    if (view(2.3, cam, T) > 0.05) { setT(T.s, T.tx, T.ty); drawItems(way.chiasm.motes, T, smooth(0.15, 0.5, 2.3 - cam.z)); }
     rollC = 1; rollS = 0;
     cover(CHAZE, 1 - smooth(U_NERVE, U_NERVE + 0.01, u));
     cover('#17151A', smooth(U_CHIASM - 0.012, U_CHIASM, u));   // the tract dives under, into the dark
@@ -2208,13 +2216,16 @@
     ['Ax', 'horizontal axon'], ['Ast', 'astrocyte'], ['Cap', 'capillary'], ['Rbc', 'red blood cell'], ['S', 'sehn']];
   var LAYERS_C = [['I', 'molecular', PIA, L_II], ['II–III', 'pyramidal', L_II, L_IV], ['IV', 'granular', L_IV, L_V], ['V', 'inner pyramidal', L_V, L_VI], ['VI', 'multiform', L_VI, WM]];
   function scaleAt(x) { return x < V2_AT ? 1 : x < V4_AT ? 1.35 : 1.75; }
+  // and how old the wood is: V1 young and slender, close together; V2 old, its birches thick and black-fissured; V4 grown
+  function ageAt(x) { return x < V2_AT ? 0.55 : x < V4_AT ? 1.6 : 1.15; }
 
   // A pyramidal cell, the cortex's birch: a triangular body, its apical dendrite a white trunk with dark marks up to a
   // crown of bare twigs in layer I, a skirt of basal dendrites like roots, an axon down into the snow. Snow is caught
   // in its twigs; in V4 the same places hold leaves, for the colour to fill.
   var OBL = { step: 0.012, wiggle: 0.35, taper: 0.4, spread: 0.7, lenK: 0.6, wK: 0.65, depth: 1 };
   function pyramidal(g, rnd, x, y, top, sc, lod, big) {
-    var w = (big ? 0.014 : 0.0092) * sc, r = (big ? 0.017 : 0.011) * sc, lean = (rnd() - 0.5) * 0.03, n = 14, pts = [], i;
+    var age = ageAt(x), w = (big ? 0.014 : 0.0092) * sc * age, r = (big ? 0.017 : 0.011) * sc, lean = (rnd() - 0.5) * 0.03 * (0.6 + age * 0.6), n = 14, pts = [], i;
+    sc *= 0.75 + 0.25 * age;   // older, the crowns and roots spread wider
     var lr = rnd(), leaf = lr < 0.45 ? g.leafA : lr < 0.85 ? g.leafB : g.leafC, v4 = x > V4_AT;
     for (i = 0; i <= n; i++) {
       var t = i / n, yy = lerp(y - r, top, t), xx = x + lean * t + Math.sin(t * 5 + x * 13) * 0.004 * sc;
@@ -2225,12 +2236,16 @@
       }
     }
     g.bark.taper(pts);
-    // the birch's marks: dark dashes across the white, closer and heavier towards its foot
-    for (var yy2 = y - r - 0.01 * sc; yy2 > top + 0.02; yy2 -= (0.018 + rnd() * 0.03) * sc * (0.6 + 0.6 * (y - yy2) / (y - top))) {
+    // the birch's marks: dark dashes across the white, closer and heavier towards its foot (few on a young one; an old one
+    // fissured black in diamonds, and black all round its foot)
+    for (var yy2 = y - r - 0.01 * sc; yy2 > top + 0.02; yy2 -= (0.018 + rnd() * 0.03) * sc * (0.6 + 0.6 * (y - yy2) / (y - top)) / Math.min(1.4, age)) {
       var tt = (y - r - yy2) / (y - r - top), mx = x + lean * tt + Math.sin(tt * 5 + x * 13) * 0.004 * sc, mw = w * (1 - 0.55 * tt);
-      g.marks.taper([[mx - mw * (0.3 + rnd() * 0.7), yy2, 0.0008 * sc], [mx + mw * (rnd() - 0.3), yy2 + 0.002, 0.0016 * sc], [mx + mw * (0.4 + rnd() * 0.6), yy2 + (rnd() - 0.5) * 0.004, 0.0006 * sc]]);
+      if (age < 1 && rnd() < 0.45) continue;
+      g.marks.taper([[mx - mw * (0.3 + rnd() * 0.7), yy2, 0.0008 * sc], [mx + mw * (rnd() - 0.3), yy2 + 0.002, 0.0016 * sc * age], [mx + mw * (0.4 + rnd() * 0.6), yy2 + (rnd() - 0.5) * 0.004, 0.0006 * sc]]);
+      if (age > 1.2 && tt < 0.6 && rnd() < 0.35) g.marks.blob(mx + (rnd() - 0.5) * mw, yy2, mw * (0.35 + rnd() * 0.3), Math.PI / 2, 0.9);   // a black diamond
     }
-    g.marks.taper([[x - w * 0.9, y - r * 0.6, w * 0.25], [x, y - r - 0.03 * sc, w * 0.5], [x + w * 0.9, y - r * 0.4, w * 0.25]]);   // dark at the foot
+    var foot = 0.03 * sc * age * age;
+    g.marks.taper([[x - w * 0.9, y - r * 0.6, w * 0.25], [x, y - r - foot, w * 0.5], [x + w * 0.9, y - r * 0.4, w * 0.25]]);   // dark at the foot
     var tx = pts[n][0], tuft = { step: 0.012 * sc, wiggle: 0.4, taper: 0.4, spread: 0.8, lenK: 0.6, wK: 0.65, depth: 1 + lod, pullK: 0.08,
       leafInk: leaf, leaf: v4 ? 0.95 : lod ? 0.3 : 0.15, leafR: (v4 ? 0.0085 : 0.0055) * sc };
     for (i = 0; i < 3 + lod; i++) {
@@ -2360,8 +2375,8 @@
       var pl = { D: D, lod: lod, frame: frame, items: [], chunks: [], qpx: F / den * paintScale * (frame ? 0.45 : D > 6 ? 0.75 : 0.9) };
       function add(cx, reach, draw) { pl.items.push({ x0: cx - reach, x1: cx + reach, seed: (rnd() * 1e9) | 0, draw: draw }); }
       // the trees: layer V's big pyramids, II and III's smaller ones, VI's (their trunks only up to IV)
-      for (x = x0; x < x1; x += 0.42 * scaleAt(x) * (frame ? 3.5 : 1) * (0.45 + rnd() * 1.1)) add(x, 0.32 * scaleAt(x), P5(x, lerp(L_V, L_VI, 0.3 + rnd() * 0.3), scaleAt(x), lod, PIA + 0.03, true));
-      for (x = x0; x < x1; x += (frame ? 1.1 : lod > 1 ? 0.24 : lod ? 0.3 : 0.45) * scaleAt(x) * (0.45 + rnd() * 1.1)) add(x, 0.24 * scaleAt(x), P5(x, lerp(L_II + 0.12, L_IV - 0.06, rnd()), scaleAt(x), lod, PIA + 0.03, false));
+      for (x = x0; x < x1; x += 0.42 * scaleAt(x) * (0.55 + 0.45 * ageAt(x)) * (frame ? 3.5 : 1) * (0.45 + rnd() * 1.1)) add(x, 0.44 * scaleAt(x), P5(x, lerp(L_V, L_VI, 0.3 + rnd() * 0.3), scaleAt(x), lod, PIA + 0.03, true));
+      for (x = x0; x < x1; x += (frame ? 1.1 : lod > 1 ? 0.24 : lod ? 0.3 : 0.45) * scaleAt(x) * (0.55 + 0.45 * ageAt(x)) * (0.45 + rnd() * 1.1)) add(x, 0.34 * scaleAt(x), P5(x, lerp(L_II + 0.12, L_IV - 0.06, rnd()), scaleAt(x), lod, PIA + 0.03, false));
       if (!frame) {
         for (x = x0; x < x1; x += 0.55 * scaleAt(x) * (0.45 + rnd() * 1.1)) add(x, 0.2 * scaleAt(x), P5(x, lerp(L_VI + 0.08, WM - 0.1, rnd()), scaleAt(x), lod, L_IV, false));
         if (lod) for (x = x0; x < x1; x += (x < V2_AT ? 0.11 : 0.3 * scaleAt(x)) * (0.7 + rnd() * 0.6)) add(x, 0.08, ST(x, lerp(L_IVC + 0.03, L_V - 0.03, rnd()), scaleAt(x), lod));
@@ -2390,7 +2405,8 @@
     cortex.chunks.sort(function (a, b) { return Math.max(a.x0, -1) - Math.max(b.x0, -1) || a.pl.D - b.pl.D; });
     cortex.chunks.forEach(function (ch) { cortex.steps.push(function chunk() { return paintChunk(ch, 1); }); });
     // the capillary in the bottom layer, winding off into the distance, single file, and the boat coming back on it
-    var cap = makeRiver([[7.75, 0.95], [7.25, 1.25], [7.05, 1.7], [7.45, 2.4], [7.7, 3.3], [7.15, 4.8], [6.75, 7.2], [7.4, 10.5], [7.9, 15], [7.3, 22]]), cells = [];
+    var cap = makeRiver([[7.95, -0.25], [7.85, 0.25], [7.75, 0.6], [7.55, 0.95], [7.25, 1.25],   // from past us on the right, where it runs off the screen
+       [7.05, 1.7], [7.45, 2.4], [7.7, 3.3], [7.15, 4.8], [6.75, 7.2], [7.4, 10.5], [7.9, 15], [7.3, 22]]), cells = [];
     for (var i = 0; i < 26; i++) cells.push({ t: (i + rnd() * 0.5) / 26, v: 0.9 + rnd() * 0.2, off: (rnd() - 0.5) * 0.2, d: rnd() * 0.3, ph: rnd() * TAU, spin: 0.5 + rnd(), rot: (rnd() - 0.5) * 0.6, size: 0.9 + rnd() * 0.2 });
     cortex.stream = { pts: cap, Y: WM, wid: 0.042, cells: cells, boat: { t: 0.9 }, rf: null, banks: true, cellK: 1.25, boatK: 0.7 };
     cortex.runs = split(cap.map(function (r) { return r[1]; }), CPLANES);
@@ -2509,22 +2525,36 @@
     drawItems([c.rev], T, 1);
   }
 
-  // the banks of the capillary: its wall of endothelial cells, sealed by tight junctions, standing up along each side
-  // like stones along a stream in snow
+  // the banks of the capillary: its wall of endothelial cells, sealed by tight junctions, standing up along each side,
+  // as rocks along a stream in snow: each its own shape, shadowed below, snow on top
+  function hash(n) { var h = Math.sin(n * 12.9898) * 43758.5453; return h - Math.floor(h); }
   function drawBanks(sc, n) {
-    var side, i, c, prev;
+    var side, i, j, c, prev, P = [], m = 9;
     for (side = -1; side <= 1; side += 2) {
       prev = null;
       for (i = 0; i < n; i++) {
         c = sc[i];
-        var hs = Math.sin(i * 12.9898 + side * 78.233) * 43758.5453, f = hs - Math.floor(hs);
-        var bx = c[0] + c[3] * side * 1.15, by = c[1] + c[4] * side * 1.15, h = Math.max(1, c[2] * (0.32 + 0.22 * f));
-        if (prev && Math.hypot(bx - prev[0], by - prev[1]) < h * (1.3 + f)) continue;
-        var ang = prev ? Math.atan2(by - prev[1], bx - prev[0]) : 0, len = prev ? Math.min(h * 2.2, Math.hypot(bx - prev[0], by - prev[1])) : h * 1.8;
-        ctx.fillStyle = '#C9C6C1'; ctx.strokeStyle = 'rgba(64,62,64,.75)'; ctx.lineWidth = Math.max(0.6, h * 0.08);
-        ctx.beginPath(); ctx.ellipse(bx, by - h * 0.55, len * 0.55, h * 0.6, ang, 0, TAU); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = '#FBFAF7'; ctx.beginPath(); ctx.ellipse(bx, by - h * 0.85, len * 0.45, h * 0.3, ang, 0, TAU); ctx.fill();   // snow on it
-        if (h > 4) { ctx.fillStyle = '#8A8682'; ctx.beginPath(); ctx.ellipse(bx, by - h * 0.45, len * 0.16, h * 0.2, ang, 0, TAU); ctx.fill(); }
+        var f = hash(i * 7.1 + side * 3.3), g2 = hash(i * 3.7 + side * 9.1), bx = c[0] + c[3] * side * (1.12 + 0.12 * g2), by = c[1] + c[4] * side * (1.12 + 0.12 * g2);
+        var h = Math.max(1, c[2] * (0.3 + 0.35 * f) * (g2 > 0.8 ? 1.8 : 1));   // pebbles, stones, the odd boulder
+        if (prev && Math.hypot(bx - prev[0], by - prev[1]) < h * (1.1 + 0.9 * g2)) continue;
+        var ang = prev ? Math.atan2(by - prev[1], bx - prev[0]) : 0, len = h * (1.3 + 0.9 * f), cx = bx, cy = by - h * 0.5;
+        // the rock's outline: lumpy, flatter on its underside
+        P.length = 0;
+        for (j = 0; j < m; j++) {
+          var a = j / m * TAU, rr = 0.78 + 0.32 * hash(i * 13.3 + j * 5.7 + side), ca = Math.cos(a), sa = Math.sin(a) * (Math.sin(a) > 0 ? 0.75 : 1);
+          var lx = ca * len * 0.55 * rr, ly = sa * h * 0.62 * rr;
+          P.push(cx + lx * Math.cos(ang) - ly * Math.sin(ang), cy + lx * Math.sin(ang) + ly * Math.cos(ang));
+        }
+        var path = new Path2D();
+        path.moveTo(P[0], P[1]);
+        for (j = 1; j <= m; j++) { var k0 = (j % m) * 2, kp = (j - 1) * 2; path.quadraticCurveTo(P[kp], P[kp + 1], (P[kp] + P[k0]) / 2, (P[kp + 1] + P[k0 + 1]) / 2); }
+        path.closePath();
+        ctx.fillStyle = f < 0.33 ? '#8E8A86' : f < 0.66 ? '#7F7B78' : '#9A9691'; ctx.fill(path);
+        ctx.save(); ctx.clip(path);
+        ctx.fillStyle = 'rgba(52,54,64,.35)'; ctx.beginPath(); ctx.ellipse(cx + len * 0.15, cy + h * 0.45, len * 0.7, h * 0.45, ang, 0, TAU); ctx.fill();   // its shadowed side
+        if (f > 0.22) { ctx.fillStyle = '#FBFAF7'; ctx.beginPath(); ctx.ellipse(cx - len * 0.05, cy - h * (0.55 + 0.25 * g2), len * (0.45 + 0.25 * g2), h * (0.3 + 0.2 * f), ang, 0, TAU); ctx.fill(); }   // snow on most
+        ctx.restore();
+        ctx.strokeStyle = 'rgba(48,46,48,.7)'; ctx.lineWidth = Math.max(0.6, h * 0.06); ctx.stroke(path);
         prev = [bx, by];
       }
     }
@@ -2540,7 +2570,7 @@
     var r = smooth(U_REST - 0.04, 1, u);   // at rest: down by the capillary in the bottom layer
     c.by += 0.55 * r; c.z = CZ + 0.45 * r;
     c.x = ptr.x * 0.08 * (1 - 0.5 * r); c.py = ptr.y * 0.03 * (1 - 0.5 * r); c.y = c.by + c.py;
-    cortex.stream.boat.t = lerp(0.85, 0.12, smooth(U_REST - 0.02, 1, u));
+    cortex.stream.boat.t = lerp(0.85, 0.26, smooth(U_REST - 0.02, 1, u));   // rowing towards us, stopping in view
     return c;
   }
   function paintCortexBack(cam) {
@@ -2922,10 +2952,13 @@
       panels.push({ sec: sec, wrap: wrap, svg: svg, w: 0, h: 0 });
     });
     function draw(pn) {
-      var w = pn.wrap.offsetWidth, h = pn.wrap.offsetHeight, r = w < 600 ? 15 : 22, gap = r + 7, step = w < 600 ? 10 : 12, html = '';
-      if (!w || (w === pn.w && h === pn.h)) return;
+      // the square is the paper, set in from the panel's edge by --kzi (so the pac-men stay on screen)
+      var k = parseFloat(getComputedStyle(pn.wrap).getPropertyValue('--kzi')) || 0, W0 = pn.wrap.offsetWidth, H0 = pn.wrap.offsetHeight;
+      var w = W0 - 2 * k, h = H0 - 2 * k, r = W0 < 600 ? 17 : 27, gap = r + 8, step = W0 < 600 ? 11 : 14, html = '';
+      if (!W0 || (w === pn.w && h === pn.h)) return;
       pn.w = w; pn.h = h;
       pn.svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h); pn.svg.setAttribute('width', w); pn.svg.setAttribute('height', h);
+      pn.svg.style.left = pn.svg.style.top = k + 'px';
       function at(cx, cy, a) { a *= Math.PI / 180; return (cx + r * Math.cos(a)).toFixed(1) + ' ' + (cy + r * Math.sin(a)).toFixed(1); }
       // the pac-men: each missing the quarter that faces the middle
       [[0, 0, 0], [w, 0, 90], [w, h, 180], [0, h, 270]].forEach(function (c, i) {
@@ -2937,8 +2970,8 @@
         var len = Math.hypot(e[2] - e[0], e[3] - e[1]), ux = (e[2] - e[0]) / len, uy = (e[3] - e[1]) / len, n = Math.floor((len / 2 - gap) / step), i;
         for (i = 0; i <= n; i++) {
           var d = gap + i * step;
-          html += '<circle class="kz-dot" style="--i:' + i + '" r="2" cx="' + (e[0] + ux * d).toFixed(1) + '" cy="' + (e[1] + uy * d).toFixed(1) + '"/>';
-          html += '<circle class="kz-dot" style="--i:' + i + '" r="2" cx="' + (e[2] - ux * d).toFixed(1) + '" cy="' + (e[3] - uy * d).toFixed(1) + '"/>';
+          html += '<circle class="kz-dot" style="--i:' + i + '" r="2.6" cx="' + (e[0] + ux * d).toFixed(1) + '" cy="' + (e[1] + uy * d).toFixed(1) + '"/>';
+          html += '<circle class="kz-dot" style="--i:' + i + '" r="2.6" cx="' + (e[2] - ux * d).toFixed(1) + '" cy="' + (e[3] - uy * d).toFixed(1) + '"/>';
         }
       });
       pn.svg.innerHTML = html;
@@ -2951,7 +2984,7 @@
         var pn = panels.filter(function (x) { return x.wrap === en.target; })[0];
         draw(pn); pn.sec.classList.add('kz-in'); io.unobserve(en.target);
       });
-    }, { rootMargin: '0px 0px -18% 0px' });
+    }, { rootMargin: '0px 0px -38% 0px' });   // once it is well up on the screen, where we are looking
     panels.forEach(function (pn) { io.observe(pn.wrap); });
     if ('ResizeObserver' in window) new ResizeObserver(drawAll).observe(document.body);
     else window.addEventListener('resize', drawAll);
