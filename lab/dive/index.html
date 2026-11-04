@@ -75,7 +75,10 @@
     .site-footer-wrap .footer > .wrap { padding-top: 56px; padding-bottom: 56px; border-radius: 24px; background: rgba(10, 17, 29, .9); }
     .footer .credits { max-width: 40em; margin: 24px auto 0; font-family: var(--label); font-style: italic; text-transform: none; letter-spacing: 0; font-size: 17px; line-height: 1.5; color: var(--on-dark-2); }
     .footer .credits a { color: var(--on-dark); }
-    /* past the footer, the plate's lower margin: the forest fades into paper, and a folded explanation of the plate */
+    /* the way on from the retina to the cortex: no page over it, just the scroll that carries the camera */
+    .journey { position: relative; height: 380vh; }
+
+    /* at the end of each part, its plate's lower margin: the scene fades into paper, and a folded explanation of the plate */
     .plate-legend { position: relative; z-index: 2; padding: 9vh 16px 28px; color: #1E1612;
       background: linear-gradient(to bottom, rgba(244, 236, 217, 0), rgba(244, 236, 217, .88) 8vh, rgba(244, 236, 217, .96)); }
     .plate-legend > * { max-width: 1120px; margin-left: auto; margin-right: auto; }
@@ -120,7 +123,36 @@
     .dive-ctl .switch[aria-pressed="true"] .switch__track { background: var(--rose); }
     /* just the forest: everything over it fades away, and scrolling still flies through it */
     .site-header, .over, .site-footer-wrap, .plate-legend { transition: opacity .4s ease, visibility .4s; }
-    html.bare :is(.site-header, .hero-copy, .over, .site-footer-wrap, .plate-legend, .plate) { opacity: 0 !important; visibility: hidden !important; }
+    html.bare :is(.site-header, .hero-copy, .over, .site-footer-wrap, .plate-legend) { opacity: 0 !important; visibility: hidden !important; }
+
+    /* From V2 on each panel arrives as a Kanizsa square: four pac-men around where it will be, the boundary completing
+       between them dot by dot, the paper filling in from their mouths until the boundary holds it, then what is on it */
+    @property --kz { syntax: '<number>'; inherits: true; initial-value: 1; }
+    .kz > .wrap { position: relative; isolation: isolate; --kz-paper: rgba(246, 240, 227, .93); transition: --kz 1.3s cubic-bezier(.35, .1, .3, 1) .75s; }
+    .kz.section--dark-left > .wrap { --kz-paper: rgba(10, 17, 29, .9); }
+    .kz.section--plum > .wrap { --kz-paper: rgba(110, 42, 71, .93); }
+    .js .over .kz > .wrap { background: none; box-shadow: none; }
+    .js .kz > .wrap::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--kz-paper);
+      box-shadow: 0 1px 0 rgba(59, 42, 30, .08), 0 34px 70px -34px rgba(40, 16, 10, .7);
+      -webkit-mask: radial-gradient(ellipse calc(var(--kz) * 82%) calc(var(--kz) * 82%) at 0 0, #000 88%, transparent),
+        radial-gradient(ellipse calc(var(--kz) * 82%) calc(var(--kz) * 82%) at 100% 0, #000 88%, transparent),
+        radial-gradient(ellipse calc(var(--kz) * 82%) calc(var(--kz) * 82%) at 0 100%, #000 88%, transparent),
+        radial-gradient(ellipse calc(var(--kz) * 82%) calc(var(--kz) * 82%) at 100% 100%, #000 88%, transparent);
+      mask: radial-gradient(ellipse calc(var(--kz) * 82%) calc(var(--kz) * 82%) at 0 0, #000 88%, transparent),
+        radial-gradient(ellipse calc(var(--kz) * 82%) calc(var(--kz) * 82%) at 100% 0, #000 88%, transparent),
+        radial-gradient(ellipse calc(var(--kz) * 82%) calc(var(--kz) * 82%) at 0 100%, #000 88%, transparent),
+        radial-gradient(ellipse calc(var(--kz) * 82%) calc(var(--kz) * 82%) at 100% 100%, #000 88%, transparent); }
+    .js .kz:not(.kz-in) > .wrap { --kz: 0; }
+    .js .kz > .wrap > :not(.kz-marks) { transition: opacity .7s ease 1.7s; }
+    .js .kz:not(.kz-in) > .wrap > :not(.kz-marks) { opacity: 0; }
+    .kz-marks { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; z-index: 1; }
+    .kz-pac { fill: #1E1612; transform: scale(0); transform-box: fill-box; }
+    .kz-dot { fill: #1E1612; opacity: 0; }
+    .kz-in .kz-pac { animation: kz-pac 3s cubic-bezier(.3, 1.4, .5, 1) var(--d) both; }
+    .kz-in .kz-dot { animation: kz-dot 2.6s ease calc(.45s + var(--i) * 26ms) both; }
+    @keyframes kz-pac { 0% { transform: scale(0); } 14% { transform: scale(1); } 72% { transform: scale(1); } 100% { transform: scale(.55); } }
+    @keyframes kz-dot { 0% { opacity: 0; } 8% { opacity: 1; } 55% { opacity: 1; } 100% { opacity: 0; } }   /* the boundary was never there */
+    @media (prefers-reduced-motion: reduce) { .kz-marks { display: none; } .js .kz:not(.kz-in) > .wrap { --kz: 1; } .js .kz:not(.kz-in) > .wrap > * { opacity: 1; } }
 
     .hud { position: fixed; top: 76px; left: 8px; z-index: 60; margin: 0; padding: 6px 8px; font: 12px/1.35 ui-monospace, monospace; color: #CFE; background: rgba(0, 0, 0, .55); border-radius: 6px; pointer-events: none; }
   </style>
@@ -257,6 +289,30 @@
         </div>
       </div>
     </section>
+
+    <!-- the forest's plate, folded, at the end of the forest: open it, point at a line, and its cell is named in the forest -->
+    <details class="plate-legend">
+      <summary><b>Explanation of Plate I</b><span>sehn.ai dib., after the plates of S. Ramón y Cajal</span></summary>
+      <p class="why">The retina, from the inside. Light comes down from above and passes through every layer before it reaches the rods and cones; on its way back, the picture is taken apart and analysed, layer by layer, before the brain ever sees it.</p>
+      <p class="layers"><span><b>I.</b> ganglion cells, the roof</span> <span><b>II.</b> inner plexiform, the canopy</span> <span><b>III.</b> inner nuclear, the upper trunks</span> <span><b>IV.</b> outer plexiform, the lower branches</span> <span><b>V.</b> outer nuclear, the nuclei of rods and cones</span> <span><b>VI.</b> rods and cones, the trunks</span></p>
+      <dl>
+        <div data-k="Gc" tabindex="0"><dt>Gc</dt><dd><i>ganglion cell</i>the retina’s output: their fibres make the optic nerve, carrying a picture already analysed</dd></div>
+        <div data-k="Ac" tabindex="0"><dt>Ac</dt><dd><i>amacrine cell</i>compares neighbours across space and time; some detect the direction of motion</dd></div>
+        <div data-k="Bc" tabindex="0"><dt>Bc</dt><dd><i>bipolar cell</i>carries the signal inward, split into “lighter than around” and “darker than around”</dd></div>
+        <div data-k="Hc" tabindex="0"><dt>Hc</dt><dd><i>horizontal cell</i>holds back each cell’s neighbours, so that edges stand out</dd></div>
+        <div data-k="Mg" tabindex="0"><dt>Mg</dt><dd><i>Müller glia</i>span the whole retina, and guide light down through it like optical fibres</dd></div>
+        <div data-k="R" tabindex="0"><dt>R</dt><dd><i>rods</i>see in dim light</dd></div>
+        <div data-k="C" tabindex="0"><dt>C</dt><dd><i>cones</i>see colour and fine detail</dd></div>
+        <div data-k="Cap" tabindex="0"><dt>Cap</dt><dd><i>capillary</i>feeds the inner layers</dd></div>
+        <div data-k="Rbc" tabindex="0"><dt>Rbc</dt><dd><i>red blood cell</i>darker than the plasma it floats in</dd></div>
+        <div data-k="S" tabindex="0"><dt>S</dt><dd><i>sehn</i>learning to see the same way</dd></div>
+      </dl>
+    </details>
+
+    <!-- the way on: past the river, out through the blind spot, along the optic nerve, across the chiasm, up through the LGN, into the cortex -->
+    <div class="journey" id="journey">
+      <p class="visually-hidden">Scrolling on, the camera rises out of the forest's roof and over the retina, where every nerve fibre, drawn in rose, flows to the blind spot, a pale lake, and drops into it. Alongside the optic nerve, a cable of fibres beaded with white myelin; then the chiasm from above, where the other eye's nerve comes in, in teal, and half the fibres cross. Up through the lateral geniculate nucleus, six bent layers striped by eye, with the optic radiation fanning upwards into white, and out of the white into the visual cortex: a birch wood in snow.</p>
+    </div>
 
     <!-- How it works -->
     <section class="section section--light section--tight-top" id="how" aria-labelledby="how-title">
@@ -626,30 +682,12 @@
         <img src="../../public/assets/brand/logo.svg" width="160" height="104" alt="sehn.ai logo">
         <p>sehn.ai is a product of <a href="https://mindsprings.ai">Mindsprings</a></p><p>Mindsprings LLC · sehn.ai · <a href="https://mindsprings.ai">mindsprings.ai</a></p>
         <p><a href="../../public/imprint.html">Imprint &amp; privacy</a></p>
-        <p class="credits">The dive into the eye is inspired by <a href="https://en.wikipedia.org/wiki/Santiago_Ram%C3%B3n_y_Cajal">Santiago Ramón y Cajal</a>’s drawings of the retina, Disney’s <a href="https://en.wikipedia.org/wiki/Multiplane_camera">multiplane camera</a>, and the films of <a href="https://www.youtube.com/watch?v=n11j73OYqOY">McBess</a>.</p>
+        <p class="credits">The dive into the eye is inspired by <a href="https://en.wikipedia.org/wiki/Santiago_Ram%C3%B3n_y_Cajal">Santiago Ramón y Cajal</a>’s drawings of the retina and the visual cortex, the laminar models of <a href="https://sites.bu.edu/steveg/">Stephen Grossberg</a>, Disney’s <a href="https://en.wikipedia.org/wiki/Multiplane_camera">multiplane camera</a>, and the films of <a href="https://www.youtube.com/watch?v=n11j73OYqOY">McBess</a>.</p>
         <p class="tm">Magic Eye® is a trademark of Magic Eye Inc.</p>
       </div>
     </footer>
   </div>
 
-  <!-- the plate's legend, folded, past the end of the page: open it, point at a line, and its cell is named in the forest -->
-  <details class="plate-legend">
-    <summary><b>Explanation of Plate I</b><span>sehn.ai dib., after the plates of S. Ramón y Cajal</span></summary>
-    <p class="why">The retina, from the inside. Light comes down from above and passes through every layer before it reaches the rods and cones; on its way back, the picture is taken apart and analysed, layer by layer, before the brain ever sees it.</p>
-    <p class="layers"><span><b>I.</b> ganglion cells, the roof</span> <span><b>II.</b> inner plexiform, the canopy</span> <span><b>III.</b> inner nuclear, the upper trunks</span> <span><b>IV.</b> outer plexiform, the lower branches</span> <span><b>V.</b> outer nuclear, the nuclei of rods and cones</span> <span><b>VI.</b> rods and cones, the trunks</span></p>
-    <dl>
-      <div data-k="Gc" tabindex="0"><dt>Gc</dt><dd><i>ganglion cell</i>the retina’s output: their fibres make the optic nerve, carrying a picture already analysed</dd></div>
-      <div data-k="Ac" tabindex="0"><dt>Ac</dt><dd><i>amacrine cell</i>compares neighbours across space and time; some detect the direction of motion</dd></div>
-      <div data-k="Bc" tabindex="0"><dt>Bc</dt><dd><i>bipolar cell</i>carries the signal inward, split into “lighter than around” and “darker than around”</dd></div>
-      <div data-k="Hc" tabindex="0"><dt>Hc</dt><dd><i>horizontal cell</i>holds back each cell’s neighbours, so that edges stand out</dd></div>
-      <div data-k="Mg" tabindex="0"><dt>Mg</dt><dd><i>Müller glia</i>span the whole retina, and guide light down through it like optical fibres</dd></div>
-      <div data-k="R" tabindex="0"><dt>R</dt><dd><i>rods</i>see in dim light</dd></div>
-      <div data-k="C" tabindex="0"><dt>C</dt><dd><i>cones</i>see colour and fine detail</dd></div>
-      <div data-k="Cap" tabindex="0"><dt>Cap</dt><dd><i>capillary</i>feeds the inner layers</dd></div>
-      <div data-k="Rbc" tabindex="0"><dt>Rbc</dt><dd><i>red blood cell</i>darker than the plasma it floats in</dd></div>
-      <div data-k="S" tabindex="0"><dt>S</dt><dd><i>sehn</i>learning to see the same way</dd></div>
-    </dl>
-  </details>
 
   <script>
     // This is a lab copy of the page: the API key form must never reach HubSpot from here.
@@ -660,6 +698,26 @@
       if (status) status.textContent = 'This is the lab copy of the page, so nothing was sent.';
     }, true);
   </script>
+
+  <!-- the cortex's plate, folded, past the end of the page: open it, point at a line, and its cell is named in the wood -->
+  <details class="plate-legend">
+    <summary><b>Explanation of Plate II</b><span>sehn.ai dib., after S. Ramón y Cajal and the models of S. Grossberg</span></summary>
+    <p class="why">The visual cortex, edge on, as a birch wood in snow. The picture comes in from the LGN to layer IV of V1, still in columns for the two eyes, and from there it is put together again, area by area: in V2, long horizontal fibres complete the boundaries between things, even across gaps; in V4, colour and surface fill in within them, and a figure stands out from its ground. The panels of this page arrived that way, as Kanizsa squares.</p>
+    <p class="layers"><span><b>I.</b> molecular, the canopy</span> <span><b>II–III.</b> pyramidal, the birches</span> <span><b>IV.</b> granular, where the LGN’s fibres end; in V1 the mist</span> <span><b>V.</b> inner pyramidal, the tallest birches</span> <span><b>VI.</b> multiform, over the snow of the white matter</span></p>
+    <dl>
+      <div data-k="Pyr" tabindex="0"><dt>Pyr</dt><dd><i>pyramidal cell</i>the cortex’s own: a trunk up to layer I, roots below, an axon down and on to the next area</dd></div>
+      <div data-k="St" tabindex="0"><dt>St</dt><dd><i>stellate cell</i>in layer IV, takes in the picture from the LGN</dd></div>
+      <div data-k="CR" tabindex="0"><dt>CR</dt><dd><i>Cajal–Retzius cell</i>of layer I, which Cajal drew; it lays out the cortex as it grows</dd></div>
+      <div data-k="Lgn" tabindex="0"><dt>Lgn</dt><dd><i>fibre from the LGN</i>brings the picture in, one eye to a column</dd></div>
+      <div data-k="G" tabindex="0"><dt>G</dt><dd><i>stripe of Gennari</i>white fibres you can see by eye; it marks V1, and stops where V2 begins</dd></div>
+      <div data-k="Ax" tabindex="0"><dt>Ax</dt><dd><i>horizontal axon</i>links cells far apart that see the same orientation: in Grossberg’s models, boundaries are completed along them</dd></div>
+      <div data-k="Ast" tabindex="0"><dt>Ast</dt><dd><i>astrocyte</i>glia: feeds the neurons, and holds the capillaries with its feet</dd></div>
+      <div data-k="Cap" tabindex="0"><dt>Cap</dt><dd><i>capillary</i>its wall sealed tight, the blood–brain barrier</dd></div>
+      <div data-k="Rbc" tabindex="0"><dt>Rbc</dt><dd><i>red blood cell</i>squeezes through, single file</dd></div>
+      <div data-k="S" tabindex="0"><dt>S</dt><dd><i>sehn</i>on its way back from the eye</dd></div>
+    </dl>
+    <p class="why">After S. Grossberg, <a href="https://doi.org/10.3389/fnsys.2021.650263">A canonical laminar neocortical circuit</a> (2021) and <a href="https://doi.org/10.3389/fpsyg.2015.02054">Cortical dynamics of figure-ground separation</a> (2016), and the plates of Cajal’s <i>Estudios sobre la corteza cerebral humana</i> (1899).</p>
+  </details>
 
   <div class="dive-ctl">
     <div class="dive-flat" id="dive-flat">
