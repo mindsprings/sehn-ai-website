@@ -57,7 +57,7 @@
 
     /* the scroll that drives the camera, from the eye down into the forest */
     .track { position: relative; height: 520vh; }
-    .hero-copy { position: fixed; left: 0; right: 0; bottom: 7vh; z-index: 1; padding: 0 16px; text-align: center; color: var(--on-dark); }
+    .hero-copy { position: fixed; left: 0; right: 0; bottom: calc(2vh + 70px); z-index: 1; padding: 0 16px; text-align: center; color: var(--on-dark); }
     .hero-copy .eyebrow { justify-content: center; color: var(--rose); font-size: 13px; }
     .hero-copy h1 { font-size: clamp(38px, 5.6vw, 72px); letter-spacing: -0.015em; line-height: 1.04; margin-bottom: 14px; }
     .hero-copy h1 em { color: var(--rose); }
@@ -122,8 +122,18 @@
 
     /* the cookie question, up beside the eye, clear of the headline below it (nothing is counted before it is answered) */
     @media (min-width: 721px) { .consent { top: calc(var(--header-h) + 16px); bottom: auto; } }
-    /* on a phone there is no room beside the eye: it asks once the dive begins and the headline has gone */
-    @media (max-width: 720px) { html:not(.diving) .consent { visibility: hidden; } }
+    /* on a phone there is no room beside the eye, and asking as the dive begins stopped people diving: it asks once we
+       have arrived in the forest */
+    @media (max-width: 720px) { html:not(.arrived) .consent { visibility: hidden; } }
+
+    /* the beckoning: whenever we stop on the way in, before the forest, a dotted line with a dot running down it */
+    .cue { position: fixed; left: 50%; bottom: 2vh; z-index: 30; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px;
+      font: italic 400 17px/1.2 "Old Standard TT", serif; color: var(--rose); pointer-events: none; opacity: 0; visibility: hidden; transition: opacity .5s ease; }
+    .cue i { position: relative; display: block; width: 3px; height: 36px; background: radial-gradient(circle, var(--rose) 1.3px, transparent 1.7px) 0 0 / 3px 8px repeat-y; }
+    .cue i::after { content: ""; position: absolute; left: -3.5px; top: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--rose); animation: cue 1.6s ease-in infinite; }
+    @keyframes cue { 0% { transform: translateY(-6px); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(32px); opacity: 0; } }
+    .hero-copy .note { display: none; }   /* the cue says it, and bobs */
+    @media (prefers-reduced-motion: reduce) { .cue i::after { animation: none; top: 26px; } }
 
     /* the switches, once we are in the forest: the page lifted off it (all the way down), and the multiplane (while it is in full view) */
     .dive-ctl { position: fixed; right: 16px; bottom: 16px; z-index: 40; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
@@ -195,8 +205,8 @@
   <header class="hero-copy" id="hero-copy">
     <p class="eyebrow">Visual-spatial perception for AI agents</p>
     <h1 id="hero-title">Agents want to <em>see</em> like we&nbsp;do.</h1>
-    <p class="note">scroll to look inside ↓</p>
   </header>
+  <div class="cue" id="cue" aria-hidden="true"><span>scroll to look inside</span><i></i></div>
 
   <!-- the dive: scrolling through this flies the camera into the eye -->
   <div class="track" id="top">
