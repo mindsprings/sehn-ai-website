@@ -36,7 +36,7 @@
   // and in the white of the myelin. The retina keeps its yellow; the cortex is grey, like Cajal's silver, with colour
   // only in the fibres (rose for this eye, teal for the other), in the blood, and in V4, where colour is seen.
   var U_DARK = 0.012, U_LAKE = 0.07, U_NERVE = 0.13, U_CHIASM = 0.19, U_RISE = 0.26, U_V1 = 0.31, U_V2 = 0.5, U_V4 = 0.72, U_REST = 0.9;
-  var U_C0 = 0.53, U_C1 = 0.6;   // the pause in V2 where Plate III, Grossberg's circuit, is drawn
+  var U_R0 = 0.72, U_R1 = 0.86;   // the pause in V4 where Plate III, adaptive resonance, plays out
   var ROSE = '#B57A8E', TEAL = '#5E9090', CHAZE = '#D7D8D9', MYELIN = '#F4F1EA';
 
   // ---------- small helpers ----------
@@ -1842,7 +1842,7 @@
     el.addEventListener('blur', function () { set(false); });
   });
   // the labels are measured in their own type, once it has arrived
-  if (document.fonts) document.fonts.ready.then(function () { if (plate) plate.kinds.forEach(function (o) { o.w = 0; }); });
+  if (document.fonts) document.fonts.ready.then(function () { if (plate) plate.kinds.forEach(function (o) { o.w = 0; }); if (P3 && P3.res) P3.res.forEach(function (tx) { tx._w = 0; }); });
 
   // the light from above, and the roof and the floor as two planes running off into the distance (in strips)
   // The light, the roof and the floor are soft and fill the whole screen, so they are drawn at half resolution
@@ -2254,7 +2254,7 @@
   // chunks in the order the camera reaches them.
   var PIA = -0.9, L_II = -0.78, L_IV = -0.3, L_IVC = -0.12, L_V = 0.14, L_VI = 0.44, WM = 0.8;
   var V2_AT = 2.2, V4_AT = 4.9, CX_END = 7.6, CZ = -0.4, CPLANES = [14, 8, 4.8, 3, 2, 1.3];
-  var CX_AT = [[U_V1, 0], [U_V2, 2.5], [U_C0, 2.75], [U_C1, 2.95], [U_V4, 5.3], [U_REST, 6.9], [1, 7.3]];   // all but still while the circuit is drawn
+  var CX_AT = [[U_V1, 0], [U_V2, 2.5], [0.66, 4.6], [U_R0, 5.5], [U_R1, 5.8], [U_REST, 6.9], [1, 7.3]];   // all but still while the resonance plays
   var KINDS_C = [['Pyr', 'pyramidal cell'], ['St', 'stellate cell'], ['CR', 'Cajal–Retzius cell'], ['Lgn', 'fibre from the LGN', 2], ['G', 'stripe of Gennari'],
     ['Ax', 'horizontal axon'], ['Ast', 'astrocyte'], ['Cap', 'capillary'], ['Rbc', 'red blood cell'], ['S', 'sehn']];
   var LAYERS_C = [['I', 'molecular', PIA, L_II], ['II–III', 'pyramidal', L_II, L_IV], ['IV', 'granular', L_IV, L_V], ['V', 'inner pyramidal', L_V, L_VI], ['VI', 'multiform', L_VI, WM]];
@@ -2719,171 +2719,24 @@
     ctx.globalAlpha = 1;
   }
 
-  // ---------- Plate III: the circuit, after Grossberg ----------
-  // In a pause in the page, over the old wood of V2, his laminar circuit is drawn in as we scroll, a connection at a
-  // time, on cells that are really there: a, input from below to layers IV and VI; b, VI's on-centre, off-surround onto
-  // IV; c, IV up to II–III; d, the bipole, two cells far apart that see the same line completing a boundary inward onto
-  // a cell between them (and one alone held back, two against one); e, the folded feedback, down from II–III to VI;
-  // f, on to V4. Then in V4, g: a surface filling in, outward, until its boundary holds it. His notation: arrows excite,
-  // round ends inhibit, the bipole's receptive field a figure of eight.
+  // ---------- Plate III: its layer ----------
+  // Plate III is adaptive resonance (below): its glow is drawn on the canvas, its lettering here, over it, in SVG.
   var plate3El = document.getElementById('plate3'), P3 = null, p3show = 0;
-  var CIRCUIT = { a: [0, 0.13], b: [0.13, 0.28], c: [0.28, 0.38], d: [0.38, 0.62], e: [0.62, 0.77], f: [0.77, 0.9] };
-  var P3_LABELS = { a: 'input, from below', b: 'on-centre, off-surround', c: 'up to II–III', d: 'bipole: a boundary completes inward', e: 'folded feedback',
-    f: 'on to V4', g: 'filling-in, outward, until a boundary holds it' };
   function buildPlate3() {
     plate3El.textContent = '';
-    P3 = { els: {}, shown: -1, pick: null, seed: null };
-    'abcdefg'.split('').forEach(function (k) {
-      var g = svgEl('g', '', plate3El), e = { g: g, strokes: [], text: svgEl('text', 'lab', g), a: -1 };
-      svgEl('tspan', 'k', e.text).textContent = k + '. ';
-      svgEl('tspan', '', e.text).textContent = P3_LABELS[k];
-      P3.els[k] = e;
-    });
+    P3 = { shown: -1, res: null };
     P3.title = svgEl('text', 'ttl', plate3El);
-    P3.title.textContent = 'Pl. III, after S. Grossberg';
+    P3.title.textContent = 'Pl. III, adaptive resonance, after S. Grossberg';
   }
-  // the i-th stroke of an element: a halo and a line, drawn on as it goes (pathLength 1), and its end
-  function stroke3(e, i, cls, end) {
-    var s = e.strokes[i];
-    if (!s) {
-      s = e.strokes[i] = { halo: svgEl('path', 'halo3', e.g), line: svgEl('path', cls, e.g), end: end ? svgEl(end === 'head' ? 'path' : 'circle', end, e.g) : null };
-      if (cls !== 'rf') [s.halo, s.line].forEach(function (q) { q.setAttribute('pathLength', 1); q.setAttribute('stroke-dasharray', '1 1'); });   // (a dotted line keeps its own lengths)
-      e.g.appendChild(e.text);   // the label over its lines
-    }
-    return s;
-  }
-  // a gently bowed stroke from a to b (they stop short of the cells they join), drawn on to f
-  function curve3(s, a, b, bow, f, pad) {
-    var dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1, ux = dx / l, uy = dy / l;
-    pad = pad == null ? 9 : pad;
-    var ax = a.x + ux * pad, ay = a.y + uy * pad, bx = b.x - ux * pad, by = b.y - uy * pad, cx = (ax + bx) / 2 - uy * bow, cy = (ay + by) / 2 + ux * bow;
-    var d = 'M' + ax.toFixed(1) + ',' + ay.toFixed(1) + 'Q' + cx.toFixed(1) + ',' + cy.toFixed(1) + ' ' + bx.toFixed(1) + ',' + by.toFixed(1), off = (1 - f).toFixed(3);
-    attr(s.halo, 'd', d); attr(s.line, 'd', d); attr(s.halo, 'stroke-dashoffset', off); attr(s.line, 'stroke-dashoffset', off);
-    if (!s.end) return;
-    attr(s.end, 'opacity', f > 0.97 ? 1 : 0);
-    if (s.end.tagName === 'circle') { attr(s.end, 'cx', bx.toFixed(1)); attr(s.end, 'cy', by.toFixed(1)); attr(s.end, 'r', 4.5); return; }
-    var an = Math.atan2(by - cy, bx - cx), c = Math.cos(an), sn = Math.sin(an);
-    attr(s.end, 'd', 'M' + (bx + c * 3).toFixed(1) + ',' + (by + sn * 3).toFixed(1) + 'L' + (bx - c * 10 - sn * 5).toFixed(1) + ',' + (by - sn * 10 + c * 5).toFixed(1) +
-      'L' + (bx - c * 10 + sn * 5).toFixed(1) + ',' + (by - sn * 10 - c * 5).toFixed(1) + 'Z');
-  }
-  function label3(e, x, y, f) {
-    var a = Math.round(smooth(0.45, 1, f) * 100) / 100;
-    attr(e.text, 'x', x.toFixed(1)); attr(e.text, 'y', y.toFixed(1)); attr(e.text, 'opacity', a);
-  }
-  // the cells it is drawn on: in the nearest plane that names its cells, around a II–III pyramid a little left of middle
-  function nearest3(k, x, y0, y1, D, not) {
-    var best = null, bd = 1e9;
-    (cortex.markBy[k] || []).forEach(function (m) {
-      if (m.D !== D || m.Y < y0 || m.Y > y1 || m === not) return;
-      var d = Math.abs(m.x - x);
-      if (d < bd) { bd = d; best = m; }
-    });
-    return best;
-  }
-  function pick3(cam) {
-    // centred on where the camera will be when it is half drawn (it is still drifting along when it starts)
-    var D = 2, den = D - cam.z, xc = wxAt(U_C0 + (U_C1 - U_C0) * 0.6) - 0.03 * W * den / F, span = Math.min(0.75 * scaleAt(xc), 0.34 * W * den / F);
-    var P = nearest3('Pyr', xc, L_II, L_IV, D) || { x: xc, Y: -0.5, D: D };
-    return {
-      P: P, D: D,
-      S: nearest3('St', P.x + 0.04, L_IV, L_V + 0.05, D) || { x: P.x + 0.05, Y: 0, D: D },
-      V6: nearest3('Pyr', P.x - 0.06, L_VI, WM, D) || { x: P.x - 0.06, Y: 0.62, D: D },
-      L: nearest3('Pyr', P.x - span, L_II, L_IV, D, P) || { x: P.x - span, Y: -0.5, D: D },
-      R: nearest3('Pyr', P.x + span, L_II, L_IV, D, P) || { x: P.x + span, Y: -0.5, D: D }
-    };
-  }
-  function at3(m, cam, dy) { var q = proj(m.x, m.Y + (dy || 0), m.D, cam); return { x: q.x, y: q.y }; }
   function hidePlate3() { if (P3 && P3.shown !== 0) { P3.shown = 0; plate3El.style.opacity = 0; plate3El.style.visibility = 'hidden'; } p3show = 0; }
-
   function drawPlate3(cam, now, u) {
     if (!P3) buildPlate3();
-    var s1 = circuitEl ? smooth(U_C0 - 0.006, U_C0 + 0.008, u) * (1 - smooth(U_C1 + 0.05, U_V4 - 0.03, u)) : 0;
     var s3 = resEl ? smooth(U_R0 - 0.01, U_R0 + 0.005, u) * (1 - smooth(U_R1 + 0.01, U_R1 + 0.04, u)) : 0;
-    var s2 = smooth(U_V4, U_V4 + 0.02, u) * (1 - smooth(U_REST - 0.05, U_REST - 0.02, u)) * (1 - s3);
-    var show = Math.round(Math.max(s1, s2, s3) * 100) / 100;
-    labelsRes();
-    if (SKIP.indexOf('plate') >= 0) show = 0;
-    p3show = Math.max(s1, s3);
+    var show = SKIP.indexOf('plate') >= 0 ? 0 : Math.round(s3 * 100) / 100;
+    p3show = s3;   // (while it plays, Plate II's cells go unnamed)
     if (show !== P3.shown) { P3.shown = show; plate3El.style.opacity = show; plate3El.style.visibility = show > 0 ? 'visible' : 'hidden'; }
-    'abcdefg'.split('').forEach(function (k) { var e = P3.els[k], f = k === focusK; if (e.f !== f) { e.f = f; e.g.classList.toggle('is-focus', f); } });
-    attr(P3.title, 'x', 14); attr(P3.title, 'y', (H - 24).toFixed(0)); attr(P3.title, 'opacity', show);
-    if (show <= 0) { P3.pick = null; P3.seed = null; return; }
-
-    // the circuit, over V2
-    var t = reduce ? 1 : clamp((u - U_C0) / (U_C1 - U_C0), 0, 1), E = P3.els;
-    if (s1 > 0) {
-      var m = P3.pick || (P3.pick = pick3(cam));
-      var P = at3(m.P, cam), S = at3(m.S, cam), V6 = at3(m.V6, cam), L = at3(m.L, cam), R = at3(m.R, cam), D = m.D, k = F / (D - cam.z);
-      var bottom = Math.min(H + 20, at3(m.S, cam, WM + 0.45 - m.S.Y).y), wing = 0.2 * k, sF = function (key) { var r = CIRCUIT[key]; return clamp((t - r[0]) / (r[1] - r[0]), 0, 1); };
-      var f;
-      f = sF('a');
-      curve3(stroke3(E.a, 0, 'ex', 'head'), { x: S.x - 14, y: bottom }, S, 12, f, 0);
-      curve3(stroke3(E.a, 1, 'ex', 'head'), { x: V6.x + 22, y: bottom }, V6, -10, f, 0);
-      label3(E.a, S.x + 18, lerp(S.y, bottom, 0.62), f);
-      f = sF('b');
-      curve3(stroke3(E.b, 0, 'ex', 'head'), V6, S, -0.25 * Math.abs(V6.y - S.y), f);
-      curve3(stroke3(E.b, 1, 'inh', 'disc'), V6, { x: S.x - wing, y: S.y + 4 }, -18, f);
-      curve3(stroke3(E.b, 2, 'inh', 'disc'), V6, { x: S.x + wing, y: S.y + 4 }, 18, f);
-      label3(E.b, S.x + wing + 12, S.y + 26, f);
-      f = sF('c');
-      curve3(stroke3(E.c, 0, 'ex', 'head'), S, P, 0.18 * Math.abs(S.y - P.y), f);
-      label3(E.c, Math.max(S.x, P.x) + 16, lerp(S.y, P.y, 0.45), f);
-      f = sF('d');
-      curve3(stroke3(E.d, 0, 'ex', 'head'), L, P, -0.12 * Math.abs(P.x - L.x), f);
-      curve3(stroke3(E.d, 1, 'ex', 'head'), R, P, 0.12 * Math.abs(R.x - P.x), f);
-      var I = { x: P.x, y: P.y + 0.09 * k };   // the small inhibitory cell under it: two against one
-      curve3(stroke3(E.d, 2, 'inh', 'disc'), I, P, 0, f, 3);
-      var rf = stroke3(E.d, 3, 'rf', null), rxL = Math.max(8, (P.x - L.x) / 2 * 0.92), rxR = Math.max(8, (R.x - P.x) / 2 * 0.92), ry = 0.07 * k;
-      var lobes = 'M' + P.x.toFixed(1) + ',' + P.y.toFixed(1) + 'A' + rxL.toFixed(1) + ',' + ry.toFixed(1) + ' 0 1 0 ' + (P.x - 2 * rxL).toFixed(1) + ',' + P.y.toFixed(1) +
-        'A' + rxL.toFixed(1) + ',' + ry.toFixed(1) + ' 0 1 0 ' + P.x.toFixed(1) + ',' + P.y.toFixed(1) +
-        'M' + P.x.toFixed(1) + ',' + P.y.toFixed(1) + 'A' + rxR.toFixed(1) + ',' + ry.toFixed(1) + ' 0 1 1 ' + (P.x + 2 * rxR).toFixed(1) + ',' + P.y.toFixed(1) +
-        'A' + rxR.toFixed(1) + ',' + ry.toFixed(1) + ' 0 1 1 ' + P.x.toFixed(1) + ',' + P.y.toFixed(1);
-      attr(rf.line, 'd', lobes); attr(rf.halo, 'd', ''); attr(rf.line, 'opacity', smooth(0.3, 0.8, f));
-      label3(E.d, P.x - 2 * rxL + 6, P.y - ry - 12, f);
-      f = sF('e');
-      curve3(stroke3(E.e, 0, 'ex', 'head'), P, V6, 0.45 * Math.abs(V6.y - P.y), f);   // round by the left, down through V
-      label3(E.e, Math.min(P.x, V6.x) - 0.3 * Math.abs(V6.y - P.y) - 100, lerp(P.y, V6.y, 0.55), f);
-      f = sF('f');
-      var out = { x: Math.min(W - 40, P.x + 0.32 * W), y: Math.max(PLATE_TOP + 30, P.y - 0.24 * H) };
-      curve3(stroke3(E.f, 0, 'ex', 'head'), P, out, -40, f);
-      label3(E.f, out.x - 70, out.y - 12, f);
-    }
-    ['a', 'b', 'c', 'd', 'e', 'f'].forEach(function (k2) { attr(E[k2].g, 'opacity', s1 > 0 ? 1 : 0); });
-
-    // filling-in, in V4: around a crown whose colour is filling in now, outward from inside, held by its boundary
-    attr(E.g.g, 'opacity', s2 > 0 ? 1 : 0);
-    if (s2 > 0) {
-      var sd = P3.seed;
-      if (!sd || (u - sd[3]) / 0.05 > 1.4) {
-        sd = null;
-        var bestD = 1e9;
-        cortex.planes.forEach(function (pl) {
-          if (pl.D !== 2 && pl.D !== 3) return;
-          pl.chunks.forEach(function (ch) {
-            if (!ch.col) return;
-            ch.col.seeds.forEach(function (q) {
-              var tt = (u - q[3]) / 0.05;
-              if (tt < 0.02 || tt > 0.7) return;
-              var pr = proj(q[0], q[1], pl.D, cam), dd = Math.hypot(pr.x - 0.62 * W, pr.y - 0.4 * H);
-              if (pr.x > 60 && pr.x < W - 60 && pr.y > PLATE_TOP + 40 && dd < bestD) { bestD = dd; sd = [q[0], q[1], q[2], q[3], pl.D]; }
-            });
-          });
-        });
-        P3.seed = sd;
-      }
-      if (sd) {
-        var c0 = proj(sd[0], sd[1], sd[4], cam), cx0 = c0.x, cy0 = c0.y, rr = sd[2] * F / (sd[4] - cam.z), tf = clamp((u - sd[3]) / 0.05, 0, 1), i;
-        var ring = stroke3(E.g, 0, 'rf', null);
-        attr(ring.line, 'd', 'M' + (cx0 + rr).toFixed(1) + ',' + cy0.toFixed(1) + 'A' + rr.toFixed(1) + ',' + rr.toFixed(1) + ' 0 1 1 ' + (cx0 - rr).toFixed(1) + ',' + cy0.toFixed(1) +
-          'A' + rr.toFixed(1) + ',' + rr.toFixed(1) + ' 0 1 1 ' + (cx0 + rr).toFixed(1) + ',' + cy0.toFixed(1));
-        attr(ring.halo, 'd', ''); attr(ring.line, 'opacity', 1);
-        for (i = 0; i < 6; i++) {
-          var an = i / 6 * TAU + 0.3, r0 = rr * 0.12, r1 = rr * (0.2 + 0.62 * easeInOut(tf));
-          curve3(stroke3(E.g, 1 + i, 'ex', 'head'), { x: cx0 + Math.cos(an) * r0, y: cy0 + Math.sin(an) * r0 }, { x: cx0 + Math.cos(an) * r1, y: cy0 + Math.sin(an) * r1 }, 0, 1, 0);
-        }
-        label3(E.g, cx0 + rr + 10, cy0 - rr * 0.6, 1);
-      } else attr(E.g.g, 'opacity', 0);
-    }
+    attr(P3.title, 'x', 14); attr(P3.title, 'y', (H - (W < 600 ? 70 : 24)).toFixed(0)); attr(P3.title, 'opacity', show);   // (on a phone, above the switch)
+    if (show > 0) labelsRes();
   }
 
   // ---------- Plate III, ART: adaptive resonance ----------
@@ -2893,19 +2746,27 @@
   // and the search goes on. The next fits: where what rises and what descends agree, those trees ring together, the
   // others quiet (the matching rule's off-surround; an expectation alone only primes, two against one); and only
   // there, in resonance, is anything learned, which is why nothing old is forgotten.
-  var resEl = document.getElementById('resonance'), circuitEl = document.getElementById('circuit');
-  var U_R0 = 0.72, U_R1 = 0.86;
-  if (resEl) CX_AT = [[U_V1, 0], [U_V2, 2.5], [0.66, 4.6], [U_R0, 5.5], [U_R1, 5.8], [U_REST, 6.9], [1, 7.3]];   // all but still while it plays
-  var R_BU = [1, 2, 4, 5], R_A = [0, 3, 6], R_B = [1, 2, 4, 6];   // which of seven trees: what rises, a wrong guess, the right one
-  var RES = { picks: null };
+  var resEl = document.getElementById('resonance');
+  // which trees: what rises (bu), a wrong guess (a), the right one (b), and the tree each line of lettering is by; seven
+  // trees on a wide screen, five on a narrow one (there are not seven to be had in a phone's view of the wood)
+  var ROLES = {
+    7: { bu: [1, 2, 4, 5], a: [0, 3, 6], b: [1, 2, 4, 6], lab: [1, 3, 3, 6, 2, 5, 4] },
+    5: { bu: [0, 1, 3], a: [2, 4], b: [0, 1, 4], lab: [1, 2, 2, 4, 0, 3, 1] }
+  };
+  var R_BU, R_A, R_B, RES = { picks: null };
   function resT(u) { return clamp((u - U_R0) / (U_R1 - U_R0), 0, 1); }
+  // the trees it plays on: real ones in view, well spread, a little apart on screen
   function pickRes(cam) {
-    var D = 2, den = D - cam.z, list = (cortex.markBy.Pyr || []).filter(function (m) { return m.D === D && m.Y > L_V && m.Y < L_VI; }), out = [];
-    var x0 = cam.wx + (0.1 * W - C.x) * den / F, x1 = cam.wx + (0.9 * W - C.x) * den / F, step = (x1 - x0) / 7;
-    for (var i = 0; i < 7; i++) {
-      var want = x0 + step * (i + 0.5), best = null, bd = Infinity;
-      list.forEach(function (m) { var d = Math.abs(m.x - want); if (d < bd && d < step * 0.5) { bd = d; best = m; } });
-      out.push(best || { x: want, Y: lerp(L_V, L_VI, 0.4), D: D });
+    var n = W < 600 ? 5 : 7, D = 2, den = D - cam.z, k = F / den, r = ROLES[n], i;
+    R_BU = r.bu; R_A = r.a; R_B = r.b; RES.lab = r.lab;
+    var x0 = cam.wx + (0.08 * W - C.x) / k, x1 = cam.wx + (0.92 * W - C.x) / k, list = [];
+    (cortex.markBy.Pyr || []).filter(function (m) { return m.D === D && m.Y > L_II + 0.1 && m.Y < L_VI && m.x > x0 && m.x < x1; })
+      .sort(function (a, b) { return a.x - b.x; })
+      .forEach(function (m) { if (!list.length || (m.x - list[list.length - 1].x) * k > 34) list.push(m); });
+    var out = [];
+    for (i = 0; i < n; i++) {
+      if (list.length >= n) out.push(list[Math.round(i * (list.length - 1) / (n - 1))]);
+      else out.push({ x: lerp(x0, x1, (i + 0.5) / n), Y: lerp(L_V, L_VI, 0.4), D: D });   // (the wood not painted yet: somewhere to stand)
     }
     return out;
   }
@@ -2946,7 +2807,7 @@
     if (on <= 0) { RES.picks = null; return; }
     if (!RES.picks) RES.picks = pickRes(cam);
     var t = reduce ? 1 : resT(u), i, T = [];
-    for (i = 0; i < 7; i++) {
+    for (i = 0; i < RES.picks.length; i++) {
       var m = RES.picks[i], b = proj(m.x, WM + 0.02, m.D, cam), bx = b.x, by = b.y, sm = proj(m.x, m.Y, m.D, cam), sx = sm.x, sy = sm.y, tp = proj(m.x, PIA + 0.06, m.D, cam);
       T.push({ base: { x: bx, y: by }, soma: { x: sx, y: sy }, top: { x: tp.x, y: tp.y } });
     }
@@ -2954,14 +2815,14 @@
     var bu = smooth(0.02, 0.12, t), aIn = smooth(0.22, 0.33, t), aOut = smooth(0.38, 0.41, t), bIn = smooth(0.43, 0.56, t), res = smooth(0.6, 0.68, t), learn = smooth(0.84, 0.92, t);
     var beat = 0.65 + 0.35 * Math.sin(now * 0.0125);   // ringing together, all in time
     // the off-surround: what rose without being expected is quieted
-    if (res > 0) for (i = 0; i < 7; i++) if (has(R_BU, i) && !has(R_B, i)) {
+    if (res > 0) for (i = 0; i < T.length; i++) if (has(R_BU, i) && !has(R_B, i)) {
       var qx = T[i].soma.x, qy = (T[i].top.y + T[i].base.y) / 2, qh = (T[i].base.y - T[i].top.y) * 0.6, sg = ctx.createRadialGradient(qx, qy, 0, qx, qy, qh);
       sg.addColorStop(0, 'rgba(48,52,64,.42)'); sg.addColorStop(0.5, 'rgba(48,52,64,.24)'); sg.addColorStop(1, 'rgba(48,52,64,0)');
       ctx.save(); ctx.translate(qx, qy); ctx.scale(0.22, 1); ctx.translate(-qx, -qy);   // a soft, tall shade over the tree
       ctx.globalAlpha = res * on; ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(qx, qy, qh, 0, TAU); ctx.fill(); ctx.restore(); ctx.globalAlpha = 1;
     }
     ctx.globalCompositeOperation = 'lighter';
-    for (i = 0; i < 7; i++) {
+    for (i = 0; i < T.length; i++) {
       var q = T[i], up = has(R_BU, i), match = has(R_B, i) && up, quiet = up && !has(R_B, i) ? 1 - 0.75 * res : 1;
       // bottom-up: light running up the trunk
       if (up) {
@@ -2984,7 +2845,7 @@
     }
     ctx.globalCompositeOperation = 'source-over';
     // the guesses, coming down
-    for (i = 0; i < 7; i++) {
+    for (i = 0; i < T.length; i++) {
       if (has(R_A, i)) thread(T[i].top, T[i].soma, aIn, on * (1 - aOut) * (t > 0.33 && t < 0.4 ? 0.55 + 0.45 * Math.sin(now * 0.05) : 1), false);
       if (has(R_B, i)) thread(T[i].top, T[i].soma, bIn, on, learn > 0.5 && has(R_BU, i));
     }
@@ -3007,15 +2868,17 @@
     }
     var T = RES.T, t = RES.t || 0, on = resEl && RES.on ? RES.on : 0;
     P3.res.forEach(function (tx, j) {
-      var L = RES_LABELS[j], a = on * smooth(L[2], L[2] + 0.04, t) * (1 - smooth(L[3], L[3] + 0.04, t)), x = 0, y = 0;
+      var L = RES_LABELS[j], f = L[0] === focusK, a = on * smooth(L[2], L[2] + 0.04, t) * (1 - smooth(L[3], L[3] + 0.04, t)), x = 0, y = 0;
+      if (tx._f !== f) { tx._f = f; tx.classList.toggle('is-focus', f); }   // named from the legend: in plum
       if (T && a > 0) {
-        var q = j === 0 ? T[1] : j === 1 || j === 2 ? T[3] : j === 3 ? T[6] : j === 4 ? T[2] : j === 5 ? T[5] : T[4];
+        var q = T[RES.lab[j]];
         if (j === 0) { x = q.soma.x + 16; y = lerp(q.soma.y, q.base.y, 0.5); }
         else if (j < 4) { x = q.top.x + 12; y = q.top.y - 0.12 * H; }
         else if (j === 4) { x = q.top.x + 14; y = q.top.y + 0.05 * H; }
         else if (j === 5) { x = q.soma.x + 14; y = q.soma.y + 0.06 * H; }
         else { x = q.top.x + 12; y = q.top.y - 0.06 * H; }
-        x = Math.min(x, W - 300); y = clamp(y, PLATE_TOP + 24, H - 40);
+        tx._w = tx._w || tx.getComputedTextLength();
+        x = clamp(x, 8, W - tx._w - 10); y = clamp(y, PLATE_TOP + 24, H - 40);   // (on screen, however narrow)
       }
       attr(tx, 'x', x.toFixed(1)); attr(tx, 'y', y.toFixed(1)); attr(tx, 'opacity', Math.round(a * 100) / 100);
     });
@@ -3072,7 +2935,7 @@
   // The forest ends where its plate's folded legend comes in (opened, it scrolls on without moving the camera). The
   // journey after it carries the camera on to the cortex, and from there each part of the page has its place in it.
   var journeyEl = document.getElementById('journey');
-  var STOPS = [['how', 0.85, U_V1], ['model', 0.4, U_V2], ['circuit', 0.35, U_C0], ['evidence', 0.75, U_C1], ['markets', 0.4, U_V4], ['contact', 0.4, U_REST]];
+  var STOPS = [['how', 0.85, U_V1], ['evidence', 0.4, U_V2], ['science', 0.45, 0.66], ['resonance', 0.3, U_R0], ['contact', 0.4, U_REST]];
   // (a page can set its own: data-u, where in the way on an element comes in, and data-at, how far up the screen then)
   var pageStops = document.querySelectorAll('[data-u]');
   if (pageStops.length) STOPS = Array.prototype.map.call(pageStops, function (el) { return [el, parseFloat(el.getAttribute('data-at') || 0.5), parseFloat(el.getAttribute('data-u'))]; });
@@ -3101,7 +2964,7 @@
     var target = fixedP != null ? fixedP : scrollP();
     if (reduce) {
       // no flight: fade between the eye, the forest, and the cortex's areas, each as its part of the page comes in
-      var at = [0, 1, 1 + U_V1, 1 + U_V2, 1 + U_C1, 1 + U_V4, 1 + U_REST], i;
+      var at = [0, 1, 1 + U_V1, 1 + U_V2, 1 + U_V4, 1 + U_R1, 1 + U_REST], i;
       for (i = at.length - 1; i > 0 && target < (i === 1 ? 0.5 : at[i] - 0.02); i--);
       target = at[i];
       if (shown === null) { shown = target; p = target; }
@@ -3135,14 +2998,14 @@
       iris.tx = Math.cos(a) * MAX_X * kk; iris.ty = Math.sin(a) * MAX_Y * kk;
       iris.wanderAt = now + 1600 + Math.random() * 1800;
     }
-    // Beckoning. Whenever we stop where no page is over the scene (on the way in, on the journey, in Plate III's pause),
+    // Beckoning. Whenever we stop where no page is over the scene (on the way in, on the journey, in the resonance's pause),
     // the cue says to keep scrolling; and at the very top,
     // left alone a few seconds, the eye glances down at it and the camera leans in towards the pupil and back, a taste of
     // what scrolling does. (Someone on a phone once scrolled a little, met the cookie question, and never went in.)
     var idle = now - lastInput, top = p < 0.008;
     if (cueEl) {
       if (cueText && cueText._top !== top) { cueText._top = top; cueText.textContent = top ? 'scroll to look inside' : 'keep scrolling'; }
-      var bare2 = p < P_CUT - 0.02 || (p > 1 + U_DARK && p < 1 + U_V1 - 0.03) || (p > 1 + U_C0 && p < 1 + U_C1 - 0.01);   // no page over the scene: the way in, the journey, the pause
+      var bare2 = p < P_CUT - 0.02 || (p > 1 + U_DARK && p < 1 + U_V1 - 0.03) || (p > 1 + U_R0 && p < 1 + U_R1 - 0.01);   // no page over the scene: the way in, the journey, the pause
       fade(cueEl, fixedP == null && bare2 && (top || idle > 1600) ? 1 : 0);
     }
     var phase = (idle - 3500) % 6500 / 1700, tz = !reduce && fixedP == null && top && idle > 3500 && phase < 1 ? Math.sin(Math.PI * phase) : 0;
@@ -3352,8 +3215,8 @@
   // All of it follows one number (--kzt), moved on with time once the panel comes up the screen, and with the scroll
   // when that is faster: however quickly we go, it is done by the time the panel reaches the top quarter.
   (function () {
-    var NS = 'http://www.w3.org/2000/svg', panels = [], named = document.querySelectorAll('[data-kz]');   // (a page may name its own)
-    (named.length ? Array.prototype.slice.call(named) : ['model', 'evidence', 'markets', 'name', 'team', 'contact']).forEach(function (id) {
+    var NS = 'http://www.w3.org/2000/svg', panels = [], named = document.querySelectorAll('[data-kz]');   // (the page names them)
+    Array.prototype.forEach.call(named, function (id) {
       var sec = typeof id === 'string' ? document.getElementById(id) : id, wrap = sec && sec.querySelector(':scope > .wrap');
       if (!wrap) return;
       sec.classList.add('kz');

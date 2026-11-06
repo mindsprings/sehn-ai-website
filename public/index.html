@@ -93,7 +93,7 @@
     /* the way on from the retina to the cortex: no page over it, just the scroll that carries the camera */
     .journey { position: relative; height: 220vh; }
     /* a pause in the page, for Plate III to be drawn */
-    .breath { position: relative; height: 90vh; }
+    .breath { position: relative; height: 130vh; }   /* the pause where adaptive resonance plays out */
 
     /* at the end of each part, its plate's lower margin: the scene fades into paper, and a folded explanation of the plate */
     .plate-legend { position: relative; z-index: 2; padding: 9vh 16px 28px; color: #1E1612;
@@ -182,20 +182,42 @@
     @media (max-width: 720px) { .kz > .wrap { --kzi: 9px; } }
     @media (prefers-reduced-motion: reduce) { .kz-marks { display: none; } .kz > .wrap { --kzt: 1 !important; } }
 
-    /* Plate III: Grossberg's circuit over the wood, in his notation: arrows excite, round ends inhibit */
-    .plate3 .halo3 { fill: none; stroke: rgba(246, 236, 214, .7); stroke-width: 6.5; stroke-linecap: round; }
-    .plate3 .ex, .plate3 .inh { fill: none; stroke-width: 2.3; stroke-linecap: round; }
-    .plate3 .ex { stroke: #8E2F55; }
-    .plate3 .inh { stroke: #3F5170; }
-    .plate3 .head { fill: #8E2F55; }
-    .plate3 .disc { fill: #3F5170; stroke: rgba(246, 236, 214, .8); stroke-width: 2; }
-    .plate3 .rf { fill: none; stroke: #8E2F55; stroke-width: 2.6; stroke-dasharray: .1 7; stroke-linecap: round; }
+    /* Plate III: adaptive resonance, after Grossberg, lettered over the wood (the glow is drawn on the canvas) */
     .plate3 .lab { font-size: 15px; font-style: italic; }
     .plate3 .lab .k { font-style: normal; font-size: 17px; }
     .plate3 .ttl { font-size: 17px; }
-    .plate3 g.is-focus .ex, .plate3 g.is-focus .rf { stroke: #C9587C; }
-    .plate3 g.is-focus .head { fill: #C9587C; }
-    .plate3 g.is-focus text { fill: #8E2F55; }
+    .plate3 text.is-focus { fill: #8E2F55; }
+
+    /* the page as a plate's captions: narrow, set beside the scene rather than over it, each with its card */
+    .cap-row { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 29rem) minmax(0, 34rem); justify-content: space-between; align-items: center;
+      gap: 4vw; max-width: 1240px; margin: 0 auto; padding: 22vh 4vw; min-height: 100vh; }
+    .cap-row--right { grid-template-columns: minmax(0, 34rem) minmax(0, 29rem); }
+    .cap-row--right > .cap { order: 2; }
+    .cap { position: relative; }
+    .cap > .wrap { max-width: none; margin: 0; padding: 30px 32px 26px; border-radius: 6px; background: rgba(246, 240, 227, .9);
+      box-shadow: 0 1px 0 rgba(59, 42, 30, .08), 0 30px 60px -34px rgba(40, 16, 10, .55); }
+    .cap .eyebrow { margin-bottom: 10px; }
+    .cap h2 { font-size: clamp(26px, 2.6vw, 36px); line-height: 1.12; margin-bottom: 14px; }
+    .cap p { font-size: 16.5px; line-height: 1.55; color: var(--ink-2); margin: 0 0 10px; }
+    .cap .cap-small { font-size: 14.5px; }
+    .cap .honest { font-size: 14.5px; margin-top: 12px; }
+    .cap.kz > .wrap { background: none; box-shadow: none; }
+    .cap--plum > .wrap { background: rgba(110, 42, 71, .93); }
+    .cap--plum p, .cap--plum h2 { color: var(--on-dark); }
+    .cap--plum a { color: var(--rose); }
+    .cap--plum.kz > .wrap { --kz-paper: rgba(110, 42, 71, .93); }
+    .cap-card--chart { background: rgba(10, 17, 29, .88); color: var(--on-dark); border-radius: 6px; padding: 26px 28px; }
+    .cap-card--chart .chart-title { font-size: 20px; margin-bottom: 18px; }
+    .cap-card--chart .chart { gap: 16px; }
+    .cap-card--chart .chart__row { grid-template-columns: 1fr auto; gap: 6px 14px; align-items: center; }   /* the chart, made to fit a card */
+    .cap-card--chart .chart__label { grid-column: 1 / -1; }
+    .cap-card--chart .chart__track { width: 100%; height: 22px; }
+    .cap-card--chart .chart-note { margin-top: 16px; font-size: 14.5px; }
+    .cap .honest { color: var(--ink-2); border-color: rgba(59, 42, 30, .35); }
+    @media (max-width: 860px) {
+      .cap-row, .cap-row--right { grid-template-columns: 1fr; padding: 14vh 16px; gap: 18px; min-height: 0; }
+      .cap-row--right > .cap { order: 0; }
+    }
 
     .hud { position: fixed; top: 76px; left: 8px; z-index: 60; margin: 0; padding: 6px 8px; font: 12px/1.35 ui-monospace, monospace; color: #CFE; background: rgba(0, 0, 0, .55); border-radius: 6px; pointer-events: none; }
   </style>
@@ -237,7 +259,7 @@
         <a href="#problem">The problem</a>
         <a href="#how">How it works</a>
         <a href="#evidence">Evidence</a>
-        <a href="#team">Team</a>
+        <a href="#science">The science</a>
       </nav>
       <a class="btn btn--rose btn--small" href="#contact">Get an API key</a>
     </div>
@@ -279,18 +301,16 @@
       </div>
     </section>
 
-    <!-- The problem -->
-    <section class="section section--light" id="problem" aria-labelledby="problem-title">
-      <div class="wrap">
-        <div class="split-head reveal">
-          <div>
-            <p class="eyebrow" data-n="I">The problem</p>
-            <h2 id="problem-title">An LLM doesn’t see an image. It reads a list of patches.</h2>
-          </div>
-          <p class="lead">Today’s models talk brilliantly about pictures. Yet they stumble on spatial tasks a small child solves at a glance. Try one yourself.</p>
+    <!-- I. The problem: a caption beside the forest, and the puzzle pinned on the other side -->
+    <section class="cap-row" id="problem" aria-labelledby="problem-title">
+      <div class="cap">
+        <div class="wrap">
+          <p class="eyebrow" data-n="I">The problem</p>
+          <h2 id="problem-title">An LLM doesn’t see an image. It reads a list of patches.</h2>
+          <p>A three-year-old follows the line with their eyes. A vision model cuts the picture into patches first, so a line across many of them is no longer one line, and it has to guess. Try it.</p>
         </div>
-
-        <div class="puzzle-layout">
+      </div>
+      <div class="cap-card">
           <div class="puzzle-card reveal" id="puzzle-card">
             <span class="tape" aria-hidden="true"></span>
             <div class="puzzle" id="puzzle">
@@ -324,14 +344,6 @@
             </div>
             <p class="puzzle-feedback" id="puzzle-feedback" aria-live="polite">Tap the box where line A ends.</p>
           </div>
-
-          <div class="problem-side reveal d2">
-            <p class="lead">A three-year-old simply follows the line with their eyes.</p>
-            <p class="lead">A vision model first cuts the picture into a grid of small patches and turns each one into numbers. A line that runs across many patches is no longer one line, so the model has to guess where it goes.</p>
-            <p class="lead">The same blind spot shows up everywhere: what is in front of what, what connects to what, where there is room to move.</p>
-            <p class="note" aria-hidden="true"><svg viewBox="0 0 46 30" style="transform:scaleX(-1) rotate(-20deg)"><use href="#arrow"/></svg>go on, pick a box</p>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -359,44 +371,16 @@
       <p class="visually-hidden">Scrolling on, the camera rises out of the forest's roof and over the retina, where every nerve fibre, drawn in rose, flows to the blind spot, a pale lake, and drops into it. Alongside the optic nerve, a cable of fibres beaded with white myelin; then the chiasm from above, where the other eye's nerve comes in, in teal, and half the fibres cross. Up through the lateral geniculate nucleus, six bent layers striped by eye, with the optic radiation fanning upwards into white, and out of the white into the visual cortex: a birch wood in snow.</p>
     </div>
 
-    <!-- How it works -->
-    <section class="section section--light section--tight-top" id="how" aria-labelledby="how-title">
-      <div class="wrap">
-        <div class="split-head reveal">
-          <div>
-            <p class="eyebrow" data-n="II">How it works</p>
-            <h2 id="how-title">One sentence, and your agent can see.</h2>
-          </div>
-          <p class="lead">sehn.ai is an MCP service. Tell your agent to use the tools at sehn.ai, and it gains a sense of space it did not have before.</p>
+    <!-- II. How it works, over V1 -->
+    <section class="cap-row cap-row--right" id="how" data-u="0.31" data-at="0.85" aria-labelledby="how-title">
+      <div class="cap">
+        <div class="wrap">
+          <p class="eyebrow" data-n="II">How it works</p>
+          <h2 id="how-title">One sentence, and your agent can see.</h2>
+          <p>sehn.ai is an MCP service. Bring the agent you already use, tell it to “use the tools at sehn.ai”, and it answers questions about shape, position and connection that it couldn’t before.</p>
         </div>
-
-        <div class="how">
-          <ol class="steps-v reveal">
-            <li>
-              <span class="num">I.</span>
-              <div>
-                <h3>Any agent</h3>
-                <p>Bring the agent you already use.</p>
-                <ul class="chips"><li class="chip">Claude</li><li class="chip">GPT</li><li class="chip">Gemini</li><li class="chip">Any agent</li></ul>
-              </div>
-            </li>
-            <li>
-              <span class="num">II.</span>
-              <div>
-                <h3>The sehn.ai MCP server</h3>
-                <p class="quote">“use the tools at sehn.ai”</p>
-                <ul class="chips"><li class="chip">Paths, connections</li><li class="chip chip--soon">More coming</li></ul>
-              </div>
-            </li>
-            <li>
-              <span class="num">III.</span>
-              <div>
-                <h3>New answers</h3>
-                <p>About shape, position and connection, that it could not give before.</p>
-              </div>
-            </li>
-          </ol>
-
+      </div>
+      <div class="cap-card">
           <div class="chat-wrap reveal d2">
             <p class="note" aria-hidden="true">flip the switch<svg viewBox="0 0 46 30" style="transform:rotate(60deg)"><use href="#arrow"/></svg></p>
             <div class="chat" id="chat">
@@ -413,48 +397,24 @@
               </div>
             </div>
           </div>
-        </div>
       </div>
-
       <!-- pictures the user "sends" in the chat demo -->
       <template id="thumb-trace"><svg viewBox="0 0 480 300" aria-hidden="true"><use href="#puz"/></svg></template>
       <template id="thumb-front"><svg viewBox="0 0 220 124" aria-hidden="true"><path d="M8,6 Q110,4 212,7 Q214,62 212,118 Q110,120 8,118 Q6,62 8,6 Z" fill="#FFFDF7" stroke="#3B2A1E" stroke-width="2"/><rect x="22" y="30" width="62" height="8" rx="4" fill="#3B2A1E" opacity=".75"/><rect x="22" y="46" width="176" height="24" rx="5" fill="#F3E3C6" stroke="#3B2A1E" stroke-width="2"/><rect x="48" y="20" width="74" height="26" rx="9" fill="#8E2F55" stroke="#3B2A1E" stroke-width="2"/><rect x="22" y="82" width="46" height="8" rx="4" fill="#3B2A1E" opacity=".75"/><rect x="22" y="96" width="176" height="14" rx="5" fill="#F3E3C6" stroke="#3B2A1E" stroke-width="2"/></svg></template>
       <template id="thumb-pipe"><svg viewBox="0 0 220 124" aria-hidden="true"><path d="M8,6 Q110,4 212,7 Q214,62 212,118 Q110,120 8,118 Q6,62 8,6 Z" fill="#F3E3C6" stroke="#3B2A1E" stroke-width="2"/><g fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22,24 L140,24 Q152,24 152,36 L152,106" stroke="#3B2A1E" stroke-width="4"/><path d="M22,100 L58,100 Q70,100 70,88 L70,50 Q70,42 78,42 L170,42 Q178,42 178,50 L178,62 L184,62" stroke="#F3E3C6" stroke-width="11"/><path d="M22,100 L58,100 Q70,100 70,88 L70,50 Q70,42 78,42 L170,42 Q178,42 178,50 L178,62 L184,62" stroke="#3B2A1E" stroke-width="4"/><path d="M22,62 L98,62 Q110,62 110,74 L110,106" stroke="#F3E3C6" stroke-width="11"/><path d="M22,62 L98,62 Q110,62 110,74 L110,106" stroke="#3B2A1E" stroke-width="4"/></g><g fill="#F7DDE5" stroke="#3B2A1E" stroke-width="2"><circle cx="20" cy="24" r="6"/><circle cx="20" cy="62" r="6"/><circle cx="20" cy="100" r="6"/></g><path d="M184,52 L206,72 L206,52 L184,72 Z" fill="#E9C9A0" stroke="#3B2A1E" stroke-width="2" stroke-linejoin="round"/></svg></template>
     </section>
 
-    <!-- What we model -->
-    <section class="section section--light section--tight-top" id="model" aria-labelledby="model-title">
-      <div class="wrap">
-        <div class="split-head reveal">
-          <div>
-            <p class="eyebrow" data-n="III">Grounded in neuroscience</p>
-            <h2 id="model-title">Built on how the brain sees space</h2>
-          </div>
-          <p class="lead">Our tools draw on decades of vision neuroscience, and give an LLM the sense of space it can’t get from a list of patches.</p>
-        </div>
-        <div class="status reveal">
-          <div class="status__now"><b>Working now</b>path tracing, 87% on 200 unseen mazes</div>
-          <div class="status__next"><b>More coming</b>new skills, each tested on puzzles it never saw</div>
+    <!-- III. First evidence, over V2's old wood -->
+    <section class="cap-row" id="evidence" data-u="0.5" data-at="0.4" aria-labelledby="evidence-title">
+      <div class="cap" data-kz>
+        <div class="wrap">
+          <p class="eyebrow" data-n="III">First evidence</p>
+          <h2 id="evidence-title">Agents trace paths they couldn’t before.</h2>
+          <p>200 new mazes, none of them used to build or tune the tools; the analysis written down before the run.</p>
+          <p class="honest"><b>Held up on its first real test</b>79% even on maze styles we never built on. Weaker on unusual rendering styles. One task family so far.</p>
         </div>
       </div>
-    </section>
-
-    <!-- a pause: Plate III, Grossberg's circuit, is drawn over the wood -->
-    <div class="breath" id="circuit">
-      <p class="visually-hidden">Plate III, after Stephen Grossberg: over the birches of V2, his laminar circuit is drawn in, one connection at a time. Input comes in from below to layer IV and layer VI; layer VI primes the cells of IV it lines up with and quiets their neighbours; IV passes the signal up to layers II and III, where long horizontal fibres complete a boundary inward between two cells that see the same line; the chosen grouping feeds back down through VI to IV; and the result goes on to the next area, V4.</p>
-    </div>
-
-    <!-- First evidence -->
-    <section class="section section--dark-left evidence" id="evidence" aria-labelledby="evidence-title">
-      <div class="edge edge--top" aria-hidden="true"></div>
-      <div class="wrap">
-        <div class="split-head reveal">
-          <div>
-            <p class="eyebrow" data-n="IV">First evidence</p>
-            <h2 id="evidence-title">With sehn.ai, agents trace paths they couldn’t before.</h2>
-          </div>
-          <p class="lead">200 new mazes: which entrance reaches the exit? None of them were used to build or tune the tools, and the analysis was written down before the run.</p>
-        </div>
+      <div class="cap-card cap-card--chart">
         <h3 class="chart-title reveal" id="chart-title">Claude Haiku 5.5 on 200 new mazes our tools never saw</h3>
         <ul class="chart reveal" aria-labelledby="chart-title">
           <li class="chart__row">
@@ -474,221 +434,38 @@
           </li>
         </ul>
         <p class="chart-note reveal">Guessing scores 30%.</p>
-        <div class="evidence__foot reveal">
-          <p class="honest"><b>Held up on its first real test</b>79% even on maze styles we never built on. Weaker on unusual rendering styles. One task family so far.</p>
-        </div>
       </div>
-      <div class="edge edge--bottom" aria-hidden="true"></div>
     </section>
 
-    <!-- Markets -->
-    <section class="section section--light" id="markets" aria-labelledby="markets-title">
-      <div class="wrap">
-        <div class="split-head reveal">
-          <div>
-            <p class="eyebrow" data-n="V">Where it matters</p>
-            <h2 id="markets-title">One way of seeing, many markets</h2>
-          </div>
-          <p class="lead">The same sense of space helps wherever a machine has to understand a room, a drawing, a face or a screen.</p>
-        </div>
-        <div class="markets">
-          <article class="market reveal">
-            <span class="tape" aria-hidden="true"></span>
-            <svg viewBox="0 0 160 100" aria-hidden="true">
-              <path d="M8,8 Q80,5 152,9 Q155,50 152,92 Q80,95 8,92 Q5,50 8,8 Z" fill="#F3E3C6" stroke="#3B2A1E" stroke-width="2.5" stroke-linejoin="round"/>
-              <path d="M50,16 Q62,14 74,17 L73,46 Q62,48 51,46 Z" fill="#E9C9A0" stroke="#3B2A1E" stroke-width="2" stroke-linejoin="round"/>
-              <path d="M96,14 Q112,12 127,15 L126,33 Q111,35 97,33 Z" fill="#E9C9A0" stroke="#3B2A1E" stroke-width="2" stroke-linejoin="round"/>
-              <path d="M92,66 Q92,52 106,52 Q120,52 119,66 Q118,80 105,80 Q92,80 92,66 Z" fill="#F7DDE5" stroke="#3B2A1E" stroke-width="2"/>
-              <path d="M52,76 Q56,68 66,70 Q72,76 66,84 Q56,86 52,76 Z" fill="#E9C9A0" stroke="#3B2A1E" stroke-width="2"/>
-              <path d="M36,70 Q58,66 70,58 Q84,48 100,44 Q118,40 132,50" fill="none" stroke="#8E2F55" stroke-width="2.5" stroke-dasharray="4 5" stroke-linecap="round"/>
-              <path d="M136,54 L136,28" fill="none" stroke="#3B2A1E" stroke-width="2.5" stroke-linecap="round"/>
-              <path d="M136,28 Q143,30 147,33 Q142,36 136,38 Z" fill="#8E2F55" stroke="#3B2A1E" stroke-width="1.5" stroke-linejoin="round"/>
-              <path d="M24,52 L24,46" stroke="#3B2A1E" stroke-width="2" stroke-linecap="round"/>
-              <circle cx="24" cy="45" r="2.2" fill="#8E2F55"/>
-              <path d="M17,52 Q24,49 31,52 L31,60 Q24,62 17,60 Z" fill="#F7DDE5" stroke="#3B2A1E" stroke-width="2" stroke-linejoin="round"/>
-              <circle cx="21.5" cy="56" r="1.3" fill="#3B2A1E"/><circle cx="26.5" cy="56" r="1.3" fill="#3B2A1E"/>
-              <path d="M14,63 Q24,61 34,63 L34,80 Q24,82 14,80 Z" fill="#E7A1B6" stroke="#3B2A1E" stroke-width="2" stroke-linejoin="round"/>
-            </svg>
-            <h3>Robotics</h3>
-            <p>A free path through a cluttered room.</p>
-          </article>
-          <article class="market reveal d1">
-            <span class="tape" aria-hidden="true"></span>
-            <svg viewBox="0 0 160 100" aria-hidden="true">
-              <path d="M8,8 Q80,5 152,9 Q155,50 152,92 Q80,95 8,92 Q5,50 8,8 Z" fill="#F3E3C6" stroke="#3B2A1E" stroke-width="2.5" stroke-linejoin="round"/>
-              <g stroke="#E9C9A0" stroke-width="1.2"><path d="M40,10 L40,90"/><path d="M80,10 L80,90"/><path d="M120,10 L120,90"/><path d="M10,36 L150,36"/><path d="M10,64 L150,64"/></g>
-              <g fill="none" stroke="#3B2A1E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14,26 L56,26 Q66,26 66,36 L66,86"/>
-                <path d="M30,86 L30,50 Q30,42 38,42 L86,42"/>
-                <path d="M106,86 L106,62 Q106,54 114,54 L146,54"/>
-              </g>
-              <path d="M60,55 L72,65 L72,55 L60,65 Z" fill="#E9C9A0" stroke="#3B2A1E" stroke-width="1.5" stroke-linejoin="round"/>
-              <path d="M14,72 L84,72 Q94,72 94,62 L94,28 Q94,18 104,18 L144,18" fill="none" stroke="#8E2F55" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <circle cx="14" cy="72" r="4.5" fill="#E7A1B6" stroke="#3B2A1E" stroke-width="1.5"/>
-              <circle cx="144" cy="18" r="4.5" fill="#8E2F55" stroke="#3B2A1E" stroke-width="1.5"/>
-            </svg>
-            <h3>Engineering firms</h3>
-            <p>Follow a pipe or wire through a drawing.</p>
-          </article>
-          <article class="market reveal d2">
-            <span class="tape" aria-hidden="true"></span>
-            <svg viewBox="0 0 160 100" aria-hidden="true">
-              <path d="M28,6 Q90,4 152,7 Q154,44 152,80 Q90,82 28,80 Q26,44 28,6 Z" fill="#E9C9A0" stroke="#3B2A1E" stroke-width="1.5" stroke-dasharray="4 4" stroke-linejoin="round"/>
-              <path d="M8,20 Q70,18 132,21 Q134,58 132,94 Q70,96 8,94 Q6,58 8,20 Z" fill="#F3E3C6" stroke="#3B2A1E" stroke-width="2.5" stroke-linejoin="round"/>
-              <path d="M14,78 Q70,74 126,78" fill="none" stroke="#3B2A1E" stroke-width="2" stroke-linecap="round"/>
-              <path d="M74,40 Q90,38 106,40 L106,74 Q90,76 74,74 Z" fill="#E9C9A0" stroke="#3B2A1E" stroke-width="2" stroke-linejoin="round"/>
-              <ellipse cx="66" cy="80" rx="16" ry="3" fill="#E9C9A0"/>
-              <circle cx="62" cy="62" r="16" fill="#E7A1B6" stroke="#3B2A1E" stroke-width="2"/>
-              <circle cx="56" cy="56" r="4" fill="#F7DDE5"/>
-              <path d="M118,26 Q119.5,32 125,33 Q119.5,34 118,40 Q116.5,34 111,33 Q116.5,32 118,26 Z" fill="#8E2F55"/>
-            </svg>
-            <h3>Image &amp; video generation</h3>
-            <p>Surfaces and depth that stay consistent.</p>
-          </article>
-          <article class="market reveal d3">
-            <span class="tape" aria-hidden="true"></span>
-            <svg viewBox="0 0 160 100" aria-hidden="true">
-              <path d="M8,8 Q80,5 152,9 Q155,50 152,92 Q80,95 8,92 Q5,50 8,8 Z" fill="#F3E3C6" stroke="#3B2A1E" stroke-width="2.5" stroke-linejoin="round"/>
-              <path d="M38,92 Q44,76 68,76 Q92,76 98,92 Z" fill="#E7A1B6" stroke="#3B2A1E" stroke-width="2" stroke-linejoin="round"/>
-              <path d="M48,44 Q48,16 68,16 Q88,16 88,44 Q88,70 68,72 Q48,70 48,44 Z" fill="#F7DDE5" stroke="#3B2A1E" stroke-width="2"/>
-              <path d="M46,42 Q42,12 68,10 Q96,10 90,44 Q86,26 70,24 Q54,24 46,42 Z" fill="#E9C9A0" stroke="#3B2A1E" stroke-width="2" stroke-linejoin="round"/>
-              <circle cx="60" cy="42" r="2" fill="#3B2A1E"/><circle cx="76" cy="42" r="2" fill="#3B2A1E"/>
-              <g fill="#E9C9A0" stroke="#3B2A1E" stroke-width="2">
-                <rect x="70" y="50" width="8" height="22" rx="4"/>
-                <rect x="79" y="46" width="8" height="24" rx="4"/>
-                <rect x="88" y="48" width="8" height="22" rx="4"/>
-                <rect x="97" y="54" width="8" height="18" rx="4"/>
-                <path d="M68,68 Q68,62 76,62 L102,62 Q108,62 108,70 L106,86 Q104,92 92,92 L80,92 Q70,92 68,86 Z" stroke-linejoin="round"/>
-                <path d="M70,80 Q58,74 56,67 Q55,61 60,62 Q66,66 72,72" stroke-linecap="round" stroke-linejoin="round"/>
-              </g>
-              <path d="M128,22 Q129.5,28 135,29 Q129.5,30 128,36 Q126.5,30 121,29 Q126.5,28 128,22 Z" fill="#E7A1B6" stroke="#3B2A1E" stroke-width="1.2"/>
-            </svg>
-            <h3>Live avatars</h3>
-            <p>A hand in front of a face, an object held up.</p>
-          </article>
-          <article class="market reveal d4">
-            <span class="tape" aria-hidden="true"></span>
-            <svg viewBox="0 0 160 100" aria-hidden="true">
-              <path d="M6,22 Q80,19 154,22 L154,78 Q80,81 6,78 Z" fill="#E9C9A0" stroke="#3B2A1E" stroke-width="2.5" stroke-linejoin="round"/>
-              <path d="M12,28 L150,28" stroke="#3B2A1E" stroke-width="4" stroke-dasharray="5 9"/>
-              <path d="M12,72 L150,72" stroke="#3B2A1E" stroke-width="4" stroke-dasharray="5 9"/>
-              <g fill="#F3E3C6" stroke="#3B2A1E" stroke-width="2" stroke-linejoin="round">
-                <path d="M14,35 Q33,34 52,35 L52,65 Q33,66 14,65 Z"/>
-                <path d="M61,35 Q80,34 99,35 L99,65 Q80,66 61,65 Z"/>
-                <path d="M108,35 Q127,34 146,35 L146,65 Q127,66 108,65 Z"/>
-              </g>
-              <path d="M26,57 Q50,30 80,43 Q108,54 130,52" fill="none" stroke="#8E2F55" stroke-width="2.5" stroke-dasharray="3 5" stroke-linecap="round"/>
-              <circle cx="26" cy="57" r="5" fill="#E7A1B6" stroke="#3B2A1E" stroke-width="1.5"/>
-              <circle cx="80" cy="43" r="5" fill="#E7A1B6" stroke="#3B2A1E" stroke-width="1.5"/>
-              <circle cx="130" cy="52" r="5" fill="#E7A1B6" stroke="#3B2A1E" stroke-width="1.5"/>
-            </svg>
-            <h3>Live video</h3>
-            <p>Follow what moves and connects across frames.</p>
-          </article>
+    <!-- IV. The science, over V4: Adaptive Resonance Theory -->
+    <section class="cap-row cap-row--right" id="science" data-u="0.66" data-at="0.45" aria-labelledby="science-title">
+      <div class="cap" data-kz>
+        <div class="wrap">
+          <p class="eyebrow" data-n="IV">The science</p>
+          <h2 id="science-title">Built on adaptive resonance.</h2>
+          <p>In Stephen Grossberg’s Adaptive Resonance Theory, seeing is a loop, not a pipeline. What the eye brings in is matched against what the brain expects. Where the two agree, the circuit resonates, and only then does it learn. So it can learn something new without forgetting what it knew, and it can tell when something doesn’t fit.</p>
+          <p>sehn is inspired by ART (Adaptive Resonance Theory) and builds on its principles and models.</p>
         </div>
       </div>
     </section>
 
-    <!-- The name -->
-    <section class="section section--light section--tight-top" id="name" aria-labelledby="name-title">
-      <div class="wrap">
-        <div class="name-grid reveal">
-          <div class="name-text">
-            <p class="eyebrow" data-n="VI">The name</p>
-            <h2 id="name-title">Why we call it sehn</h2>
-          </div>
-          <div class="name-text">
-            <p class="big"><em>sehn</em> means “to see” in Austrian German.</p>
-            <p>Diana is Austrian. For her, seeing is the most important part of a good life, and she loves that agents and LLMs can learn to see. Anton’s passion has always been vision: how we see, and how a machine could see the same way.</p>
-            <p>Both have loved Magic Eye pictures since they were children. A flat pattern, and suddenly depth appears. That moment is what we give to AI.</p>
-          </div>
-        </div>
-        <div class="polaroid-wrap">
-          <figure class="polaroid reveal" style="margin:0">
-            <span class="tape" aria-hidden="true"></span><span class="tape" aria-hidden="true"></span>
-            <div class="stereo" id="stereo" tabindex="0" aria-label="Autostereogram, scrolls sideways on small screens">
-              <div class="stereo__inner">
-                <div class="stereo__dots" aria-hidden="true"><i></i><i></i></div>
-                <img src="assets/brand/sehn-magic-eye.png" width="1200" height="760" loading="lazy" decoding="async"
-                     alt="Autostereogram in plum, rose and cream dots; with relaxed eyes a hidden word floats out in 3D.">
-                <div class="stereo__answer" aria-hidden="true">sehn</div>
-              </div>
-            </div>
-            <p class="stereo-scroll-hint" aria-hidden="true">← swipe to see the whole picture →</p>
-            <figcaption class="stereo-controls">
-              <p>Try it: look <em>through</em> the picture, as if at something far behind it. One word floats out. When the two dots turn into three, you’re close.</p>
-              <button class="btn btn--plum btn--small" type="button" id="peek">Hold to peek</button>
-            </figcaption>
-          </figure>
-          <details class="howto">
-            <summary>How to see it</summary>
-            <p>Bring your face close to the screen, so the picture is a blur. Then slowly lean back with relaxed eyes, as if you were looking at a distant point behind the screen. Give it 10 to 30 seconds.</p>
-          </details>
-        </div>
-      </div>
-    </section>
+    <!-- a pause: Plate III, adaptive resonance, plays out in the wood -->
+    <div class="breath" id="resonance" data-u="0.72" data-at="0.3">
+      <p class="visually-hidden">Plate III, after Stephen Grossberg: adaptive resonance, in the golden wood of V4. Light rises up the trunks of some birches, what the eye brings. A first expectation comes down from above onto other trees: it does not match, and with a flash it is reset. A second comes down: where it meets the rising light, those trees ring together, glowing in time, while the tree that was lit but not expected is quieted. Only then do the threads of expectation turn solid gold: learned.</p>
+    </div>
 
-    <!-- Team -->
-    <section class="section section--light section--tight-top" id="team" aria-labelledby="team-title">
-      <div class="wrap">
-        <div class="split-head reveal">
-          <div>
-            <p class="eyebrow" data-n="VII">Team</p>
-            <h2 id="team-title">The two people behind sehn</h2>
-          </div>
-          <p class="lead">A clinical psychologist with a computer-science background, and an engineer who builds brain-inspired vision systems.</p>
-        </div>
-        <div class="team">
-          <article class="card card--dark person reveal">
-            <div class="photo"><img src="assets/photos/anton-vattay.jpg" width="150" height="150" loading="lazy" decoding="async" alt="Portrait of Anton Vattay"></div>
-            <div>
-              <h3>Anton Vattay</h3>
-              <p class="role">Co-founder · CTO · Research</p>
-            </div>
-            <ul>
-              <li>20 years of engineering</li>
-              <li>Vision AI at Toren AI and VEDO</li>
-              <li>Brain-inspired computer vision</li>
-              <li>Model training and deployment</li>
-            </ul>
-          </article>
-          <article class="card person reveal d1">
-            <div class="photo"><img src="assets/photos/diana-schaffer.jpg" width="150" height="150" loading="lazy" decoding="async" alt="Portrait of Dr. Diana Schaffer"></div>
-            <div>
-              <h3>Dr. Diana Schaffer</h3>
-              <p class="role">Co-founder · CEO</p>
-            </div>
-            <ul>
-              <li>Clinical psychologist, PhD; studied computer science</li>
-              <li>10+ years of clinical practice</li>
-              <li>Organisational development, built high-performance teams</li>
-              <li>Former CEO of a medical center</li>
-            </ul>
-          </article>
-        </div>
-        <div class="story">
-          <h3 class="reveal">How we got here</h3>
-          <ol class="timeline">
-            <li class="reveal"><span class="num">I.</span>People reason in pictures: we follow, fit and compare shapes without a word.</li>
-            <li class="reveal d1"><span class="num">II.</span>LLMs describe images brilliantly, then get the space in them wrong.</li>
-            <li class="reveal d2"><span class="num">III.</span>Anton had met the same blind spot throughout his years in computer vision.</li>
-            <li class="reveal d3"><span class="num">IV.</span>sehn.ai: give AI the non-verbal reasoning it is missing.</li>
-          </ol>
-        </div>
-      </div>
-    </section>
-
-    <!-- Contact / API key -->
-    <section class="section section--plum contact" id="contact" aria-labelledby="contact-title">
-      <div class="edge edge--top" aria-hidden="true"></div>
-      <div class="wrap contact__grid">
-        <div class="reveal">
-          <p class="eyebrow" data-n="VIII">Early access</p>
+    <!-- V. Early access, at rest by the capillary -->
+    <section class="cap-row" id="contact" data-u="0.9" data-at="0.4" aria-labelledby="contact-title">
+      <div class="cap cap--plum" data-kz>
+        <div class="wrap">
+          <p class="eyebrow" data-n="V">Early access</p>
           <h2 id="contact-title">Every AI that sees should see like we do.</h2>
-          <p class="lead">sehn.ai is in early access. Tell us what your agent should see, and we’ll send you an API key to try it.</p>
-          <p class="contact__direct"><a href="mailto:anton@mindsprings.ai">anton@mindsprings.ai</a> <a href="mailto:diana@mindsprings.ai">diana@mindsprings.ai</a></p>
-          <p class="note" style="margin-top:28px" aria-hidden="true">we read every one<svg viewBox="0 0 46 30" style="transform:rotate(-10deg)"><use href="#arrow"/></svg></p>
+          <p>Tell us what your agent should see, and we’ll send you an API key to try it.</p>
+          <p class="cap-small">For robots finding their way, engineering drawings, image and video generation, live avatars and live video.</p>
+          <p class="cap-small">sehn means “to see” in Austrian German. We are Anton Vattay (research) and Dr. Diana Schaffer, at Mindsprings: <a href="mailto:anton@mindsprings.ai">anton@mindsprings.ai</a> · <a href="mailto:diana@mindsprings.ai">diana@mindsprings.ai</a></p>
         </div>
+      </div>
+      <div class="cap-card">
         <form class="index-card reveal d2" id="key-form" novalidate>
           <span class="tape" aria-hidden="true"></span>
           <h3>Ask for an API key</h3>
@@ -721,7 +498,6 @@
           <small><i aria-hidden="true">*</i> required. We use your details only to reply and set up your access (<a href="imprint.html#requests">privacy</a>).</small>
         </form>
       </div>
-      <div class="edge edge--bottom-night" aria-hidden="true"></div>
     </section>
 
   </main>
@@ -759,20 +535,19 @@
     <p class="why">After S. Grossberg, <a href="https://doi.org/10.3389/fnsys.2021.650263">A canonical laminar neocortical circuit</a> (2021) and <a href="https://doi.org/10.3389/fpsyg.2015.02054">Cortical dynamics of figure-ground separation</a> (2016), and the plates of Cajal’s <i>Estudios sobre la corteza cerebral humana</i> (1899).</p>
   </details>
 
-  <!-- Plate III, folded: point at a line and its part of the circuit is picked out in the wood -->
+  <!-- Plate III, folded: adaptive resonance -->
   <details class="plate-legend">
-    <summary><b>Explanation of Plate III</b><span>after the laminar models of S. Grossberg</span></summary>
-    <p class="why">The circuit that repeats through every area of the cortex, in the same few layers, wired the same way, and doing grouping, attention and learning at once: not stacked filters, but a loop that settles on a reading of the picture and holds it. Drawn over V2, where it repeats V1’s circuit at a larger scale; in V4, the surfaces fill in. These are the models that started sehn.</p>
+    <summary><b>Explanation of Plate III</b><span>adaptive resonance, after S. Grossberg</span></summary>
+    <p class="why">Perception as a loop: what comes in from the eye, bottom-up, is matched against what is expected, top-down, from categories already learned. A match resonates; a mismatch resets and the search goes on. Learning happens only in resonance, so new things are learned without old ones being forgotten: Grossberg’s answer to the stability–plasticity dilemma, and the reason deep networks, which adjust everything a little at a time, can forget catastrophically.</p>
     <dl>
-      <div data-k="a" tabindex="0"><dt>a</dt><dd><i>input</i>the picture arrives from below, from the LGN into V1 and from V1 into V2, and drives layers IV and VI</dd></div>
-      <div data-k="b" tabindex="0"><dt>b</dt><dd><i>on-centre, off-surround</i>layer VI primes the cells of IV it lines up with and quiets their neighbours: contrast is normalised, and attention acts here</dd></div>
-      <div data-k="c" tabindex="0"><dt>c</dt><dd><i>up to II–III</i>layer IV hands the signal up to the cells that group</dd></div>
-      <div data-k="d" tabindex="0"><dt>d</dt><dd><i>bipole</i>a cell between two others that see the same line fires when both do, though nothing is in front of it, so a boundary completes inward across a gap; one alone is held back, two against one</dd></div>
-      <div data-k="e" tabindex="0"><dt>e</dt><dd><i>folded feedback</i>the grouping chosen in II–III reaches back down to VI and so to IV, holding its own inputs steady: how the cortex learns without forgetting</dd></div>
-      <div data-k="f" tabindex="0"><dt>f</dt><dd><i>on to V4</i>and up to the next area, which repeats the circuit larger again</dd></div>
-      <div data-k="g" tabindex="0"><dt>g</dt><dd><i>filling-in</i>in V4, colour spreads from where it starts, outward and every way, until a boundary holds it: a surface is seen, and a figure stands out from its ground</dd></div>
+      <div data-k="a" tabindex="0"><dt>a</dt><dd><i>bottom-up</i>the features the eye brings, through an adaptive filter, rising</dd></div>
+      <div data-k="b" tabindex="0"><dt>b</dt><dd><i>top-down expectation</i>a learned category reads out what it expects to find</dd></div>
+      <div data-k="c" tabindex="0"><dt>c</dt><dd><i>reset and search</i>when they do not match, the category is set aside and another is tried, or a new one learned</dd></div>
+      <div data-k="d" tabindex="0"><dt>d</dt><dd><i>resonance</i>where they match, the cells synchronise and amplify each other: what we consciously see</dd></div>
+      <div data-k="e" tabindex="0"><dt>e</dt><dd><i>the matching rule</i>an expectation alone only primes; with what comes in it fires (two against one), and what was not expected is quieted</dd></div>
+      <div data-k="f" tabindex="0"><dt>f</dt><dd><i>learning</i>only in resonance do the adaptive weights change: stable, and still able to learn</dd></div>
     </dl>
-    <p class="why">After S. Grossberg, <a href="https://doi.org/10.3389/fnsys.2021.650263">A canonical laminar neocortical circuit</a> (2021), figs. 4–6, and <a href="https://doi.org/10.3389/fpsyg.2015.02054">Cortical dynamics of figure-ground separation</a> (2016), figs. 6–7.</p>
+    <p class="why">After S. Grossberg, <a href="https://doi.org/10.3389/fnsys.2021.650263">A canonical laminar neocortical circuit</a> (2021), figs. 6–8 and 15.</p>
   </details>
 
   <div class="dive-ctl">
