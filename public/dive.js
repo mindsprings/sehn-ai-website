@@ -2696,6 +2696,7 @@
         if (ch.col) drawColour(ch, T, u);
       });
     }
+    drawResonance(cam, now, u);
     drawSnow(cam, now);
   }
   // snow, falling slowly through the wood, near and far
@@ -2796,10 +2797,13 @@
 
   function drawPlate3(cam, now, u) {
     if (!P3) buildPlate3();
-    var s1 = smooth(U_C0 - 0.006, U_C0 + 0.008, u) * (1 - smooth(U_C1 + 0.05, U_V4 - 0.03, u)), s2 = smooth(U_V4, U_V4 + 0.02, u) * (1 - smooth(U_REST - 0.05, U_REST - 0.02, u));
-    var show = Math.round(Math.max(s1, s2) * 100) / 100;
+    var s1 = circuitEl ? smooth(U_C0 - 0.006, U_C0 + 0.008, u) * (1 - smooth(U_C1 + 0.05, U_V4 - 0.03, u)) : 0;
+    var s3 = resEl ? smooth(U_R0 - 0.01, U_R0 + 0.005, u) * (1 - smooth(U_R1 + 0.01, U_R1 + 0.04, u)) : 0;
+    var s2 = smooth(U_V4, U_V4 + 0.02, u) * (1 - smooth(U_REST - 0.05, U_REST - 0.02, u)) * (1 - s3);
+    var show = Math.round(Math.max(s1, s2, s3) * 100) / 100;
+    labelsRes();
     if (SKIP.indexOf('plate') >= 0) show = 0;
-    p3show = s1;
+    p3show = Math.max(s1, s3);
     if (show !== P3.shown) { P3.shown = show; plate3El.style.opacity = show; plate3El.style.visibility = show > 0 ? 'visible' : 'hidden'; }
     'abcdefg'.split('').forEach(function (k) { var e = P3.els[k], f = k === focusK; if (e.f !== f) { e.f = f; e.g.classList.toggle('is-focus', f); } });
     attr(P3.title, 'x', 14); attr(P3.title, 'y', (H - 24).toFixed(0)); attr(P3.title, 'opacity', show);
@@ -2882,6 +2886,141 @@
     }
   }
 
+  // ---------- Plate III, ART: adaptive resonance ----------
+  // Where the page has a pause for it (#resonance), in the golden wood of V4: Grossberg's Adaptive Resonance Theory, the
+  // heart of it. What the eye brings rises from below, up the trunks of the birches it lights; what is expected comes
+  // down from above, from a category already learned. A first guess does not fit: the match fails, the guess is reset,
+  // and the search goes on. The next fits: where what rises and what descends agree, those trees ring together, the
+  // others quiet (the matching rule's off-surround; an expectation alone only primes, two against one); and only
+  // there, in resonance, is anything learned, which is why nothing old is forgotten.
+  var resEl = document.getElementById('resonance'), circuitEl = document.getElementById('circuit');
+  var U_R0 = 0.72, U_R1 = 0.86;
+  if (resEl) CX_AT = [[U_V1, 0], [U_V2, 2.5], [0.66, 4.6], [U_R0, 5.5], [U_R1, 5.8], [U_REST, 6.9], [1, 7.3]];   // all but still while it plays
+  var R_BU = [1, 2, 4, 5], R_A = [0, 3, 6], R_B = [1, 2, 4, 6];   // which of seven trees: what rises, a wrong guess, the right one
+  var RES = { picks: null };
+  function resT(u) { return clamp((u - U_R0) / (U_R1 - U_R0), 0, 1); }
+  function pickRes(cam) {
+    var D = 2, den = D - cam.z, list = (cortex.markBy.Pyr || []).filter(function (m) { return m.D === D && m.Y > L_V && m.Y < L_VI; }), out = [];
+    var x0 = cam.wx + (0.1 * W - C.x) * den / F, x1 = cam.wx + (0.9 * W - C.x) * den / F, step = (x1 - x0) / 7;
+    for (var i = 0; i < 7; i++) {
+      var want = x0 + step * (i + 0.5), best = null, bd = Infinity;
+      list.forEach(function (m) { var d = Math.abs(m.x - want); if (d < bd && d < step * 0.5) { bd = d; best = m; } });
+      out.push(best || { x: want, Y: lerp(L_V, L_VI, 0.4), D: D });
+    }
+    return out;
+  }
+  function has(a, i) { return a.indexOf(i) >= 0; }
+  // a soft light along a line, added to what is there
+  function glowLine(x0, y0, x1, y1, w, col, a) {
+    if (a <= 0.01) return;
+    ctx.globalAlpha = a; ctx.strokeStyle = col; ctx.lineCap = 'round';
+    [[w * 3.2, 0.25], [w * 1.6, 0.5], [w * 0.7, 1]].forEach(function (s) { ctx.lineWidth = s[0]; ctx.globalAlpha = a * s[1]; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); });
+    ctx.globalAlpha = 1;
+  }
+  function halo(x, y, r, col, a) {
+    if (a <= 0.01) return;
+    var g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, col); g.addColorStop(1, 'rgba(255,220,140,0)');
+    ctx.globalAlpha = a; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); ctx.globalAlpha = 1;
+  }
+  // a thread of expectation coming down from above to a tree's crown and on down its trunk, grown to f; solid once learned
+  function thread(top, soma, f, a, learned) {
+    if (f <= 0 || a <= 0.01) return;
+    var y0 = Math.min(top.y - 0.1 * H, PLATE_TOP), len = soma.y - y0, y1 = Math.min(y0 + len * f, soma.y);
+    ctx.lineCap = 'round';
+    ctx.globalCompositeOperation = 'lighter';   // a glow under it, so it reads against the wood
+    ctx.globalAlpha = a * 0.5; ctx.strokeStyle = 'rgba(255,200,90,.6)'; ctx.lineWidth = learned ? 12 : 9;
+    ctx.beginPath(); ctx.moveTo(top.x, y0); ctx.lineTo(top.x, y1); ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = a; ctx.strokeStyle = learned ? '#D9A23C' : '#E9B648'; ctx.lineWidth = learned ? 4 : 3;
+    ctx.setLineDash(learned ? [] : [3, 6]);
+    ctx.beginPath(); ctx.moveTo(top.x, y0); ctx.lineTo(top.x, y1); ctx.stroke();
+    ctx.setLineDash([]);
+    if (f < 1) halo(top.x, y1, 10, 'rgba(255,226,140,1)', a);   // its head, coming down
+    if (learned) { ctx.fillStyle = '#E8B547'; ctx.beginPath(); ctx.arc(top.x, top.y, 5, Math.PI, TAU); ctx.fill(); }   // the learned trace, Grossberg's half-disc
+    ctx.globalAlpha = 1;
+  }
+  function drawResonance(cam, now, u) {
+    if (!resEl) return;
+    var on = smooth(U_R0 - 0.01, U_R0 + 0.005, u) * (1 - smooth(U_R1 + 0.01, U_R1 + 0.04, u));
+    if (on <= 0) { RES.picks = null; return; }
+    if (!RES.picks) RES.picks = pickRes(cam);
+    var t = reduce ? 1 : resT(u), i, T = [];
+    for (i = 0; i < 7; i++) {
+      var m = RES.picks[i], b = proj(m.x, WM + 0.02, m.D, cam), bx = b.x, by = b.y, sm = proj(m.x, m.Y, m.D, cam), sx = sm.x, sy = sm.y, tp = proj(m.x, PIA + 0.06, m.D, cam);
+      T.push({ base: { x: bx, y: by }, soma: { x: sx, y: sy }, top: { x: tp.x, y: tp.y } });
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var bu = smooth(0.02, 0.12, t), aIn = smooth(0.22, 0.33, t), aOut = smooth(0.38, 0.41, t), bIn = smooth(0.43, 0.56, t), res = smooth(0.6, 0.68, t), learn = smooth(0.84, 0.92, t);
+    var beat = 0.65 + 0.35 * Math.sin(now * 0.0125);   // ringing together, all in time
+    // the off-surround: what rose without being expected is quieted
+    if (res > 0) for (i = 0; i < 7; i++) if (has(R_BU, i) && !has(R_B, i)) {
+      var qx = T[i].soma.x, qy = (T[i].top.y + T[i].base.y) / 2, qh = (T[i].base.y - T[i].top.y) * 0.6, sg = ctx.createRadialGradient(qx, qy, 0, qx, qy, qh);
+      sg.addColorStop(0, 'rgba(48,52,64,.42)'); sg.addColorStop(0.5, 'rgba(48,52,64,.24)'); sg.addColorStop(1, 'rgba(48,52,64,0)');
+      ctx.save(); ctx.translate(qx, qy); ctx.scale(0.22, 1); ctx.translate(-qx, -qy);   // a soft, tall shade over the tree
+      ctx.globalAlpha = res * on; ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(qx, qy, qh, 0, TAU); ctx.fill(); ctx.restore(); ctx.globalAlpha = 1;
+    }
+    ctx.globalCompositeOperation = 'lighter';
+    for (i = 0; i < 7; i++) {
+      var q = T[i], up = has(R_BU, i), match = has(R_B, i) && up, quiet = up && !has(R_B, i) ? 1 - 0.75 * res : 1;
+      // bottom-up: light running up the trunk
+      if (up) {
+        // (up the whole tree: in by the foot, through the body, up the trunk to the crown)
+        glowLine(q.base.x, q.base.y, q.soma.x, q.soma.y, 3, 'rgba(255,236,190,1)', 0.6 * bu * on * quiet);
+        glowLine(q.soma.x, q.soma.y, q.top.x, q.top.y, 2.4, 'rgba(255,236,190,1)', 0.45 * bu * on * quiet);
+        for (var k = 0; k < 4; k++) {
+          var f = (now * 0.00035 + k / 4 + i * 0.17) % 1, px = lerp(q.base.x, q.top.x, f), py = lerp(q.base.y, q.top.y, f);
+          halo(px, py, 12, 'rgba(255,244,214,1)', bu * on * quiet * Math.sin(Math.PI * f));
+        }
+      }
+      // resonance: the matched trees ring, crown to foot
+      if (match && res > 0) {
+        glowLine(q.soma.x, q.soma.y, q.top.x, q.top.y, 3, 'rgba(255,214,120,1)', 0.55 * res * beat * on);
+        halo(q.soma.x, q.soma.y, 0.045 * H, 'rgba(255,226,150,1)', 0.75 * res * beat * on);
+        halo(q.top.x, q.top.y + 0.02 * H, 0.08 * H, 'rgba(255,214,110,1)', 0.5 * res * beat * on);
+      }
+      // expected but not seen: primed, not lit
+      if (has(R_B, i) && !up && res > 0) halo(q.soma.x, q.soma.y, 0.03 * H, 'rgba(255,226,150,1)', 0.22 * res * on);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    // the guesses, coming down
+    for (i = 0; i < 7; i++) {
+      if (has(R_A, i)) thread(T[i].top, T[i].soma, aIn, on * (1 - aOut) * (t > 0.33 && t < 0.4 ? 0.55 + 0.45 * Math.sin(now * 0.05) : 1), false);
+      if (has(R_B, i)) thread(T[i].top, T[i].soma, bIn, on, learn > 0.5 && has(R_BU, i));
+    }
+    // the reset: a flash, as the wrong guess is dropped
+    var fl = smooth(0.38, 0.4, t) * (1 - smooth(0.4, 0.45, t));
+    if (fl > 0) cover('#FFF6E0', 0.28 * fl * on);
+    RES.T = T; RES.t = t; RES.on = on;
+  }
+  // its lettering, in Plate III's layer
+  var RES_LABELS = [['a', 'what the eye brings, rising', 0.04, 1], ['b', 'what is expected, coming down', 0.24, 0.42], ['c', 'no match: reset, and search on', 0.35, 0.5],
+    ['b', 'another expectation', 0.45, 0.62], ['d', 'a match: they resonate, ringing together', 0.63, 1], ['e', 'the rest is quieted', 0.68, 1], ['f', 'and only now is anything learned', 0.86, 1]];
+  function labelsRes() {
+    if (!P3.res) {
+      P3.res = RES_LABELS.map(function (L) {
+        var tx = svgEl('text', 'lab', plate3El);
+        svgEl('tspan', 'k', tx).textContent = L[0] + '. ';
+        svgEl('tspan', '', tx).textContent = L[1];
+        return tx;
+      });
+    }
+    var T = RES.T, t = RES.t || 0, on = resEl && RES.on ? RES.on : 0;
+    P3.res.forEach(function (tx, j) {
+      var L = RES_LABELS[j], a = on * smooth(L[2], L[2] + 0.04, t) * (1 - smooth(L[3], L[3] + 0.04, t)), x = 0, y = 0;
+      if (T && a > 0) {
+        var q = j === 0 ? T[1] : j === 1 || j === 2 ? T[3] : j === 3 ? T[6] : j === 4 ? T[2] : j === 5 ? T[5] : T[4];
+        if (j === 0) { x = q.soma.x + 16; y = lerp(q.soma.y, q.base.y, 0.5); }
+        else if (j < 4) { x = q.top.x + 12; y = q.top.y - 0.12 * H; }
+        else if (j === 4) { x = q.top.x + 14; y = q.top.y + 0.05 * H; }
+        else if (j === 5) { x = q.soma.x + 14; y = q.soma.y + 0.06 * H; }
+        else { x = q.top.x + 12; y = q.top.y - 0.06 * H; }
+        x = Math.min(x, W - 300); y = clamp(y, PLATE_TOP + 24, H - 40);
+      }
+      attr(tx, 'x', x.toFixed(1)); attr(tx, 'y', y.toFixed(1)); attr(tx, 'opacity', Math.round(a * 100) / 100);
+    });
+  }
+
   // ---------- render ----------
   function render(now) {
     if (p < 1 + U_RISE) hidePlate3();
@@ -2934,6 +3073,9 @@
   // journey after it carries the camera on to the cortex, and from there each part of the page has its place in it.
   var journeyEl = document.getElementById('journey');
   var STOPS = [['how', 0.85, U_V1], ['model', 0.4, U_V2], ['circuit', 0.35, U_C0], ['evidence', 0.75, U_C1], ['markets', 0.4, U_V4], ['contact', 0.4, U_REST]];
+  // (a page can set its own: data-u, where in the way on an element comes in, and data-at, how far up the screen then)
+  var pageStops = document.querySelectorAll('[data-u]');
+  if (pageStops.length) STOPS = Array.prototype.map.call(pageStops, function (el) { return [el, parseFloat(el.getAttribute('data-at') || 0.5), parseFloat(el.getAttribute('data-u'))]; });
   function docTop(el) { return el.getBoundingClientRect().top + window.scrollY; }
   function legendEnd(el, vh) { var sum = el.querySelector('summary'); return docTop(sum) + sum.offsetHeight + 28 - vh; }
   function scrollP() {
@@ -2944,7 +3086,7 @@
     if (!journeyEl || y <= max) return P_REST + (1 - P_REST) * clamp((y - end) / Math.max(1, max - end), 0, 1);
     // the way on: from one stop to the next, each where a part of the page comes in
     var stops = [[Math.max(max, docTop(journeyEl) - vh * 0.6), 0]], last = document.documentElement.scrollHeight - vh, i, el;
-    STOPS.forEach(function (s) { if ((el = document.getElementById(s[0]))) stops.push([docTop(el) - vh * s[1], s[2]]); });
+    STOPS.forEach(function (s) { if ((el = typeof s[0] === 'string' ? document.getElementById(s[0]) : s[0])) stops.push([docTop(el) - vh * s[1], s[2]]); });
     if (legends.length > 1) last = Math.min(last, legendEnd(legends[legends.length - 1], vh));
     stops.push([last, 1]);
     for (i = 1; i < stops.length; i++) stops[i][0] = Math.max(stops[i][0], stops[i - 1][0] + 1);
@@ -3210,9 +3352,9 @@
   // All of it follows one number (--kzt), moved on with time once the panel comes up the screen, and with the scroll
   // when that is faster: however quickly we go, it is done by the time the panel reaches the top quarter.
   (function () {
-    var NS = 'http://www.w3.org/2000/svg', panels = [];
-    ['model', 'evidence', 'markets', 'name', 'team', 'contact'].forEach(function (id) {
-      var sec = document.getElementById(id), wrap = sec && sec.querySelector(':scope > .wrap');
+    var NS = 'http://www.w3.org/2000/svg', panels = [], named = document.querySelectorAll('[data-kz]');   // (a page may name its own)
+    (named.length ? Array.prototype.slice.call(named) : ['model', 'evidence', 'markets', 'name', 'team', 'contact']).forEach(function (id) {
+      var sec = typeof id === 'string' ? document.getElementById(id) : id, wrap = sec && sec.querySelector(':scope > .wrap');
       if (!wrap) return;
       sec.classList.add('kz');
       var svg = document.createElementNS(NS, 'svg');
