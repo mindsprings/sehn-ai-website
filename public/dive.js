@@ -2890,7 +2890,7 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     rollC = 1; rollS = 0;
-    if (p < P_PUPIL) { hidePlate(); drawEye(eyeCam(p), now); return; }
+    if (p < P_PUPIL) { hidePlate(); drawEye(eyeCam(p + (P_DIVE + 0.024 - p) * root.tease), now); return; }
     if (p < P_CUT) { hidePlate(); drawFall(fallCam(p)); return; }
     var u = p - 1;
     if (u >= U_DARK && u < U_RISE) { hidePlate(); drawWay(u, now); return; }
@@ -2918,7 +2918,7 @@
   }
 
   // ---------- update: scroll, pointer, the eye's own life ----------
-  var root = {}, heroCopy = document.getElementById('hero-copy'), flatBox = document.getElementById('dive-flat'), paperEl = document.querySelector('.paper');
+  var root = { tease: 0 }, cueEl = document.getElementById('cue'), cueText = cueEl && cueEl.querySelector('span'), heroCopy = document.getElementById('hero-copy'), flatBox = document.getElementById('dive-flat'), paperEl = document.querySelector('.paper');
   var track = document.querySelector('.track');
   var flatBtn = document.getElementById('flat'), bareBox = document.getElementById('dive-bare'), bareBtn = document.getElementById('bare'), bare = false;
   function fade(el, v) {
@@ -2993,6 +2993,17 @@
       iris.tx = Math.cos(a) * MAX_X * kk; iris.ty = Math.sin(a) * MAX_Y * kk;
       iris.wanderAt = now + 1600 + Math.random() * 1800;
     }
+    // Beckoning. Whenever we stop on the way in, before the forest, the cue says to keep scrolling; and at the very top,
+    // left alone a few seconds, the eye glances down at it and the camera leans in towards the pupil and back, a taste of
+    // what scrolling does. (Someone on a phone once scrolled a little, met the cookie question, and never went in.)
+    var idle = now - lastInput, top = p < 0.008;
+    if (cueEl) {
+      if (cueText && cueText._top !== top) { cueText._top = top; cueText.textContent = top ? 'scroll to look inside' : 'keep scrolling'; }
+      fade(cueEl, fixedP == null && p < P_CUT - 0.02 && (top || idle > 1600) ? 1 : 0);
+    }
+    var phase = (idle - 3500) % 6500 / 1700, tz = !reduce && fixedP == null && top && idle > 3500 && phase < 1 ? Math.sin(Math.PI * phase) : 0;
+    root.tease += (tz - root.tease) * (1 - Math.exp(-dt * 8));
+    if (root.tease > 0.01) { iris.tx *= 1 - root.tease; iris.ty = lerp(iris.ty, MAX_Y, root.tease); }
     var look = 1 - smooth(0.02, 0.08, p), ki = reduce || fixedPtr ? 1 : 1 - Math.exp(-dt * 7);   // diving in, it looks straight at us
     iris.x += (iris.tx * look - iris.x) * ki;
     iris.y += (iris.ty * look - iris.y) * ki;
@@ -3004,8 +3015,9 @@
     blink.v = bt >= 0 && bt <= 1 ? Math.sin(Math.PI * bt) : 0;
 
     fade(heroCopy, 1 - smooth(0.008, 0.045, p));
-    var diving = p > 0.045;   // the headline has gone (a phone asks about cookies only then)
+    var diving = p > 0.045, arrived = p > P_REST - 0.01;   // the headline has gone; we are in the forest (a phone asks about cookies only then)
     if (diving !== root.diving) { root.diving = diving; document.documentElement.classList.toggle('diving', diving); }
+    if (arrived !== root.arrived) { root.arrived = arrived; document.documentElement.classList.toggle('arrived', arrived); }
     fade(paperEl, smooth(P_PUPIL, P_GLOW + 0.03, p));
     // once in the forest, the page can be lifted off it; the flattening only while the scene is in full view: the
     // forest before the page comes over it, the way on to the cortex (or anywhere, bare)
