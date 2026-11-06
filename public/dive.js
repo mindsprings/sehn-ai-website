@@ -2993,13 +2993,15 @@
       iris.tx = Math.cos(a) * MAX_X * kk; iris.ty = Math.sin(a) * MAX_Y * kk;
       iris.wanderAt = now + 1600 + Math.random() * 1800;
     }
-    // Beckoning. Whenever we stop on the way in, before the forest, the cue says to keep scrolling; and at the very top,
+    // Beckoning. Whenever we stop where no page is over the scene (on the way in, on the journey, in Plate III's pause),
+    // the cue says to keep scrolling; and at the very top,
     // left alone a few seconds, the eye glances down at it and the camera leans in towards the pupil and back, a taste of
     // what scrolling does. (Someone on a phone once scrolled a little, met the cookie question, and never went in.)
     var idle = now - lastInput, top = p < 0.008;
     if (cueEl) {
       if (cueText && cueText._top !== top) { cueText._top = top; cueText.textContent = top ? 'scroll to look inside' : 'keep scrolling'; }
-      fade(cueEl, fixedP == null && p < P_CUT - 0.02 && (top || idle > 1600) ? 1 : 0);
+      var bare2 = p < P_CUT - 0.02 || (p > 1 + U_DARK && p < 1 + U_V1 - 0.03) || (p > 1 + U_C0 && p < 1 + U_C1 - 0.01);   // no page over the scene: the way in, the journey, the pause
+      fade(cueEl, fixedP == null && bare2 && (top || idle > 1600) ? 1 : 0);
     }
     var phase = (idle - 3500) % 6500 / 1700, tz = !reduce && fixedP == null && top && idle > 3500 && phase < 1 ? Math.sin(Math.PI * phase) : 0;
     root.tease += (tz - root.tease) * (1 - Math.exp(-dt * 8));
