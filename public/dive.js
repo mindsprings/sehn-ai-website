@@ -112,6 +112,19 @@
     }
     taper(this.cur(), pts);
     for (var i = 0; i < pts.length; i++) this.fit(pts[i][0], pts[i][1], pts[i][2]);
+    if (this.halo) this.halo.grown(pts);
+  };
+  // An ink's halo: the same shapes, grown by w all round, to fill in a darker colour under them as their outline
+  // (what stroking their outlines twice as wide, then filling them, would show; much faster to draw).
+  Ink.prototype.addHalo = function (w) { this.halo = new Ink(); this.halo.by = w; return this.halo; };
+  Ink.prototype.grown = function (pts) {
+    var w = this.by, n = pts.length, out = pts.map(function (q) { return [q[0], q[1], q[2] + w]; });
+    // flat ends stand out by w too (a pointed one does not: the outline's corner there is cut off)
+    function end(a, b) { var dx = a[0] - b[0], dy = a[1] - b[1], d = Math.hypot(dx, dy) || 1; return [a[0] + dx / d * w, a[1] + dy / d * w, a[2] + w]; }
+    if (pts[0][2] > 0) out.unshift(end(pts[0], pts[1]));
+    if (pts[n - 1][2] > 0) out.push(end(pts[n - 1], pts[n - 2]));
+    taper(this.cur(), out);
+    for (var i = 0; i < out.length; i++) this.fit(out[i][0], out[i][1], out[i][2]);
   };
   // a rounded cell body, drawn out towards ang
   Ink.prototype.blob = function (x, y, r, ang, point) {
@@ -142,6 +155,39 @@
     P.moveTo(x + r, y);
     P.arc(x, y, r, 0, TAU, true);
     this.fit(x, y, r);
+    if (this.halo) this.halo.dot(x, y, r + this.halo.by);
+  };
+  // Outlines as fills. Stroking thousands of little outlines every frame is slow (on a GPU most of all); the band a
+  // stroke of width 2h would cover is filled instead: between two outlines, h out and h in, wound opposite ways.
+  // The outline of a dot:
+  Ink.prototype.ring = function (x, y, r, h) {
+    var P = this.cur();
+    P.moveTo(x + r + h, y); P.arc(x, y, r + h, 0, TAU, false);
+    P.moveTo(x + r - h, y); P.arc(x, y, r - h, 0, TAU, true);
+    this.fit(x, y, r + h);
+  };
+  // and of a pillow: round, through the midpoints of a polygon's sides, its corners pts as the curves' controls
+  // (closed, so each curve meets the next along the side between them). Each curve, offset, is another such curve:
+  // its ends moved out along the side's normal, its control where the two sides, moved out, meet.
+  Ink.prototype.pillowRim = function (pts, h) {
+    var n = pts.length, P = this.cur(), i, area = 0, side = [];
+    for (i = 0; i < n; i++) { var a = pts[i], b = pts[(i + 1) % n]; area += a[0] * b[1] - b[0] * a[1]; }
+    var out = area > 0 ? 1 : -1;   // which way is outward, for this winding
+    for (i = 0; i < n; i++) {
+      var p = pts[i], q = pts[(i + 1) % n], dx = q[0] - p[0], dy = q[1] - p[1], d = Math.hypot(dx, dy) || 1;
+      side.push({ mx: (p[0] + q[0]) / 2, my: (p[1] + q[1]) / 2, nx: dy / d * out, ny: -dx / d * out });
+    }
+    function at(k, s) {   // the side k's midpoint, and corner k's control (between sides k - 1 and k), offset by s
+      var A = side[(k + n - 1) % n], B = side[k], m = 1 + A.nx * B.nx + A.ny * B.ny;
+      return [B.mx + B.nx * s, B.my + B.ny * s, pts[k][0] + (A.nx + B.nx) / m * s, pts[k][1] + (A.ny + B.ny) / m * s];
+    }
+    var k, m0 = at(n - 1, h);
+    P.moveTo(m0[0], m0[1]);
+    for (k = 0; k < n; k++) { var c = at(k, h); P.quadraticCurveTo(c[2], c[3], c[0], c[1]); }
+    m0 = at(n - 1, -h);   // and back the other way, h in
+    P.moveTo(m0[0], m0[1]);
+    for (k = n - 1; k >= 0; k--) { var c2 = at(k, -h), e = at((k + n - 1) % n, -h); P.quadraticCurveTo(c2[2], c2[3], e[0], e[1]); }
+    for (k = 0; k < n; k++) this.fit(pts[k][0], pts[k][1], h * 3);
   };
   Ink.prototype.hex = function (x, y, r, a) {
     var P = this.cur();
@@ -500,15 +546,15 @@
     for (var i = 0; i < items.length; i++) {
       var it = items[i], b = it.box;
       if (b && (b[2] * T.s + T.tx < -pad || b[0] * T.s + T.tx > W + pad || b[3] * T.s + T.ty < -pad || b[1] * T.s + T.ty > H + pad)) continue;
-      ctx.globalAlpha = (it.a == null ? 1 : it.a) * mult;
+      var ga = (it.a == null ? 1 : it.a) * mult;
+      if (!(ga > 0)) continue;
+      ctx.globalAlpha = ga;
       if (it.comp) ctx.globalCompositeOperation = it.comp;
       if (it.img) ctx.drawImage(it.img, b[0], b[1], b[2] - b[0], b[3] - b[1]);
-      else if (it.under) {   // the outline under the fill: only the outside of the whole shape shows, not where its strokes overlap
-        ctx.strokeStyle = it.stroke; ctx.lineWidth = it.lw * 2; ctx.stroke(it.path);
-        ctx.fillStyle = it.fill; ctx.fill(it.path);
-      } else {
+      else {
         if (it.fill) { ctx.fillStyle = it.fill; ctx.fill(it.path); }
-        if (it.stroke) { ctx.strokeStyle = it.stroke; ctx.lineWidth = it.lw; ctx.stroke(it.path); }
+        if (it.rim) { ctx.fillStyle = it.edge; ctx.fill(it.rim); }   // its outline, made as a fill (see Ink.ring)
+        else if (it.stroke) { ctx.strokeStyle = it.stroke; ctx.lineWidth = it.lw; ctx.stroke(it.path); }
       }
       if (it.comp) ctx.globalCompositeOperation = 'source-over';
     }
@@ -685,7 +731,7 @@
 
   // An organic honeycomb: a hex lattice whose corners are nudged (each corner once, so neighbours still meet),
   // its cells drawn as soft pillows set a little apart, so you see down between them, each with its nucleus.
-  function honeycomb(rnd, R, s, jit) {
+  function honeycomb(rnd, R, s, jit, rim) {   // (rim: the width of an outline round each cell, as a fill)
     var tiles = {}, n = Math.ceil(R / s) + 2, ts = R / 6, cr = s / Math.sqrt(3), i, j, c;
     function nudge(x, y) {   // the same corner always moves the same way, whichever cell asks
       var h = Math.sin(Math.round(x * 1e4) * 12.9898 + Math.round(y * 1e4) * 78.233) * 43758.5453, f = h - Math.floor(h);
@@ -697,16 +743,17 @@
         var cx = (i + (j & 1 ? 0.5 : 0)) * s, cy = j * s * 0.866;
         if (rnd() < smooth(R * 0.45, R, Math.hypot(cx, cy))) continue;
         var key = Math.floor(cx / ts) + ':' + Math.floor(cy / ts);
-        var t = tiles[key] || (tiles[key] = { cells: [new Ink(), new Ink(), new Ink()], nuc: new Ink() }), pts = [];
+        var t = tiles[key] || (tiles[key] = { cells: [new Ink(), new Ink(), new Ink()], rims: [new Ink(), new Ink(), new Ink()], nuc: new Ink() }), pts = [];
         for (c = 0; c < 6; c++) {
           var a = Math.PI / 6 + c / 6 * TAU, q = nudge(cx + Math.cos(a) * cr, cy + Math.sin(a) * cr), inset = 0.84 + rnd() * 0.06;
           pts.push([lerp(cx, q[0], inset), lerp(cy, q[1], inset)]);
         }
-        var ink = t.cells[Math.floor(rnd() * 3)], P = ink.cur();
+        var sh = Math.floor(rnd() * 3), ink = t.cells[sh], P = ink.cur();
         P.moveTo((pts[5][0] + pts[0][0]) / 2, (pts[5][1] + pts[0][1]) / 2);
         for (c = 0; c < 6; c++) { var nx = pts[(c + 1) % 6]; P.quadraticCurveTo(pts[c][0], pts[c][1], (pts[c][0] + nx[0]) / 2, (pts[c][1] + nx[1]) / 2); }
         P.closePath();
         ink.fit(cx, cy, cr * 1.2);
+        if (rim) t.rims[sh].pillowRim(pts, rim / 2);
         if (rnd() < 0.8) t.nuc.dot(cx + (rnd() - 0.5) * s * 0.25, cy + (rnd() - 0.5) * s * 0.25, s * (0.11 + rnd() * 0.06));
       }
     }
@@ -753,8 +800,8 @@
 
     // the middle layer's cell bodies, packed like bubbles, see-through
     L = layer(0.15, 0.005);
-    scatter(rnd, 0.42, 0.0115, 0.5, function (ink, x, y) { ink.dot(x, y, 0.0042 + rnd() * 0.0016); })
-      .forEach(function (t) { L.items.push({ path: t.path, fill: 'rgba(150,70,40,.16)', stroke: 'rgba(74,34,38,.6)', lw: 0.0011, box: t.box }); });
+    scatter(rnd, 0.42, 0.0115, 0.5, function (ink, x, y) { var r = 0.0042 + rnd() * 0.0016; ink.dot(x, y, r); (ink.rim = ink.rim || new Ink()).ring(x, y, r, 0.00055); })
+      .forEach(function (t) { L.items.push({ path: t.path, fill: 'rgba(150,70,40,.16)', rim: t.rim.path, edge: 'rgba(74,34,38,.6)', box: t.rim.box }); });
     list.push(L);
 
     // the amacrine cells' lace
@@ -769,8 +816,8 @@
     // the roof: an organic honeycomb of ganglion cells, see-through, in three shades, each with its nucleus
     L = layer(ROOF_H, 0.009);
     var cells = [], nuclei = [], shades = ['rgba(110,40,58,.24)', 'rgba(88,30,48,.34)', 'rgba(132,54,72,.17)'];
-    honeycomb(rnd, 0.5, 0.02, 0.22).forEach(function (t) {
-      t.cells.forEach(function (ink, c) { if (isFinite(ink.box[0])) cells.push({ path: ink.path, fill: shades[c], stroke: 'rgba(62,20,34,.5)', lw: 0.0009, box: ink.box }); });
+    honeycomb(rnd, 0.5, 0.02, 0.22, 0.0009).forEach(function (t) {
+      t.cells.forEach(function (ink, c) { if (isFinite(ink.box[0])) cells.push({ path: ink.path, fill: shades[c], rim: t.rims[c].path, edge: 'rgba(62,20,34,.5)', box: ink.box }); });
       if (isFinite(t.nuc.box[0])) nuclei.push({ path: t.nuc.path, fill: 'rgba(58,18,32,.5)', box: t.nuc.box });
     });
     L.items = cells.concat(nuclei);
@@ -801,7 +848,7 @@
     g = ctx.createRadialGradient(BLIND.x, BLIND.y, 0, BLIND.x, BLIND.y, 0.16);
     g.addColorStop(0, '#FFF8E6'); g.addColorStop(0.25, '#FCEBB8'); g.addColorStop(0.6, '#F6D27E'); g.addColorStop(0.8, '#E9A548'); g.addColorStop(1, 'rgba(225,140,60,0)');
     L.items.push({ path: circle(BLIND.x, BLIND.y, 0.16), fill: g, box: [BLIND.x - 0.16, BLIND.y - 0.16, BLIND.x + 0.16, BLIND.y + 0.16] });
-    var veins = new Ink(), arteries = new Ink();
+    var veins = new Ink(), arteries = new Ink(), veinRim = veins.addHalo(0.003), arteryRim = arteries.addHalo(0.0025);
     var o = { step: 0.008, wiggle: 0.06, taper: 0.82, spread: 0.55, lenK: 0.7, wK: 0.74, depth: 5, side: 0.03, sideK: 0.45, joint: true,
       inside: function (x, y) { var r2 = x * x + y * y; return r2 > 0.02 && r2 < 3; } };   // they keep out of the very middle
     [[-0.42, 0.022, 0.015, veins], [-0.56, 0.024, 0.011, arteries], [0.42, -0.022, 0.015, veins], [0.56, -0.024, 0.011, arteries],
@@ -813,8 +860,9 @@
       grow(v[3], o, rnd, sx, sy, v[0], 0.62, v[2], 0);
     });
     veins.dot(BLIND.x, BLIND.y, 0.016);   // the cup they come out of
-    L.items.push({ path: veins.path, fill: '#8C1626', stroke: '#4A0A14', lw: 0.003, box: veins.box, under: true });
-    L.items.push({ path: arteries.path, fill: '#C3343B', stroke: '#5E0E1C', lw: 0.0025, box: arteries.box, under: true });
+    // each outlined all round (their halos under them), the arteries over the veins
+    L.items.push({ path: veinRim.path, fill: '#4A0A14', box: veinRim.box }, { path: veins.path, fill: '#8C1626', box: veins.box });
+    L.items.push({ path: arteryRim.path, fill: '#5E0E1C', box: arteryRim.box }, { path: arteries.path, fill: '#C3343B', box: arteries.box });
     list.push(L);
 
     // floaters in the vitreous: faint threads and beads, the only things in the dark on the way down
@@ -849,9 +897,28 @@
     return c;
   }
 
+  // While the fall (or the rise out of it to the lake) zooms quickly, it is drawn with fewer pixels, and sharp again
+  // as soon as it slows. Its thousands of shapes are what cost, and they cost about half as much with 0.6 of the
+  // pixels; in the middle of a zoom nobody sees the softness. (How fast: the change in the roof's size, and our
+  // drift across it, in screens per second; the pointer's sway alone never counts.)
+  var ZOOM_LOW = 0.6, zoom = { k: 0, x: 0, y: 0, at: 0, rate: 0, low: false, calm: 0 }, MOTION = q.get('motion') !== '0';
+  function watchZoom(cam) {
+    var now = performance.now(), dt = (now - zoom.at) / 1000, k = cam.c - ROOF_H + 0.002;
+    if (zoom.at && dt > 0 && dt < 0.25) {
+      var r = (Math.abs(Math.log(k / zoom.k)) + Math.hypot(cam.x - zoom.x, cam.y - zoom.y) / k) / dt;
+      zoom.rate += (r - zoom.rate) * (1 - Math.exp(-dt / 0.08));
+    } else zoom.rate = 0;
+    zoom.k = k; zoom.x = cam.x; zoom.y = cam.y; zoom.at = now;
+    if (zoom.rate > 1.2) { zoom.low = MOTION; zoom.calm = 0; }
+    else if (zoom.rate < 0.5) { zoom.calm = zoom.calm || now; if (now - zoom.calm > 150) zoom.low = false; }
+    else zoom.calm = 0;
+  }
+  function stillZoom() { zoom.low = false; zoom.at = 0; zoom.rate = 0; }
+
   // look (on the way out, rising from the roof to the blind spot): how lit (e), how far the vignette opens (f),
   // how dark it still is, and the layers above the roof not fading as we near them
   function drawFall(cam, look) {
+    watchZoom(cam);
     rollC = Math.cos(cam.roll); rollS = Math.sin(cam.roll);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = '#0A0C14';
@@ -2474,7 +2541,7 @@
   // A chunk of a plane: lay out its inks, wash them one at a time, then finish (and in V4, a second cel of colour)
   function chunkSteps(pl, ch) {
     var S = {};
-    function pin(on) { tint = on ? TEX.cool : null; org[0] = on ? -S.box[0] * S.qpx : 0; org[1] = on ? -S.box[1] * S.qpx : 0; }
+    function pin(on, b) { b = b || S.box; tint = on ? TEX.cool : null; org[0] = on ? -b[0] * S.qpx : 0; org[1] = on ? -b[1] * S.qpx : 0; }
     // the brush's state is shared, and another chunk may be painted between two steps of this one
     function inking(on) { wob = S.wob; wobble = on ? 0.32 : 0; minInk = on ? 0.7 / S.qpx : 0; marks = on ? S.marks : null; }
     return [
@@ -2511,15 +2578,30 @@
         if (g.seeds && g.seeds.length) S.colour = [[g.leafA, '#D69A34', 0.15], [g.leafB, '#E6C45E', 0.15], [g.leafC, '#C9707E', 0.15]].filter(function (w) { return isFinite(w[0].box[0]); });
         S.cv = document.createElement('canvas');
         S.cv.width = Math.ceil((S.box[2] - S.box[0]) * S.qpx); S.cv.height = Math.ceil((S.box[3] - S.box[1]) * S.qpx);
-        if (S.colour && S.colour.length) { S.cc = document.createElement('canvas'); S.cc.width = S.cv.width; S.cc.height = S.cv.height; }
+        if (S.colour && S.colour.length) {
+          // the colour's own cel covers only the leaves and their bleed (what its washes touch), on the same pixels as
+          // the chunk's: most of a chunk has no leaves, and every pixel of it is drawn again each frame
+          var q = S.qpx, r = Math.max(0.8, (pl.frame ? 0.02 : 0.008) * q), pad = Math.ceil(r * 2.5 + 2), cb = [Infinity, Infinity, -Infinity, -Infinity];
+          S.colour.forEach(function (w) {
+            var ib = w[0].box;
+            cb[0] = Math.min(cb[0], Math.floor((ib[0] - S.box[0]) * q) - pad); cb[1] = Math.min(cb[1], Math.floor((ib[1] - S.box[1]) * q) - pad);
+            cb[2] = Math.max(cb[2], Math.ceil((ib[2] - S.box[0]) * q) + pad); cb[3] = Math.max(cb[3], Math.ceil((ib[3] - S.box[1]) * q) + pad);
+          });
+          cb = [clamp(cb[0], 0, S.cv.width), clamp(cb[1], 0, S.cv.height), clamp(cb[2], 0, S.cv.width), clamp(cb[3], 0, S.cv.height)];
+          S.cbox = [S.box[0] + cb[0] / q, S.box[1] + cb[1] / q, S.box[0] + cb[2] / q, S.box[1] + cb[3] / q];   // where it is painted
+          // and where it is shown: the chunk's canvas is a whole number of pixels, stretched a little to fit its box
+          var sx = (S.box[2] - S.box[0]) / S.cv.width, sy = (S.box[3] - S.box[1]) / S.cv.height;
+          S.cshow = [S.box[0] + cb[0] * sx, S.box[1] + cb[1] * sy, S.box[0] + cb[2] * sx, S.box[1] + cb[3] * sy];
+          S.cc = document.createElement('canvas'); S.cc.width = Math.max(1, cb[2] - cb[0]); S.cc.height = Math.max(1, cb[3] - cb[1]);
+        }
       },
       function chunkWash() {
         var t0 = performance.now();
-        pin(true);
         while ((S.washes.length || S.colour && S.colour.length) && performance.now() - t0 < 6) {
-          var list = S.washes.length ? S.washes : S.colour, out = S.washes.length ? S.cv : S.cc, w = list[0];
+          var cel = S.washes.length > 0, list = cel ? S.washes : S.colour, out = cel ? S.cv : S.cc, box = cel ? S.box : S.cbox, w = list[0];
+          pin(true, box);   // (the textures stay put on the world, whichever canvas)
           w.strips = w.strips || strips(w[0].box, S.qpx);
-          wash(out, w[0].path, w[1], w[3] || mix(w[1], '#16141A', 0.45), S.qpx, S.box, pl.frame ? 0.02 : w[0] === S.g.gen ? 0.03 : 0.008, w[2], w[0].box, w.strips.shift());
+          wash(out, w[0].path, w[1], w[3] || mix(w[1], '#16141A', 0.45), S.qpx, box, pl.frame ? 0.02 : w[0] === S.g.gen ? 0.03 : 0.008, w[2], w[0].box, w.strips.shift());
           if (!w.strips.length) list.shift();
         }
         pin(false);
@@ -2533,8 +2615,8 @@
           var o2 = S.cv.getContext('2d'); o2.clearRect(0, 0, S.cv.width, S.cv.height); o2.drawImage(bl, 0, 0);
         }
         ch.cel = settle({ img: S.cv, box: S.box });
-        if (S.cc) ch.col = { img: S.cc, box: S.box, w: S.cv.width, h: S.cv.height, qpx: S.qpx, u: -1,
-          seeds: S.g.seeds.map(function (s) { return [s[0], s[1], s[2], U_V4 - 0.05 + (s[0] - V4_AT) * 0.045 + Math.random() * 0.03]; }) };
+        if (S.cc) ch.col = settle({ img: S.cc, box: S.cshow, w: S.cc.width, h: S.cc.height, qpx: S.qpx, u: -1,
+          seeds: S.g.seeds.map(function (s) { return [s[0], s[1], s[2], U_V4 - 0.05 + (s[0] - V4_AT) * 0.045 + Math.random() * 0.03]; }) });
         ch.marks = !pl.frame && pl.D < 5 ? S.marks.map(function (m) { return [m.k, { x: m.x, Y: m.y, D: pl.D }]; }) : [];
         cortex.dirty = true;
         S = {};
@@ -2888,13 +2970,14 @@
   function render(now) {
     if (p < 1 + U_RISE) hidePlate3();
     if (forest) keep(p - 1);
-    useScale(p < P_PUPIL ? dprEye : dprIn);
+    var u = p - 1, falling = p >= P_PUPIL && p < P_CUT || u >= U_DARK && u < U_LAKE;
+    if (!falling) stillZoom();
+    useScale(p < P_PUPIL ? dprEye : falling && zoom.low ? dprIn * ZOOM_LOW : dprIn);   // (see watchZoom)
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     rollC = 1; rollS = 0;
     if (p < P_PUPIL) { hidePlate(); drawEye(eyeCam(p + (P_DIVE + 0.024 - p) * root.tease), now); return; }
     if (p < P_CUT) { hidePlate(); drawFall(fallCam(p)); return; }
-    var u = p - 1;
     if (u >= U_DARK && u < U_RISE) { hidePlate(); drawWay(u, now); return; }
     if (u >= U_RISE) {
       world = cortex;
@@ -3147,7 +3230,7 @@
     // Twice a second, inside the eye, measure what a frame really costs, waiting for the drawing to finish (the
     // time between frames would not do: browsers slow down pages that are not in front). Three slow ones in a row:
     // draw with fewer pixels; a run of quick ones: with more again, up to the budget.
-    if (p >= P_PUPIL && fixedP == null && !forceScale && ++cost.n % 30 === 0) {
+    if (p >= P_PUPIL && fixedP == null && !forceScale && !zoom.low && ++cost.n % 30 === 0) {   // (what it costs sharp)
       flush();
       var c = cost.last = performance.now() - t0;
       cost.slow = c > 15 ? cost.slow + (c > 30 ? 1.5 : 1) : 0;   // very slow ones count for more
