@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="theme-color" content="#16233A" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; form-action 'none'; base-uri 'none'; object-src 'none'"
+    />
+    <title>sehn.ai · Drawing Check</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --night: #0a111d;
+        --panel: #0f1826;
+        --panel-3: #1a2840;
+        --line: #22314a;
+        --line-2: #31445f;
+        --fg: #dde5f0;
+        --muted: #94a2b8;
+        --dim: #63728a;
+        --berry: #8e2f55;
+        --berry-2: #a83a66;
+        --rose: #e7a1b6;
+        --cream: #f5f2ea;
+        --red: #ff6161;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        background: var(--night);
+        color: var(--fg);
+        font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        display: grid;
+        place-items: center;
+        padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+      }
+      main { width: min(400px, 100%); }
+      .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+      .brand img { display: block; height: 30px; width: auto; }
+      .brand .eye { height: 34px; }
+      .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px 20px 20px; }
+      h1 { margin: 0 0 6px; font-size: 20px; font-weight: 600; letter-spacing: 0.01em; }
+      .badge {
+        display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; margin: 0 0 16px;
+        border: 1px solid rgba(231, 161, 182, 0.4); background: rgba(142, 47, 85, 0.25); color: var(--rose);
+        border-radius: 999px; font-size: 11px; font-weight: 500;
+      }
+      .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--rose); }
+      p { margin: 0 0 16px; color: var(--muted); }
+      label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 13px; }
+      input {
+        width: 100%; font: inherit; font-size: 16px; color: var(--fg); background: var(--night);
+        border: 1px solid var(--line-2); border-radius: 8px; padding: 10px 12px; outline: none;
+      }
+      input:focus { border-color: var(--rose); box-shadow: 0 0 0 3px rgba(231, 161, 182, 0.18); }
+      button {
+        margin-top: 12px; width: 100%; font: inherit; font-weight: 600; color: var(--cream); background: var(--berry);
+        border: 1px solid rgba(168, 58, 102, 0.6); border-radius: 8px; padding: 10px; cursor: pointer;
+      }
+      button:hover { background: var(--berry-2); }
+      button:disabled { opacity: 0.6; cursor: wait; }
+      #msg { min-height: 1.5em; margin: 10px 0 0; color: var(--red); font-size: 13px; }
+      #msg.info { color: var(--muted); }
+      .foot { margin-top: 14px; color: var(--dim); font-size: 12px; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="brand">
+        <img class="eye" src="eye.svg" alt="" width="64" height="38" />
+        <img src="wordmark.svg" alt="sehn.ai" width="137" height="30" />
+      </div>
+      <div class="card">
+        <h1 data-t="title">Drawing Check</h1>
+        <span class="badge" data-t="badge">Concept preview · results are illustrative</span>
+        <p data-t="lead">This preview is password protected.</p>
+        <form id="form" hidden>
+          <label for="pw" data-t="label">Password</label>
+          <input id="pw" name="password" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" required />
+          <button id="go" type="submit" data-t="open">Open</button>
+        </form>
+        <p id="msg" role="status" aria-live="polite"></p>
+        <noscript><p>This page needs JavaScript. · Diese Seite braucht JavaScript.</p></noscript>
+      </div>
+      <p class="foot" data-t="foot">Once opened, the preview stays unlocked on this device and also works offline.</p>
+    </main>
+    <script src="gate.js"></script>
+  </body>
+</html>
