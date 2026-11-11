@@ -237,6 +237,31 @@ function precache(state) {
   return precaching;
 }
 
+// Videos: browsers ask for byte ranges, and Safari plays only what comes back as 206 Partial Content. A sealed
+// file can only be decrypted whole, so the last one asked for in ranges stays decrypted for the next range.
+var hot = null; // { id, body }
+function byteRange(header, size) {
+  var m = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+  if (!m || (m[1] === '' && m[2] === '')) return null; // several ranges or not understood: the whole file
+  if (m[1] === '') return { start: Math.max(0, size - Number(m[2])), end: size - 1 };
+  return { start: Number(m[1]), end: m[2] === '' ? size - 1 : Math.min(Number(m[2]), size - 1) };
+}
+function answer(body, type, rangeHeader) {
+  var size = body.byteLength;
+  var headers = { 'Content-Type': type, 'X-Content-Type-Options': 'nosniff', 'Accept-Ranges': 'bytes' };
+  var r = rangeHeader ? byteRange(rangeHeader, size) : null;
+  if (r && (r.start >= size || r.start > r.end)) {
+    return new Response(null, { status: 416, headers: { 'Content-Range': 'bytes */' + size } });
+  }
+  if (r) {
+    headers['Content-Range'] = 'bytes ' + r.start + '-' + r.end + '/' + size;
+    headers['Content-Length'] = String(r.end - r.start + 1);
+    return new Response(body.slice(r.start, r.end + 1), { status: 206, headers: headers });
+  }
+  headers['Content-Length'] = String(size);
+  return new Response(body, { status: 200, headers: headers });
+}
+
 function serve(event, req, rel) {
   var nav = req.mode === 'navigate';
   return manifest(nav)
@@ -249,13 +274,18 @@ function serve(event, req, rel) {
       var path = nav ? 'index.html' : decodeURIComponent(rel);
       var entry = state.m.files[path] || (previous && previous.m.files[path]);
       if (!entry) return fetch(req);
-      return cipher(entry)
-        .then(function (buf) {
-          return open(new Uint8Array(buf), state.key, entry.id);
-        })
+      var range = nav ? null : req.headers.get('range');
+      var plain =
+        range && hot && hot.id === entry.id
+          ? Promise.resolve(hot.body)
+          : cipher(entry).then(function (buf) {
+              return open(new Uint8Array(buf), state.key, entry.id);
+            });
+      return plain
         .then(function (body) {
           if (nav) event.waitUntil(precache(state));
-          return new Response(body, { status: 200, headers: { 'Content-Type': entry.type, 'X-Content-Type-Options': 'nosniff' } });
+          if (range) hot = { id: entry.id, body: body };
+          return answer(body, entry.type, range);
         })
         .catch(function (err) {
           if (nav) return fetch(req);
